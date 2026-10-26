@@ -152,6 +152,7 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .shake { animation: shake .35s; }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 .kbd { font: 600 11px var(--font-mono); color: var(--dim); }
+.vignette { white-space: pre-line; font-size: 15.5px; line-height: 1.7; max-width: 72ch; }
 
 /* ---------- nghĩa trang ---------- */
 .graves { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -1209,7 +1210,7 @@ function viewER() {
   const E = S.er || (S.er = {});
   if (E.case) return erPlay(E);
   const subs = subjectList().filter((s) => qs(s.code).length >= 3);
-  const head = `<h1>Phòng cấp cứu</h1><p class="muted">Claude dựng một ca lâm sàng nhập vai từ các câu đề cũ của một bài (ưu tiên câu bạn hay sai). Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
+  const head = `<h1>Phòng cấp cứu</h1><p class="muted">Claude viết một ca tình huống dài kiểu đề thi (bệnh sử, khám, cận lâm sàng, chi tiết gây nhiễu) từ các câu đề và thẻ của một bài, ưu tiên câu bạn hay sai, bám theo bài soạn. Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
   if (!subs.length) return head + `<div class="empty"><h2>Chưa đủ chất liệu</h2><p class="muted">Cần ít nhất 3 câu đề trong một môn để dựng ca.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề</button></div>`;
   if (!S.sample) return head + `<div class="empty"><p class="muted">Trang chưa được phép dùng Claude nên chưa dựng ca được.</p></div>`;
   const code = E.code && S.subjects[E.code] ? E.code : subs[0].code;
@@ -1220,7 +1221,7 @@ function viewER() {
       <label class="field" style="flex:1;min-width:180px">Bài<select id="e-lesson"><option value="">Trộn cả môn</option>${lessons.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></label>
     </div>
     <div class="row"><button class="btn red big" ${E.loading ? "disabled" : ""}>${E.loading ? "Xe cấp cứu đang tới…" : "🚑 Gọi xe cấp cứu"}</button>${E.saved ? `<button type="button" class="btn" data-act="er-replay">Chơi lại ca đã lưu</button>` : ""}</div>
-    ${E.loading ? `<p class="note mono" id="er-log">Claude đang viết kịch bản ca (30–90 giây)…</p>` : ""}
+    ${E.loading ? `<p class="note mono" id="er-log">Claude đang viết ca tình huống dài kiểu đề thi (thường 1–2 phút)…</p>` : ""}
     ${E.error ? `<p style="color:var(--alarm)">${esc(E.error)}</p>` : ""}
   </form>`;
 }
@@ -1229,18 +1230,32 @@ async function buildCase(code, lesson) {
   let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
   pool = [...shuffle(pool.filter((q) => q.wrong > 0)), ...shuffle(pool.filter((q) => !q.wrong && (q.prio || 3) >= 3)), ...shuffle(pool.filter((q) => !q.wrong && (q.prio || 3) < 3))].slice(0, 24);
   E.loading = true; E.error = null; E.code = code; render();
-  const prompt = `Bạn là bác sĩ cấp cứu kiêm người viết kịch bản mô phỏng cho sinh viên Y4 Việt Nam, môn ${S.subjects[code].name}${lesson ? `, bài ${lessonName(code, lesson)}` : ""}.
-Dưới đây là các câu đề thi cũ (id, câu hỏi, đáp án đúng). Hãy dựng MỘT tình huống cấp cứu nhập vai gồm 4–6 bước quyết định, xoay quanh MỘT bệnh nhân, dùng kiến thức của các câu này.
+  // Trích bài soạn liên quan tới các câu được chọn, để ca bám đúng nội dung bộ môn dạy
+  let ctx = "";
+  const lessonIds = [...new Set(pool.map((q) => q.lesson).filter(Boolean))].slice(0, 3);
+  for (const lid of lessonIds) {
+    const pages = await loadNotes(code, lid); if (!pages) continue;
+    const probe = { stem: pool.filter((q) => q.lesson === lid).map((q) => q.stem).join(" "), answer: pool.filter((q) => q.lesson === lid).map((q) => q.answer).join(" ") };
+    ctx += passages(pages, probe, 5).map((p) => `[${lessonName(code, lid)} · trang ${p.page}] ${p.text}`).join("\n\n") + "\n\n";
+  }
+  ctx = ctx.slice(0, 9000);
+  const prompt = `Bạn là giảng viên lâm sàng ra đề thi tình huống cho sinh viên Y4 Việt Nam, môn ${S.subjects[code].name}${lesson ? `, bài ${lessonName(code, lesson)}` : ""}.
+Hãy viết MỘT ca lâm sàng nhập vai theo đúng kiểu ĐỀ THI TÌNH HUỐNG của trường Y: dài, đủ dữ kiện, đọc như một đoạn văn bệnh án — không phải câu hỏi một dòng.
 
+KIẾN THỨC CẦN KIỂM TRA (id, câu, đáp án đúng) — mỗi bước của ca phải dựa trên các câu này:
 ${pool.map((q) => `[${q.id}] ${q.stem.replace(/\s+/g, " ")}${q.options?.length ? " | Đáp án: " + q.answer + ". " + (q.options.find((o) => o.k === q.answer)?.t || "") : " | Đáp án: " + q.answer.replace(/\s+/g, " ")}`).join("\n")}
+${ctx ? `\nTRÍCH BÀI SOẠN CỦA SINH VIÊN (nguồn chuẩn cho số liệu, phân loại, phác đồ — khi bài soạn ghi "đáp án sách/bộ môn" thì theo đáp án đó):\n"""\n${ctx}\n"""\n` : ""}
+CẤU TRÚC VÀ ĐỘ DÀI:
+- "opening" (120–200 từ): hành chính (tên, tuổi, giới, nghề/hoàn cảnh nếu liên quan), lý do vào viện, bệnh sử kể theo thời gian (ngày thứ mấy, diễn tiến, đã tự điều trị gì), tiền căn bản thân/gia đình/thói quen, khám lúc nhập viện (tổng trạng, sinh hiệu, khám chuyên khoa mô tả cụ thể). Có 1–2 chi tiết gây nhiễu hợp lý như đề thật.
+- 4–6 bước. Mỗi bước: "narrative" (50–120 từ) đưa dữ kiện MỚI — kết quả cận lâm sàng có số liệu, diễn tiến sau điều trị, biến chứng, câu hỏi của người nhà…; "question" hỏi đúng giọng đề thi ("Chẩn đoán phù hợp nhất là gì?", "Xử trí tiếp theo thích hợp nhất?", "Cận lâm sàng nào cần làm ngay để…?").
+- 4 lựa chọn, mỗi lựa chọn là một câu đầy đủ; các lựa chọn dài tương đương nhau (đáp án đúng KHÔNG được dài nhất hay chi tiết nhất); đúng 1 đáp án đúng, xáo vị trí; lựa chọn sai là sai lầm sinh viên hay mắc.
+- "why": 1–2 câu chuyên môn cho mỗi lựa chọn.
+- Toàn ca KHÔNG quá khoảng 900 từ. Dài vì đủ dữ kiện, không dài vì văn hoa.
 
 LUẬT:
-- Mỗi bước kiểm tra kiến thức của 1–3 câu đề ở trên; ghi id các câu đó vào "qids". Đáp án đúng của bước phải nhất quán với đáp án đề.
-- 4 lựa chọn mỗi bước, đúng 1 cái đúng, xáo vị trí; lựa chọn sai là lỗi sinh viên hay mắc, hợp lý về lâm sàng.
-- "narrative": diễn biến mới (triệu chứng, sinh hiệu đổi) — căng thẳng, có nhịp. "why" của mỗi lựa chọn: 1 câu chuyên môn.
-- "penalty": 15–35, càng nguy hiểm thật khi chọn sai thì càng cao.
-- Sinh hiệu nhất quán với bệnh cảnh. Bệnh nhân tên Việt. Tiêu đề ngắn, gây tò mò, hơi đen tối.
-- Không bịa liều thuốc/số liệu không có trong đề.
+- Mỗi bước ghi id 1–3 câu kiến thức nó kiểm tra vào "qids"; đáp án đúng của bước phải nhất quán với đáp án đã cho và với bài soạn.
+- Số liệu bệnh nhân (tuổi, sinh hiệu, xét nghiệm) do bạn đặt nhưng phải nhất quán với bệnh cảnh. Liều thuốc, ngưỡng chẩn đoán, phân loại: chỉ dùng khi có trong câu kiến thức hoặc bài soạn.
+- "penalty": 15–35, càng nguy hiểm thật khi chọn sai thì càng cao. Bệnh nhân tên Việt. Tiêu đề ngắn, gây tò mò, hơi đen tối.
 
 Chỉ trả về JSON:
 {"title": "...", "patient": {"name": "...", "age": 0, "sex": "Nam|Nữ"}, "opening": "...", "vitals": {"hr":0,"bp":"120/80","spo2":0,"rr":0,"temp":37.0},
@@ -1286,8 +1301,8 @@ function erPlay(E) {
       <p>${dead ? esc(E.answered?.roast || "") + ` ${E.wrongQ.size} câu đề liên quan đã vào hàng Thắp nhang.` : E.hp === 100 ? "Không mất giọt máu nào. Đáng ngờ. Có tra Google không đó?" : `${esc(c.patient?.name)} sống với ${E.hp} HP. Có di chứng, nhưng sống.`}</p>
       <div class="row"><button class="btn" data-act="er-again">Chơi lại ca này</button><button class="btn red" data-act="er-new">Ca mới</button>${dead ? `<button class="btn amber" data-act="tab" data-id="review">Thắp nhang</button>` : ""}</div></section>`
   : `<section class="panel qcard" id="qcard">
-    ${E.step === 0 ? `<p class="muted" style="white-space:pre-line">${esc(c.opening)}</p>` : ""}
-    <p>${esc(st.narrative)}</p>
+    ${E.step === 0 ? `<p class="vignette">${esc(c.opening)}</p>` : ""}
+    <p class="vignette">${esc(st.narrative)}</p>
     <p class="stem">${esc(st.question)}</p>
     <div class="opts">${st.options.map((o) => {
       let cls = ""; if (E.answered) cls = o.ok ? "right" : o.k === E.answered.k ? "wrong" : "faded";
