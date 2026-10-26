@@ -113,6 +113,7 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .lesson { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 0; border-top: 1px solid var(--line); align-items: center; }
 .lesson:first-child { border-top: 0; }
 .lesson .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 560px) { .lesson { grid-template-columns: minmax(0, 1fr); } .lesson .acts { justify-content: flex-start; } }
 .qlist { grid-column: 1 / -1; display: grid; gap: 8px; padding: 6px 0 4px; }
 .qitem { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 6px; min-width: 0; }
 .qitem p { overflow-wrap: anywhere; }
@@ -188,6 +189,14 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .lecture .eyebrow { color: var(--ecg); }
 .reader { white-space: pre-line; font-size: 15px; line-height: 1.65; background: var(--bg); border-radius: 8px; padding: 14px; border: 1px solid var(--line); overflow-wrap: anywhere; }
 .reader mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; }
+
+/* ---------- trong một môn ---------- */
+.subbar { display: grid; gap: 10px; margin-bottom: 18px; }
+.subbar > button { justify-self: start; }
+.subbar h1 { margin: 0; }
+.subtabs { border-bottom: 1px solid var(--line); padding-bottom: 6px; flex-wrap: wrap; }
+@media (max-width: 460px) { .logo { font-size: 0; } .logo i { font-size: 18px; } }
+.subtabs button[aria-current="true"] { color: var(--fg); background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--alarm); }
 
 /* ---------- câu bựa ---------- */
 .fun { margin: 0; font-size: 16.5px; line-height: 1.6; }
@@ -560,17 +569,32 @@ function liveStreak() {
 /* ------------------------------------------------------------------ */
 /* Khung + điều hướng                                                  */
 /* ------------------------------------------------------------------ */
-const TABS = [
-  ["home", "Bảng tử thần"], ["cases", "Tình huống"], ["practice", "Luyện đề"], ["review", "Thắp nhang"],
-  ["er", "Cấp cứu"], ["import", "Nạp đề"], ["graves", "Nghĩa trang"],
-];
+/* Thanh trên cùng chỉ có thứ dùng chung mọi môn; đề cũ, tình huống, cấp cứu, nạp đề nằm trong từng môn. */
+const TABS = [["home", "Các môn"], ["review", "Thắp nhang"], ["graves", "Nghĩa trang"]];
+const SUBTABS = [["subject", "Bài học"], ["practice", "Đề cũ & thẻ"], ["cases", "Tình huống"], ["er", "Cấp cứu"], ["import", "Nạp đề"]];
+const inSubject = () => !!S.subject && !!S.subjects[S.subject] && (S.tab === "reader" || SUBTABS.some(([id]) => id === S.tab));
+const scope = (list) => (S.subject && S.subjects[S.subject] ? list.filter((x) => x.code === S.subject) : list);
+function subjectBar() {
+  const s = S.subjects[S.subject];
+  const exam = (s.exams || []).find((e) => !e.done && Date.parse(e.at) > Date.now());
+  return `<div class="subbar">
+    <button class="btn small ghost" data-act="tab" data-id="home">← Các môn</button>
+    <div><h1>${esc(s.name)}</h1><p class="muted">${esc(s.code)}${exam ? ` · thi ${fmtDate(exam.at)} · còn ${daysUntil(exam.at)} ngày` : ""}</p></div>
+    <nav class="subtabs" aria-label="Mục của môn">${SUBTABS.map(([id, label]) => `<button data-act="sub" data-id="${id}" aria-current="${S.tab === id}">${label}</button>`).join("")}</nav>
+  </div>`;
+}
 function renderNav() {
   const due = dueList().length;
   $("#nav").innerHTML = TABS.map(([id, label]) =>
-    `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && (S.tab === "subject" || S.tab === "reader"))}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
+    `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && inSubject())}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
 }
 function go(tab) {
-  if (tab === "practice" && S.practice?.caseRef) S.practice = { code: S.practice.code };
+  if (tab === "practice" && (S.practice?.caseRef || (S.subject && S.practice?.code !== S.subject))) S.practice = { code: S.subject || S.practice.code };
+  if (S.subject) {          // mục trong môn: trỏ mọi phiên về môn đang mở
+    if (tab === "cases") S.cs = { code: S.subject };
+    if (tab === "er" && S.er?.code !== S.subject) S.er = { code: S.subject };
+    if (tab === "import" && !S.imp?.items && !S.imp?.running) S.imp = { ...(S.imp || {}), code: S.subject, source: S.imp?.source || "", text: S.imp?.text || "", items: null };
+  }
   S.tab = tab;
   if (tab === "er" && !S.er?.case) loadSavedCase(S.er?.code || subjectList().find((x) => qs(x.code).length >= 3)?.code);
   try { localStorage.setItem("pt.tab", tab); } catch {}
@@ -581,7 +605,7 @@ function render() {
   renderNav();
   const app = $("#app");
   const view = { home: viewHome, cases: viewCases, subject: viewSubject, practice: viewPractice, review: viewReview, er: viewER, import: viewImport, graves: viewGraves, reader: viewReader }[S.tab] || viewHome;
-  app.innerHTML = view();
+  app.innerHTML = (inSubject() ? subjectBar() : "") + view();
   afterRender();
 }
 /* Dữ liệu đổi từ máy khác: chỉ vẽ lại các màn hình "đọc", không phá phiên đang làm hay ô đang gõ. */
@@ -673,7 +697,7 @@ function viewHome() {
         <div class="stat"><b>${st.saved}</b><span>Xuất viện</span></div>
       </div>
       ${due ? `<button class="btn amber big" data-act="tab" data-id="review">🕯️ Thắp nhang · ${due} thẻ</button>` : ""}
-      <button class="btn red big" data-act="tab" data-id="practice">Vào ca trực</button>
+      ${next ? `<button class="btn red big" data-act="open-subject" data-code="${next.code}">Vào ca trực: ${esc(next.title)}</button>` : ""}
     </aside>
   </div>`;
 }
@@ -718,10 +742,7 @@ function viewSubject() {
     </div>`;
   }).join("");
 
-  return `<div class="row between"><button class="btn small ghost" data-act="tab" data-id="home">← Bảng tử thần</button></div>
-  <div class="row between"><div><h1>${esc(s.name)}</h1><p class="muted">${esc(s.code)}${exam ? ` · thi ${fmtDate(exam.at)} · còn ${daysUntil(exam.at)} ngày` : ""}</p></div>
-    <div class="row"><button class="btn red" data-act="practice-subject" data-code="${s.code}">Luyện cả môn</button><button class="btn" data-act="import-subject" data-code="${s.code}">+ Nạp đề môn này</button></div></div>
-  <section class="panel">
+  return `<section class="panel">
     <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.filter((q) => !isAnki(q)).length} câu đề cũ · ${list.filter(isAnki).length} thẻ Anki</p></div>
     ${lessons.length ? `<div class="lessons">${rows}</div>` : `<div class="empty"><p>Môn này chưa có danh sách bài.</p><p class="note">Thêm bài bên dưới, hoặc cứ nạp đề — Claude sẽ đề xuất bài.</p></div>`}
     <form class="row" data-form="add-lesson" style="margin-top:12px"><input type="text" id="new-lesson" placeholder="Tên bài mới, ví dụ: Viêm tai giữa mạn" style="flex:1;min-width:180px" required><button class="btn">+ Thêm bài</button></form>
@@ -852,19 +873,19 @@ function queueCovers(code, id) {
   render();
 }
 function practiceSetup() {
-  const subs = subjectList().filter((s) => qs(s.code).length);
-  if (!subs.length) return `<h1>Luyện đề</h1><div class="empty"><h2>Kho đề trống trơn</h2><p class="muted">Chưa có câu nào. Bệnh nhân còn chưa kịp nhập viện vì bạn lười quá.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề cũ</button></div>`;
+  const subs = scope(subjectList()).filter((s) => qs(s.code).length);
+  if (!subs.length) return `<h2>Đề cũ & thẻ Anki</h2><div class="empty"><h2>Kho đề trống trơn</h2><p class="muted">Chưa có câu nào. Bệnh nhân còn chưa kịp nhập viện vì bạn lười quá.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề cũ</button></div>`;
   const P = S.practice || {};
   const code = P.code && S.subjects[P.code] && qs(P.code).length ? P.code : (allExams().find((e) => !e.done && Date.parse(e.at) > Date.now() && qs(e.code).length)?.code || subs[0].code);
   const s = S.subjects[code];
   const list = qs(code);
   const lessonsWithQ = (s.lessons || []).filter((l) => list.some((q) => q.lesson === l.id));
   const nExam = list.filter((q) => !isAnki(q)).length, nAnki = list.length - nExam;
-  return `<h1>Luyện đề</h1>
+  return `<h2>Đề cũ & thẻ Anki</h2>
   <p class="muted">Mỗi phiên là một bệnh nhân 100 HP. Sai một câu mất 20 HP và câu đó vào hàng Thắp nhang. Chết thì bệnh nhân mới nhập viện, người cũ ra nghĩa trang.</p>
   <form class="panel stack" data-form="start-practice">
     <div class="row" style="align-items:end">
-      <label class="field" style="flex:1;min-width:180px">Môn<select id="p-code" data-act="p-code">${subs.map((x) => `<option value="${x.code}" ${x.code === code ? "selected" : ""}>${esc(x.name)} (${qs(x.code).length})</option>`).join("")}</select></label>
+      ${subs.length > 1 ? `<label class="field" style="flex:1;min-width:180px">Môn<select id="p-code" data-act="p-code">${subs.map((x) => `<option value="${x.code}" ${x.code === code ? "selected" : ""}>${esc(x.name)} (${qs(x.code).length})</option>`).join("")}</select></label>` : `<input type="hidden" id="p-code" value="${code}">`}
       <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${list.filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
     </div>
     <div class="row" style="align-items:end">
@@ -904,6 +925,7 @@ function startPractice(code, lesson, mode, n, kind = "all", prio = 0) {
   if (!pool.length) { toast(mode === "wrong" ? "Không có câu nào từng sai ở đây. Hiếm có." : "Không còn câu nào khớp bộ lọc."); return; }
   const items = shuffle(pool).slice(0, n).map((q) => ({ id: q.id, code }));
   const title = `${S.subjects[code].name}${lesson ? " · " + lessonName(code, lesson) : ""}`;
+  S.subject = code;
   S.practice = { code, lesson, mode, kind, prio, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title };
   S.tab = "practice";
   render();
@@ -1031,8 +1053,8 @@ function caseStats(code, list) {
 function viewCases() {
   const P = S.practice;
   if (P?.caseRef && P.items) return P.done ? practiceSummary() : viewPractice();
-  const codes = subjectList().map((s) => s.code).filter((c) => S.cases[c]);
-  const head = `<h1>Tình huống</h1><p class="muted">Ca lâm sàng soạn sẵn từ bài soạn và thẻ Anki của bạn, chia theo từng bài. Mỗi bài có vài ca, mỗi ca vài câu hỏi; các ca của một bài phủ hết ý ★★★ và ★★. Đề cũ nằm riêng ở Luyện đề. Câu tình huống làm sai sẽ vào Thắp nhang.</p>`;
+  const codes = scope(subjectList()).map((s) => s.code).filter((c) => S.cases[c]);
+  const head = `<h2>Tình huống</h2><p class="muted">Ca lâm sàng soạn sẵn từ bài soạn và thẻ Anki của bạn, chia theo từng bài. Mỗi bài có vài ca, mỗi ca vài câu hỏi; các ca của một bài phủ hết ý ★★★ và ★★. Đề cũ nằm riêng ở Luyện đề. Câu tình huống làm sai sẽ vào Thắp nhang.</p>`;
   if (!codes.length) return head + `<div class="empty"><h2>Chưa có ca nào</h2><p class="muted">Gửi bài soạn và Anki của một môn cho Claude trong khung chat, Claude sẽ soạn ca cho từng bài.</p></div>`;
   const code = S.cs?.code && S.cases[S.cs.code] ? S.cs.code : codes[0];
   const s = S.subjects[code], byL = S.cases[code];
@@ -1057,10 +1079,11 @@ function viewCases() {
   return head + `${codes.length > 1 ? `<div class="row">${codes.map((c) => `<button class="btn small ${c === code ? "red" : "ghost"}" data-act="case-subject" data-code="${c}">${esc(S.subjects[c].name)}</button>`).join("")}</div>` : ""}
     <div class="row between"><h2>${esc(s.name)}</h2><span class="mono dim">${all.done}/${all.n} câu · ${lessons.length} bài</span></div>
     ${rows}
-    <p class="note">Muốn ca mới hoàn toàn do Claude viết từ câu bạn hay sai? Sang tab <button class="btn small ghost" data-act="tab" data-id="er">Cấp cứu</button></p>`;
+    <p class="note">Muốn ca mới hoàn toàn do Claude viết từ câu bạn hay sai? Sang mục <button class="btn small ghost" data-act="sub" data-id="er">Cấp cứu</button></p>`;
 }
 const casePatient = (c) => c.setting.match(/^((?:Bé|Anh|Chị|Ông|Bà|Em|Cô|Chú) [^,.]+, [^,.]+)/)?.[1] || pick(PATIENTS);
 function playItems(code, lesson, items, extra) {
+  S.subject = code;
   S.practice = { code, lesson, mode: "case", kind: "case", prio: 0, items, i: 0, hp: 100, patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title: `${S.subjects[code].name} · ${lessonName(code, lesson)}`, ...extra };
   S.tab = "cases";
   render();
@@ -1186,7 +1209,7 @@ function viewGraves() {
 function viewImport() {
   const I = S.imp || (S.imp = { code: "", source: "", text: "", items: null, running: false, progress: 0, log: "" });
   const subs = subjectList();
-  const head = `<h1>Nạp đề cũ</h1>
+  const head = `<h2>Nạp đề cũ</h2>
   <p class="muted">Dán nguyên đề (kể cả bảng đáp án ở cuối nếu có) hoặc chụp ảnh đề. Claude tách từng câu, giải câu chưa có đáp án, rồi xếp vào đúng bài của môn. Bạn duyệt lại trước khi lưu.</p>`;
   if (!S.sample) {
     return head + `<div class="empty"><h2>Trang chưa được phép dùng Claude</h2><p class="muted">Cho phép khi trang hỏi, hoặc dán đề thẳng vào khung chat với Claude và nhắn “nạp đề này vào Phòng Trực” — Claude sẽ phân loại và ghi vào kho giúp bạn.</p></div>`;
@@ -1351,15 +1374,15 @@ async function saveImport() {
 function viewER() {
   const E = S.er || (S.er = {});
   if (E.case) return erPlay(E);
-  const subs = subjectList().filter((s) => qs(s.code).length >= 3);
-  const head = `<h1>Phòng cấp cứu</h1><p class="muted">Claude viết một ca tình huống dài kiểu đề thi (bệnh sử, khám, cận lâm sàng, chi tiết gây nhiễu) từ các câu đề và thẻ của một bài, ưu tiên câu bạn hay sai, bám theo bài soạn. Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
+  const subs = scope(subjectList()).filter((s) => qs(s.code).length >= 3);
+  const head = `<h2>Phòng cấp cứu</h2><p class="muted">Claude viết một ca tình huống dài kiểu đề thi (bệnh sử, khám, cận lâm sàng, chi tiết gây nhiễu) từ các câu đề và thẻ của một bài, ưu tiên câu bạn hay sai, bám theo bài soạn. Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
   if (!subs.length) return head + `<div class="empty"><h2>Chưa đủ chất liệu</h2><p class="muted">Cần ít nhất 3 câu đề trong một môn để dựng ca.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề</button></div>`;
   if (!S.sample) return head + `<div class="empty"><p class="muted">Trang chưa được phép dùng Claude nên chưa dựng ca được.</p></div>`;
   const code = E.code && S.subjects[E.code] ? E.code : subs[0].code;
   const lessons = (S.subjects[code].lessons || []).filter((l) => qs(code).filter((q) => q.lesson === l.id).length >= 3);
   return head + `<form class="panel stack" data-form="er">
     <div class="row" style="align-items:end">
-      <label class="field" style="flex:1;min-width:180px">Môn<select id="e-code" data-act="e-code">${subs.map((s) => `<option value="${s.code}" ${s.code === code ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
+      ${subs.length > 1 ? `<label class="field" style="flex:1;min-width:180px">Môn<select id="e-code" data-act="e-code">${subs.map((s) => `<option value="${s.code}" ${s.code === code ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>` : `<input type="hidden" id="e-code" value="${code}">`}
       <label class="field" style="flex:1;min-width:180px">Bài<select id="e-lesson"><option value="">Trộn cả môn</option>${lessons.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></label>
     </div>
     <div class="row"><button class="btn red big" ${E.loading ? "disabled" : ""}>${E.loading ? "Xe cấp cứu đang tới…" : "🚑 Gọi xe cấp cứu"}</button>${E.saved ? `<button type="button" class="btn" data-act="er-replay">Chơi lại ca đã lưu</button>` : ""}</div>
@@ -1503,9 +1526,10 @@ document.addEventListener("click", async (ev) => {
     case "tab": if (d.id === "practice" && S.practice?.done) S.practice = { code: S.practice.code }; go(d.id); break;
     case "open-subject": S.subject = d.code; S.openLesson = null; go("subject"); break;
     case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; S.openLimit = 40; render(); break;
-    case "practice-subject": S.practice = { code: d.code }; go("practice"); break;
+    case "practice-subject": S.subject = d.code; S.practice = { code: d.code }; go("practice"); break;
+    case "sub": go(d.id); break;
     case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
-    case "import-subject": S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
+    case "import-subject": S.subject = d.code; S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
     case "rename-lesson": {
       const s = S.subjects[S.subject]; const l = s.lessons.find((x) => x.id === d.id);
       const row = el.closest(".lesson");
@@ -1542,7 +1566,7 @@ document.addEventListener("click", async (ev) => {
     case "case-subject": S.cs = { code: d.code }; render(); break;
     case "case-list": S.practice = { code: S.practice?.code }; render(); break;
     case "open-cases": {
-      S.cs = { code: d.code }; if (S.practice?.caseRef) S.practice = { code: d.code };
+      S.subject = d.code; S.cs = { code: d.code }; if (S.practice?.caseRef) S.practice = { code: d.code };
       go("cases");
       requestAnimationFrame(() => $("#cl-" + d.lesson)?.scrollIntoView({ block: "start" }));
       break;
