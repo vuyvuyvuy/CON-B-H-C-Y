@@ -1,0 +1,862 @@
+[
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "TMH0054",
+  "data": {
+   "name": "Tai Mũi Họng",
+   "order": 1,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Tai Mũi Họng",
+     "at": "2026-11-06T13:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "tmh01",
+     "name": "Viêm mũi xoang cấp và mạn"
+    },
+    {
+     "id": "tmh02",
+     "name": "Chảy máu mũi"
+    },
+    {
+     "id": "tmh03",
+     "name": "Viêm amidan và VA"
+    },
+    {
+     "id": "tmh04",
+     "name": "Áp xe quanh amidan, áp xe thành sau họng"
+    },
+    {
+     "id": "tmh05",
+     "name": "Viêm tai giữa cấp"
+    },
+    {
+     "id": "tmh06",
+     "name": "Viêm tai giữa mạn, cholesteatoma"
+    },
+    {
+     "id": "tmh07",
+     "name": "Biến chứng nội sọ do tai"
+    },
+    {
+     "id": "tmh08",
+     "name": "Điếc và thính học"
+    },
+    {
+     "id": "tmh09",
+     "name": "Ung thư vòm họng"
+    },
+    {
+     "id": "tmh10",
+     "name": "Ung thư thanh quản"
+    },
+    {
+     "id": "tmh11",
+     "name": "Khó thở thanh quản, mở khí quản"
+    },
+    {
+     "id": "tmh12",
+     "name": "Viêm thanh quản, viêm thanh thiệt"
+    },
+    {
+     "id": "tmh13",
+     "name": "Dị vật đường thở, đường ăn"
+    },
+    {
+     "id": "tmh14",
+     "name": "Chấn thương Tai Mũi Họng"
+    },
+    {
+     "id": "tmh15",
+     "name": "Liệt mặt ngoại biên"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "THH0049",
+  "data": {
+   "name": "Tâm thần",
+   "order": 2,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "LS Tâm Thần",
+     "at": "2026-10-09T07:00:00+07:00",
+     "done": true
+    },
+    {
+     "title": "Tâm Thần",
+     "at": "2026-11-13T09:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "tt01",
+     "name": "Triệu chứng học tâm thần"
+    },
+    {
+     "id": "tt02",
+     "name": "Tâm thần phân liệt"
+    },
+    {
+     "id": "tt03",
+     "name": "Rối loạn trầm cảm"
+    },
+    {
+     "id": "tt04",
+     "name": "Rối loạn lưỡng cực"
+    },
+    {
+     "id": "tt05",
+     "name": "Rối loạn lo âu"
+    },
+    {
+     "id": "tt06",
+     "name": "Rối loạn liên quan stress, PTSD"
+    },
+    {
+     "id": "tt07",
+     "name": "Rối loạn dạng cơ thể"
+    },
+    {
+     "id": "tt08",
+     "name": "Sảng"
+    },
+    {
+     "id": "tt09",
+     "name": "Sa sút trí tuệ"
+    },
+    {
+     "id": "tt10",
+     "name": "Rối loạn do rượu và chất"
+    },
+    {
+     "id": "tt11",
+     "name": "Cấp cứu tâm thần: kích động, tự sát"
+    },
+    {
+     "id": "tt12",
+     "name": "Thuốc chống loạn thần"
+    },
+    {
+     "id": "tt13",
+     "name": "Thuốc chống trầm cảm, ổn định khí sắc"
+    },
+    {
+     "id": "tt14",
+     "name": "Rối loạn tâm thần trẻ em"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "DL0050",
+  "data": {
+   "name": "Da liễu",
+   "order": 3,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Da Liễu",
+     "at": "2026-11-20T09:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "dl01",
+     "name": "Thương tổn cơ bản"
+    },
+    {
+     "id": "dl02",
+     "name": "Viêm da cơ địa, chàm"
+    },
+    {
+     "id": "dl03",
+     "name": "Vảy nến"
+    },
+    {
+     "id": "dl04",
+     "name": "Mày đay"
+    },
+    {
+     "id": "dl05",
+     "name": "Nhiễm khuẩn da"
+    },
+    {
+     "id": "dl06",
+     "name": "Nấm da"
+    },
+    {
+     "id": "dl07",
+     "name": "Ghẻ"
+    },
+    {
+     "id": "dl08",
+     "name": "Zona, Herpes"
+    },
+    {
+     "id": "dl09",
+     "name": "Phong"
+    },
+    {
+     "id": "dl10",
+     "name": "Giang mai"
+    },
+    {
+     "id": "dl11",
+     "name": "Lậu, Chlamydia"
+    },
+    {
+     "id": "dl12",
+     "name": "Biểu hiện da của HIV"
+    },
+    {
+     "id": "dl13",
+     "name": "Hồng ban đa dạng, SJS/TEN"
+    },
+    {
+     "id": "dl14",
+     "name": "Pemphigus, bệnh bọng nước"
+    },
+    {
+     "id": "dl15",
+     "name": "Lupus ban đỏ"
+    },
+    {
+     "id": "dl16",
+     "name": "Mụn trứng cá"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "MAT0051",
+  "data": {
+   "name": "Mắt",
+   "order": 4,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Mắt",
+     "at": "2026-11-27T09:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "mat01",
+     "name": "Khám mắt, thị lực"
+    },
+    {
+     "id": "mat02",
+     "name": "Tật khúc xạ"
+    },
+    {
+     "id": "mat03",
+     "name": "Viêm kết mạc"
+    },
+    {
+     "id": "mat04",
+     "name": "Viêm loét giác mạc"
+    },
+    {
+     "id": "mat05",
+     "name": "Viêm màng bồ đào"
+    },
+    {
+     "id": "mat06",
+     "name": "Glôcôm"
+    },
+    {
+     "id": "mat07",
+     "name": "Đục thể thủy tinh"
+    },
+    {
+     "id": "mat08",
+     "name": "Bệnh võng mạc đái tháo đường, tăng huyết áp"
+    },
+    {
+     "id": "mat09",
+     "name": "Bong võng mạc"
+    },
+    {
+     "id": "mat10",
+     "name": "Tắc mạch võng mạc"
+    },
+    {
+     "id": "mat11",
+     "name": "Chấn thương mắt, bỏng mắt"
+    },
+    {
+     "id": "mat12",
+     "name": "Lác, nhược thị"
+    },
+    {
+     "id": "mat13",
+     "name": "Mắt đỏ: chẩn đoán phân biệt"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "GMHS0058",
+  "data": {
+   "name": "Gây mê Hồi sức",
+   "order": 5,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Gây Mê Hồi Sức",
+     "at": "2026-12-11T13:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "gm01",
+     "name": "Khám tiền mê, phân loại ASA"
+    },
+    {
+     "id": "gm02",
+     "name": "Thuốc mê tĩnh mạch"
+    },
+    {
+     "id": "gm03",
+     "name": "Thuốc mê hô hấp"
+    },
+    {
+     "id": "gm04",
+     "name": "Thuốc giãn cơ"
+    },
+    {
+     "id": "gm05",
+     "name": "Thuốc tê, gây tê vùng"
+    },
+    {
+     "id": "gm06",
+     "name": "Kiểm soát đường thở"
+    },
+    {
+     "id": "gm07",
+     "name": "Theo dõi trong mổ"
+    },
+    {
+     "id": "gm08",
+     "name": "Hồi sinh tim phổi"
+    },
+    {
+     "id": "gm09",
+     "name": "Sốc"
+    },
+    {
+     "id": "gm10",
+     "name": "Rối loạn nước, điện giải"
+    },
+    {
+     "id": "gm11",
+     "name": "Rối loạn toan kiềm"
+    },
+    {
+     "id": "gm12",
+     "name": "Truyền máu"
+    },
+    {
+     "id": "gm13",
+     "name": "Giảm đau sau mổ"
+    },
+    {
+     "id": "gm14",
+     "name": "Thở máy cơ bản"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "SPK0052",
+  "data": {
+   "name": "Sản Phụ Khoa",
+   "order": 6,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Sản Phụ Khoa",
+     "at": "2026-12-18T13:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "sp01",
+     "name": "Khám thai, chẩn đoán thai"
+    },
+    {
+     "id": "sp02",
+     "name": "Chuyển dạ sinh lý"
+    },
+    {
+     "id": "sp03",
+     "name": "Băng huyết sau sinh"
+    },
+    {
+     "id": "sp04",
+     "name": "Tiền sản giật, sản giật"
+    },
+    {
+     "id": "sp05",
+     "name": "Thai ngoài tử cung"
+    },
+    {
+     "id": "sp06",
+     "name": "Sẩy thai"
+    },
+    {
+     "id": "sp07",
+     "name": "Nhau tiền đạo, nhau bong non"
+    },
+    {
+     "id": "sp08",
+     "name": "Ối vỡ non, sinh non"
+    },
+    {
+     "id": "sp09",
+     "name": "Đái tháo đường thai kỳ"
+    },
+    {
+     "id": "sp10",
+     "name": "Hậu sản"
+    },
+    {
+     "id": "sp11",
+     "name": "Các biện pháp tránh thai"
+    },
+    {
+     "id": "sp12",
+     "name": "U xơ tử cung"
+    },
+    {
+     "id": "sp13",
+     "name": "Khối u buồng trứng"
+    },
+    {
+     "id": "sp14",
+     "name": "Ung thư cổ tử cung"
+    },
+    {
+     "id": "sp15",
+     "name": "Viêm sinh dục"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "TK0055",
+  "data": {
+   "name": "Thần kinh",
+   "order": 7,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Thần Kinh",
+     "at": "2026-12-25T15:00:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "tk01",
+     "name": "Khám thần kinh, định khu tổn thương"
+    },
+    {
+     "id": "tk02",
+     "name": "Đột quỵ thiếu máu não"
+    },
+    {
+     "id": "tk03",
+     "name": "Xuất huyết não, xuất huyết dưới nhện"
+    },
+    {
+     "id": "tk04",
+     "name": "Động kinh, trạng thái động kinh"
+    },
+    {
+     "id": "tk05",
+     "name": "Đau đầu"
+    },
+    {
+     "id": "tk06",
+     "name": "Bệnh Parkinson"
+    },
+    {
+     "id": "tk07",
+     "name": "Hội chứng Guillain-Barré"
+    },
+    {
+     "id": "tk08",
+     "name": "Nhược cơ"
+    },
+    {
+     "id": "tk09",
+     "name": "Viêm màng não, viêm não"
+    },
+    {
+     "id": "tk10",
+     "name": "Hôn mê"
+    },
+    {
+     "id": "tk11",
+     "name": "Tổn thương tủy sống"
+    },
+    {
+     "id": "tk12",
+     "name": "Bệnh lý thần kinh ngoại biên"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "NHI0053",
+  "data": {
+   "name": "Nhi khoa",
+   "order": 8,
+   "semester": 1,
+   "exams": [
+    {
+     "title": "Nhi Khoa",
+     "at": "2027-01-07T13:30:00+07:00",
+     "done": false
+    }
+   ],
+   "lessons": [
+    {
+     "id": "nhi01",
+     "name": "Sơ sinh: vàng da, suy hô hấp"
+    },
+    {
+     "id": "nhi02",
+     "name": "Dinh dưỡng, suy dinh dưỡng"
+    },
+    {
+     "id": "nhi03",
+     "name": "Tiêu chảy, mất nước"
+    },
+    {
+     "id": "nhi04",
+     "name": "Viêm phổi"
+    },
+    {
+     "id": "nhi05",
+     "name": "Hen trẻ em"
+    },
+    {
+     "id": "nhi06",
+     "name": "Tim bẩm sinh"
+    },
+    {
+     "id": "nhi07",
+     "name": "Thấp tim"
+    },
+    {
+     "id": "nhi08",
+     "name": "Sốt xuất huyết Dengue"
+    },
+    {
+     "id": "nhi09",
+     "name": "Viêm cầu thận, hội chứng thận hư"
+    },
+    {
+     "id": "nhi10",
+     "name": "Thiếu máu"
+    },
+    {
+     "id": "nhi11",
+     "name": "Co giật, động kinh"
+    },
+    {
+     "id": "nhi12",
+     "name": "Viêm màng não"
+    },
+    {
+     "id": "nhi13",
+     "name": "Tiêm chủng"
+    },
+    {
+     "id": "nhi14",
+     "name": "Phát triển tâm vận động"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "DDYH0075",
+  "data": {
+   "name": "History, theory, ethics of medicine",
+   "order": 9,
+   "semester": 1,
+   "exams": [],
+   "lessons": [
+    {
+     "id": "hte01",
+     "name": "History of medicine"
+    },
+    {
+     "id": "hte02",
+     "name": "Theory of medicine"
+    },
+    {
+     "id": "hte03",
+     "name": "Ethics of medicine"
+    }
+   ]
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "NTQ005801",
+  "data": {
+   "name": "Ngoại Tổng quát I / II",
+   "order": 10,
+   "semester": 2,
+   "exams": [],
+   "lessons": []
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "NOI230059",
+  "data": {
+   "name": "Điều trị Nội / Nội III",
+   "order": 11,
+   "semester": 2,
+   "exams": [],
+   "lessons": []
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "YHGD0060",
+  "data": {
+   "name": "Y học Gia đình",
+   "order": 12,
+   "semester": 2,
+   "exams": [],
+   "lessons": []
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "LAO0061",
+  "data": {
+   "name": "Lão khoa",
+   "order": 13,
+   "semester": 2,
+   "exams": [],
+   "lessons": []
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "NHIEM0062",
+  "data": {
+   "name": "Nhiễm",
+   "order": 14,
+   "semester": 2,
+   "exams": [],
+   "lessons": []
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects",
+  "doc_id": "TTLP0063",
+  "data": {
+   "name": "Tâm thể Liệu pháp",
+   "order": 15,
+   "semester": 2,
+   "exams": [],
+   "lessons": []
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects/TMH0054/questions",
+  "doc_id": "vidu1",
+  "data": {
+   "stem": "Dấu hiệu kinh điển trên phim X-quang cổ nghiêng của viêm thanh thiệt cấp là gì?",
+   "options": [
+    {
+     "k": "A",
+     "t": "Dấu tháp chuông (steeple sign)"
+    },
+    {
+     "k": "B",
+     "t": "Dấu ngón tay cái (thumb sign)"
+    },
+    {
+     "k": "C",
+     "t": "Dấu cánh buồm"
+    },
+    {
+     "k": "D",
+     "t": "Dấu bóng đôi"
+    }
+   ],
+   "answer": "B",
+   "aiAnswer": false,
+   "explanation": "Thanh thiệt phù nề to tròn như đốt ngón tay cái trên phim cổ nghiêng. Dấu tháp chuông (phim thẳng) gợi ý viêm thanh khí phế quản (croup).",
+   "lesson": "tmh12",
+   "source": "Câu ví dụ (xoá được)",
+   "createdAt": 1793000000000,
+   "seen": 0,
+   "wrong": 0,
+   "card": null
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects/TMH0054/questions",
+  "doc_id": "vidu2",
+  "data": {
+   "stem": "Vị trí chảy máu mũi thường gặp nhất là?",
+   "options": [
+    {
+     "k": "A",
+     "t": "Điểm mạch Kiesselbach ở phần trước vách ngăn"
+    },
+    {
+     "k": "B",
+     "t": "Động mạch bướm khẩu cái"
+    },
+    {
+     "k": "C",
+     "t": "Động mạch sàng sau"
+    },
+    {
+     "k": "D",
+     "t": "Đuôi cuốn mũi dưới"
+    }
+   ],
+   "answer": "A",
+   "aiAnswer": false,
+   "explanation": "Khoảng 90% chảy máu mũi xuất phát từ điểm mạch Kiesselbach (vùng Little) ở phần trước dưới vách ngăn.",
+   "lesson": "tmh02",
+   "source": "Câu ví dụ (xoá được)",
+   "createdAt": 1793000000001,
+   "seen": 0,
+   "wrong": 0,
+   "card": null
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects/TMH0054/questions",
+  "doc_id": "vidu3",
+  "data": {
+   "stem": "Dấu hiệu điển hình của áp xe quanh amidan là?",
+   "options": [
+    {
+     "k": "A",
+     "t": "Lưỡi gà lệch về phía bên bệnh"
+    },
+    {
+     "k": "B",
+     "t": "Không sốt, nuốt không đau"
+    },
+    {
+     "k": "C",
+     "t": "Khít hàm, màn hầu phồng một bên, lưỡi gà bị đẩy lệch sang bên lành"
+    },
+    {
+     "k": "D",
+     "t": "Hai amidan teo nhỏ, có hốc mủ"
+    }
+   ],
+   "answer": "C",
+   "aiAnswer": false,
+   "explanation": "Ổ áp xe đẩy màn hầu phồng ra và lưỡi gà lệch sang bên đối diện; co thắt cơ chân bướm trong gây khít hàm.",
+   "lesson": "tmh04",
+   "source": "Câu ví dụ (xoá được)",
+   "createdAt": 1793000000002,
+   "seen": 0,
+   "wrong": 0,
+   "card": null
+  }
+ },
+ {
+  "op": "set",
+  "collection": "subjects/TMH0054/questions",
+  "doc_id": "vidu4",
+  "data": {
+   "stem": "Ung thư vòm họng liên quan chặt chẽ nhất với virus nào?",
+   "options": [
+    {
+     "k": "A",
+     "t": "HPV"
+    },
+    {
+     "k": "B",
+     "t": "Epstein-Barr virus (EBV)"
+    },
+    {
+     "k": "C",
+     "t": "Virus viêm gan B"
+    },
+    {
+     "k": "D",
+     "t": "Cytomegalovirus"
+    }
+   ],
+   "answer": "B",
+   "aiAnswer": false,
+   "explanation": "EBV liên quan chặt với ung thư biểu mô vòm họng thể không biệt hoá, phổ biến ở Việt Nam và Nam Trung Quốc.",
+   "lesson": "tmh09",
+   "source": "Câu ví dụ (xoá được)",
+   "createdAt": 1793000000003,
+   "seen": 0,
+   "wrong": 0,
+   "card": null
+  }
+ },
+ {
+  "op": "set",
+  "collection": "meta",
+  "doc_id": "stats",
+  "data": {
+   "total": 0,
+   "wrong": 0,
+   "killed": 0,
+   "saved": 0,
+   "streak": 0,
+   "best": 0,
+   "lastDay": null
+  }
+ }
+]

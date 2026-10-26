@@ -1,0 +1,1342 @@
+<title>Phòng Trực Y4</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Bố cục: một "monitor phòng trực" — thanh tab dính trên cùng, nội dung 1 cột rộng tối đa 960px,
+   mọi số liệu (ngày còn lại, HP, sinh hiệu) dùng font mono như màn hình theo dõi bệnh nhân.
+   Thiết kế chủ ý chỉ một giao diện tối, như đèn phòng trực ban đêm. */
+:root {
+  --bg: #0c1517;          /* xanh đen phòng hồi sức */
+  --panel: #121f22;
+  --panel-2: #182a2e;
+  --line: #24393e;
+  --fg: #e4ece9;
+  --muted: #8ea39f;
+  --dim: #5d716d;
+  --ecg: #3ddc97;         /* xanh nhịp tim trên monitor */
+  --alarm: #ff5a4f;       /* đỏ báo động */
+  --warn: #f2b134;        /* vàng cảnh báo / nhang */
+  --spo2: #5cc8ff;
+  --ink-on-light: #0c1517;
+  --font-display: "Bricolage Grotesque", "Be Vietnam Pro", system-ui, sans-serif;
+  --font-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 10px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font: 15px/1.55 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--spo2); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 21px; font-weight: 800; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font: 600 11px/1.2 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.dim { color: var(--dim); }
+.wrap { max-width: 960px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- thanh trên ---------- */
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 14px; padding-block: 10px; }
+.logo { font: 700 13px var(--font-mono); color: var(--alarm); white-space: nowrap; letter-spacing: .06em; }
+.logo i { font-style: normal; display: inline-block; animation: beat 1.2s infinite; }
+@keyframes beat { 0%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.3); } 30% { transform: scale(.95); } }
+nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+nav::-webkit-scrollbar { display: none; }
+nav button { background: none; border: 0; padding: 7px 11px; border-radius: 8px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+nav button:hover { color: var(--fg); background: var(--panel); }
+nav button[aria-current="true"] { color: var(--fg); background: var(--panel-2); }
+nav .badge { margin-left: 5px; font: 700 11px var(--font-mono); background: var(--warn); color: var(--ink-on-light); padding: 1px 6px; border-radius: 99px; }
+
+main { padding-block: 22px 60px; display: grid; gap: 18px; }
+
+/* ---------- khối dùng chung ---------- */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.between { justify-content: space-between; }
+.stack { display: grid; gap: 12px; min-width: 0; }
+.grid2 { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.btn { border: 1px solid var(--line); background: var(--panel-2); padding: 9px 14px; border-radius: 8px; font-weight: 600; }
+.btn:hover { border-color: var(--muted); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.red { background: var(--alarm); border-color: var(--alarm); color: #fff; }
+.btn.green { background: var(--ecg); border-color: var(--ecg); color: var(--ink-on-light); }
+.btn.amber { background: var(--warn); border-color: var(--warn); color: var(--ink-on-light); }
+.btn.ghost { background: none; }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn.big { padding: 13px 18px; font-size: 16px; }
+.chip { display: inline-flex; gap: 4px; align-items: center; font: 600 12px var(--font-mono); padding: 2px 8px; border-radius: 99px; background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.chip.red { background: color-mix(in srgb, var(--alarm) 22%, transparent); color: #ffb0aa; }
+.chip.amber { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.chip.green { background: color-mix(in srgb, var(--ecg) 18%, transparent); color: var(--ecg); }
+.chip.blue { background: color-mix(in srgb, var(--spo2) 18%, transparent); color: var(--spo2); }
+label.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
+input[type=text], input[type=number], input[type=datetime-local], select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; color: var(--fg); }
+textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono); }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 26px 18px; text-align: center; display: grid; gap: 8px; justify-items: center; }
+.note { font-size: 13px; color: var(--muted); }
+.toast { width: max-content; position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--ink-on-light); padding: 9px 16px; border-radius: 99px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); }
+
+/* ---------- đếm ngược ---------- */
+.hero { border-color: color-mix(in srgb, var(--alarm) 45%, var(--line)); background: linear-gradient(160deg, color-mix(in srgb, var(--alarm) 14%, var(--panel)) 0%, var(--panel) 55%); display: grid; gap: 12px; }
+.clock { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.clock div { background: rgba(0,0,0,.35); border: 1px solid color-mix(in srgb, var(--alarm) 30%, transparent); border-radius: 8px; text-align: center; padding: 10px 2px 6px; }
+.clock b { display: block; font: 700 clamp(26px, 7vw, 46px)/1 var(--font-mono); color: var(--alarm); }
+.clock span { font: 600 10px var(--font-mono); letter-spacing: .1em; color: var(--dim); text-transform: uppercase; }
+.verdict { font-weight: 600; }
+.exams { display: grid; }
+.exam { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 11px 2px; border-top: 1px solid var(--line); align-items: center; cursor: pointer; }
+.exam:first-child { border-top: 0; }
+.exam:hover h3 { color: var(--spo2); }
+.exam .days { font: 700 24px var(--font-mono); text-align: right; }
+.exam .days small { font: 500 11px var(--font-body); color: var(--dim); margin-left: 3px; }
+.exam .bar { grid-column: 1 / -1; height: 3px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.exam .bar i { display: block; height: 100%; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stat { background: var(--panel-2); border-radius: 8px; padding: 10px; }
+.stat b { display: block; font: 700 22px var(--font-mono); }
+.stat span { font-size: 12px; color: var(--muted); }
+.rank b { font-family: var(--font-display); font-size: 22px; font-weight: 800; display: block; margin-top: 4px; }
+
+/* ---------- môn & bài ---------- */
+.lessons { display: grid; }
+.lesson { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 0; border-top: 1px solid var(--line); align-items: center; }
+.lesson:first-child { border-top: 0; }
+.lesson .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.qlist { grid-column: 1 / -1; display: grid; gap: 8px; padding: 6px 0 4px; }
+.qitem { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 6px; min-width: 0; }
+.qitem p { overflow-wrap: anywhere; }
+.qitem ol { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 2px; font-size: 14px; }
+.qitem li.ok { color: var(--ecg); font-weight: 600; }
+
+/* ---------- câu hỏi / ca ---------- */
+.monitor { background: #050b0c; border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
+.monitor.dead { border-color: var(--alarm); background: color-mix(in srgb, var(--alarm) 10%, #050b0c); }
+.hp { height: 10px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
+.hp i { display: block; height: 100%; transition: width .6s ease, background .6s; }
+.vitals { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.vitals div { background: var(--panel); border-radius: 6px; padding: 6px 2px; text-align: center; min-width: 0; }
+.vitals dt { font: 600 10px var(--font-mono); color: var(--dim); }
+.vitals dd { margin: 0; font: 700 17px var(--font-mono); white-space: nowrap; }
+.vitals dd.small { font-size: 12px; line-height: 25px; }
+.blink { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.qcard { display: grid; gap: 14px; }
+.stem { font-size: 17px; font-weight: 600; white-space: pre-line; overflow-wrap: anywhere; }
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; }
+.opt:hover:not(:disabled) { border-color: var(--muted); }
+.opt .k { font: 700 14px var(--font-mono); color: var(--dim); }
+.opt.right { border-color: var(--ecg); background: color-mix(in srgb, var(--ecg) 13%, var(--panel)); }
+.opt.wrong { border-color: var(--alarm); background: color-mix(in srgb, var(--alarm) 15%, var(--panel)); }
+.opt.faded { opacity: .45; }
+.opt:disabled { cursor: default; }
+.opt small { display: block; color: var(--muted); margin-top: 4px; font-size: 13px; }
+.feedback { border-radius: 9px; padding: 12px 14px; display: grid; gap: 8px; }
+.feedback.bad { background: color-mix(in srgb, var(--alarm) 14%, var(--panel)); border: 1px solid color-mix(in srgb, var(--alarm) 50%, transparent); }
+.feedback.good { background: color-mix(in srgb, var(--ecg) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--ecg) 40%, transparent); }
+.feedback .roast { font-weight: 700; }
+.feedback.bad .roast { color: #ffb0aa; }
+.feedback.good .roast { color: var(--ecg); }
+.explain { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 14px; white-space: pre-line; border-left: 3px solid var(--spo2); }
+.shake { animation: shake .35s; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.kbd { font: 600 11px var(--font-mono); color: var(--dim); }
+
+/* ---------- nghĩa trang ---------- */
+.graves { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.grave { border: 1px solid var(--line); background: var(--panel); border-radius: 60px 60px 10px 10px; padding: 18px 14px 14px; text-align: center; display: grid; gap: 4px; }
+.grave.saved { opacity: .5; }
+.grave .stone { font-size: 30px; }
+.grave .incense { letter-spacing: 2px; font-size: 15px; }
+.grave .incense .off { opacity: .2; }
+
+/* ---------- nạp đề ---------- */
+.preview { display: grid; gap: 10px; }
+.pitem { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.pitem.off { opacity: .45; }
+.pitem .meta { display: grid; gap: 6px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 560px) { .pitem .meta { grid-template-columns: minmax(0, 1fr); } }
+.progress { height: 6px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--alarm); transition: width .4s; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+</style>
+
+<header>
+  <div class="wrap">
+    <span class="logo"><i>✚</i> PHÒNG TRỰC</span>
+    <nav id="nav" aria-label="Khu vực"></nav>
+  </div>
+</header>
+<main class="wrap" id="app">
+  <div class="empty"><p class="eyebrow">Đang bật monitor…</p></div>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   PHÒNG TRỰC Y4 — ngân hàng đề cũ + flashcard SRS + ca cấp cứu, giọng mỏ hỗn.
+   Lưu trữ: capability `db` (chỉ chủ artifact đọc/ghi). Gọi Claude: `sample`.
+     subjects/<code>                       môn: tên, lịch thi, danh sách bài
+     subjects/<code>/questions/<id>        câu hỏi + thẻ SRS gắn kèm
+     graves/<id>                           bệnh nhân đã "đăng xuất"
+     cases/<code>__<lesson>                ca cấp cứu AI gen gần nhất của 1 bài
+     meta/stats                            tổng câu, câu sai, streak…
+   ===================================================================== */
+
+const TZ = "Asia/Ho_Chi_Minh";
+const MIN = 60e3, DAY = 864e5;
+
+const S = {
+  db: null, sample: null, canImages: false,
+  subjects: {},            // code -> subject
+  questions: {},           // code -> { id -> question }
+  graves: {},
+  stats: { total: 0, wrong: 0, killed: 0, saved: 0, streak: 0, best: 0, lastDay: null },
+  loaded: { subjects: false },
+  tab: "home",
+  subject: null,           // môn đang xem
+  openLesson: null,
+  practice: null,          // phiên luyện đề
+  review: null,            // phiên thắp nhang
+  imp: null,               // phiên nạp đề
+  er: null,                // ca cấp cứu
+};
+
+/* ------------------------------------------------------------------ */
+/* Tiện ích                                                            */
+/* ------------------------------------------------------------------ */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const uid = (p = "") => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9]+/g, " ").trim();
+const ymd = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(d);
+const daysUntil = (iso, now = new Date()) => Math.round((Date.parse(ymd(new Date(iso))) - Date.parse(ymd(now))) / DAY);
+const fmtDate = (iso) => new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+const fmtShort = (ms) => new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(new Date(ms));
+
+let toastTimer;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2600);
+}
+
+/* Ghi tuần tự theo từng document: không bao giờ có 2 lệnh ghi chồng lên 1 doc. */
+const writeChains = {};
+function write(path, fn) {
+  const prev = writeChains[path] || Promise.resolve();
+  const next = prev.catch(() => {}).then(fn).catch((e) => {
+    console.error("db write", path, e);
+    toast(e?.code === "quota_exceeded" ? "Hết dung lượng lưu trữ. Xoá bớt câu cũ." : "Không lưu được. Kiểm tra mạng rồi thử lại.");
+    throw e;
+  });
+  writeChains[path] = next;
+  return next;
+}
+const qPath = (code, id) => `subjects/${code}/questions/${id}`;
+function saveQuestion(code, q) {
+  S.questions[code] = S.questions[code] || {};
+  S.questions[code][q.id] = q;               // cập nhật lạc quan
+  if (!S.db) return Promise.resolve();
+  const body = { ...q }; delete body.id;
+  return write(qPath(code, q.id), () => S.db.doc(qPath(code, q.id)).set(body));
+}
+function saveSubject(s) {
+  S.subjects[s.code] = s;
+  if (!S.db) return Promise.resolve();
+  const body = { ...s }; delete body.code;
+  return write("subjects/" + s.code, () => S.db.doc("subjects/" + s.code).set(body));
+}
+function saveStats() {
+  if (!S.db) return Promise.resolve();
+  return write("meta/stats", () => S.db.doc("meta/stats").set({ ...S.stats }));
+}
+
+/* ------------------------------------------------------------------ */
+/* SRS — SM-2 kiểu Anki                                                */
+/* ------------------------------------------------------------------ */
+const SRS = { learn: [1, 10], relearn: [10], grad: 1, easyIvl: 4, ease: 2.5, minEase: 1.3, easyBonus: 1.3, hard: 1.2, lapse: 0.2, maxIvl: 365 };
+const newCard = (now = Date.now()) => ({ state: "new", due: now, ivl: 0, ease: SRS.ease, reps: 0, lapses: 0, step: 0, last: null });
+function ratingFrom(correct, ms) { return !correct ? "again" : ms < 8000 ? "easy" : ms > 45000 ? "hard" : "good"; }
+
+function schedule(prev, rating, now = Date.now(), examAt = null) {
+  const c = { ...prev, reps: prev.reps + 1, last: now };
+  const clamp = (t) => { if (!examAt) return t; const lim = examAt - DAY; return lim > now ? Math.min(t, lim) : t; };
+  const learning = prev.state === "new" || prev.state === "learning" || prev.state === "relearning";
+  if (learning) {
+    const steps = prev.state === "relearning" ? SRS.relearn : SRS.learn;
+    if (rating === "again") { c.state = prev.state === "relearning" ? "relearning" : "learning"; c.step = 0; c.due = clamp(now + steps[0] * MIN); return c; }
+    if (rating === "easy") { c.state = "review"; c.step = 0; c.ivl = prev.state === "relearning" ? Math.max(1, prev.ivl) : SRS.easyIvl; c.due = clamp(now + c.ivl * DAY); return c; }
+    const nx = prev.step + (rating === "good" ? 1 : 0);
+    if (nx < steps.length) { c.state = prev.state === "new" ? "learning" : prev.state; c.step = nx; c.due = clamp(now + steps[nx] * MIN); return c; }
+    c.state = "review"; c.step = 0; c.ivl = prev.state === "relearning" ? Math.max(1, prev.ivl) : SRS.grad; c.due = clamp(now + c.ivl * DAY); return c;
+  }
+  if (rating === "again") { c.state = "relearning"; c.lapses = prev.lapses + 1; c.ease = Math.max(SRS.minEase, prev.ease - 0.2); c.ivl = Math.max(1, prev.ivl * SRS.lapse); c.step = 0; c.due = clamp(now + SRS.relearn[0] * MIN); return c; }
+  const over = Math.max(0, (now - prev.due) / DAY);
+  let ivl;
+  if (rating === "hard") { c.ease = Math.max(SRS.minEase, prev.ease - 0.15); ivl = prev.ivl * SRS.hard; }
+  else if (rating === "good") ivl = (prev.ivl + over / 2) * prev.ease;
+  else { c.ease = prev.ease + 0.15; ivl = (prev.ivl + over) * prev.ease * SRS.easyBonus; }
+  c.ivl = Math.min(SRS.maxIvl, Math.max(prev.ivl + 1, Math.round(ivl)));
+  c.due = clamp(now + c.ivl * DAY);
+  return c;
+}
+
+function nextExamAt(code) {
+  const s = S.subjects[code]; if (!s) return null;
+  const t = (s.exams || []).filter((e) => !e.done && Date.parse(e.at) > Date.now()).map((e) => Date.parse(e.at)).sort((a, b) => a - b)[0];
+  return t || null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Kho câu chửi                                                        */
+/* ------------------------------------------------------------------ */
+const ROAST = {
+  scratch: [
+    "Sai. {patient} mất {penalty} máu. Chắc tối qua lại lướt TikTok tới 2 giờ sáng?",
+    "Câu này nằm trong đề {source}. Đề CŨ. Đã từng ra. Người ta đưa đáp án tận tay mà vẫn trật.",
+    "Slide có. Thầy giảng. Đề cũ có. Ba lớp bảo hiểm mà vẫn rớt — đúng là tài năng.",
+    "Trả lời tự tin ghê. Để dành cái tự tin đó cho lúc đi thi lại.",
+    "Sai mà chọn nhanh vậy, chắc là đoán. Bác sĩ đoán thì bệnh nhân đoán luôn ngày giỗ.",
+    "Đề năm ngoái 200 đứa làm câu này, bạn vừa gia nhập nhóm thiểu số sai.",
+  ],
+  bleeding: [
+    "{patient} còn {hp} HP và đang nhìn bạn bằng ánh mắt của người sắp viết di chúc.",
+    "Người nhà bệnh nhân đang hỏi số điện thoại của Sở Y tế.",
+    "Điều dưỡng vừa lén gọi bác sĩ khác. Không phải bạn. Không bao giờ là bạn.",
+    "Bạn vừa phát minh ra một phác đồ mà Bộ Y tế chưa kịp cấm.",
+    "Câu này ra thi mà sai là rớt môn. Ngoài đời mà sai là {patient} rớt — xuống lỗ.",
+  ],
+  critical: [
+    "Monitor đang kêu bíp bíp. Đó không phải nhạc nền, đó là {patient} đang thoát khỏi server.",
+    "HP {hp}. Khoa giải phẫu bệnh đã dọn bàn. Cảm ơn bạn đã đóng góp tiêu bản.",
+    "Bạn cách danh hiệu 'Sát thủ blouse trắng' đúng một cú click.",
+    "{patient} thấy ánh sáng cuối đường hầm. Không phải đèn mổ đâu.",
+    "Người nhà đã đặt vòng hoa online. Ship hoả tốc.",
+  ],
+  dead: [
+    "{patient} đã đăng xuất khỏi cuộc đời. Bác sĩ điều trị: bạn.",
+    "Giờ tử vong: ngay bây giờ. Nguyên nhân: kiến thức của bác sĩ ngừng tuần hoàn trước.",
+    "Thêm một bia mộ trong nghĩa trang. Vào thắp nhang đi, hồn {patient} chưa siêu thoát đâu.",
+    "Ca này mà lên báo, tít sẽ là: 'Sinh viên Y4 và xấp đề cũ chưa từng mở'.",
+    "Flatline. Có thể ngừng bóp bóng. Cũng có thể ngừng giả vờ là đã học bài.",
+  ],
+  repeat: [
+    "Câu này bạn sai {times} lần rồi đó. Não bạn có chế độ chặn kiến thức à?",
+    "Lại là nó. Lần thứ {times}. Câu này chắc là kẻ thù truyền kiếp của bạn.",
+    "Sai {times} lần một câu. Cá vàng nhớ được 5 tháng, bạn thì không.",
+  ],
+  incense: [
+    "Quên sạch. Hồn {patient} vừa thở dài một cái.",
+    "Đứng trước mộ mà vẫn không nhớ. Nhang tắt rồi.",
+    "Ôn tới lần này vẫn quên. Thẻ quay lại cuối hàng, hẹn gặp lại sau 1 phút.",
+  ],
+};
+const PRAISE = [
+  "Đúng. Đừng tưởng bở, đây là kiến thức tối thiểu.",
+  "Chuẩn. {patient} sống thêm được một nhịp tim nhờ bạn.",
+  "Ok, lần này não có online.",
+  "Đúng rồi. Thấy chưa, học vào là biết liền.",
+  "Hợp lý. Bệnh nhân chưa chết, chưa phải lúc ăn mừng.",
+];
+const recentRoasts = [];
+function fill(t, v) { return t.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? ""); }
+function roast(kind, vars) {
+  const pool = ROAST[kind];
+  const fresh = pool.filter((t) => !recentRoasts.includes(t));
+  const t = pick(fresh.length ? fresh : pool);
+  recentRoasts.unshift(t); recentRoasts.length = Math.min(recentRoasts.length, 6);
+  return fill(t, vars);
+}
+const severity = (hp, max) => hp <= 0 ? "dead" : hp / max <= .25 ? "critical" : hp / max <= .6 ? "bleeding" : "scratch";
+
+/* ------------------------------------------------------------------ */
+/* Danh hiệu                                                           */
+/* ------------------------------------------------------------------ */
+const RANKS = [
+  { max: .05, title: "Trưởng khoa tương lai", sub: "Tạm thời chưa giết ai. Tạm thời.", color: "var(--ecg)" },
+  { max: .15, title: "Bác sĩ nội trú biết điều", sub: "Thỉnh thoảng sai, nhưng biết xấu hổ.", color: "#a6e36b" },
+  { max: .25, title: "Thực tập sinh lơ ngơ", sub: "Cầm ống nghe như cầm tai nghe AirPods.", color: "var(--warn)" },
+  { max: .40, title: "Lang băm", sub: "Kê đơn theo cảm hứng, chẩn đoán theo cung hoàng đạo.", color: "#ff9a4f" },
+  { max: .60, title: "Sát thủ blouse trắng", sub: "Nghĩa trang phải mở rộng thêm khu B.", color: "var(--alarm)" },
+  { max: 1.01, title: "Thần Chết có chứng chỉ hành nghề", sub: "Bệnh viện đang cân nhắc trả lương để bạn ĐỪNG đi làm.", color: "#e879f9" },
+];
+function rank() {
+  const { total, wrong, killed, saved } = S.stats;
+  if (total < 20) return { title: "Sinh viên cầm ống nghe ngược", sub: `Mới làm ${total} câu. Đủ 20 câu mới bị phán xét.`, color: "var(--muted)" };
+  let i = RANKS.findIndex((r) => wrong / total <= r.max);
+  if (killed > saved && i < RANKS.length - 1) i++;
+  return RANKS[i];
+}
+
+/* ------------------------------------------------------------------ */
+/* Truy vấn dữ liệu                                                    */
+/* ------------------------------------------------------------------ */
+const subjectList = () => Object.values(S.subjects).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+const qs = (code) => Object.values(S.questions[code] || {});
+const allQs = () => subjectList().flatMap((s) => qs(s.code).map((q) => ({ ...q, code: s.code })));
+const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now;
+const dueList = () => allQs().filter((q) => isDue(q)).sort((a, b) => a.card.due - b.card.due);
+const lessonName = (code, lid) => (S.subjects[code]?.lessons || []).find((l) => l.id === lid)?.name || "Chưa xếp bài";
+const PATIENTS = ["Anh Tuấn, 34t", "Bà Lan, 67t", "Bé Na, 4t", "Ông Ba, 72t", "Chị Hoa, 28t", "Cô Mai, 45t", "Chú Hùng, 58t", "Em Khoa, 17t", "Bà Sáu, 81t", "Anh Dũng, 41t", "Chị Thảo, 32t", "Bé Bin, 2t"];
+
+function allExams() {
+  return subjectList().flatMap((s) => (s.exams || []).map((e, i) => ({ ...e, code: s.code, idx: i, subject: s.name })))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
+
+function bumpStreak() {
+  const today = ymd(new Date());
+  const st = S.stats;
+  if (st.lastDay === today) return;
+  const yesterday = ymd(new Date(Date.now() - DAY));
+  st.streak = st.lastDay === yesterday ? (st.streak || 0) + 1 : 1;
+  st.best = Math.max(st.best || 0, st.streak);
+  st.lastDay = today;
+}
+function liveStreak() {
+  const st = S.stats;
+  if (!st.lastDay) return 0;
+  return st.lastDay === ymd(new Date()) || st.lastDay === ymd(new Date(Date.now() - DAY)) ? st.streak : 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Khung + điều hướng                                                  */
+/* ------------------------------------------------------------------ */
+const TABS = [
+  ["home", "Bảng tử thần"], ["practice", "Luyện đề"], ["review", "Thắp nhang"],
+  ["er", "Cấp cứu"], ["import", "Nạp đề"], ["graves", "Nghĩa trang"],
+];
+function renderNav() {
+  const due = dueList().length;
+  $("#nav").innerHTML = TABS.map(([id, label]) =>
+    `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && S.tab === "subject")}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
+}
+function go(tab) {
+  S.tab = tab;
+  if (tab === "er" && !S.er?.case) loadSavedCase(S.er?.code || subjectList().find((x) => qs(x.code).length >= 3)?.code);
+  try { localStorage.setItem("pt.tab", tab); } catch {}
+  render();
+  window.scrollTo({ top: 0 });
+}
+function render() {
+  renderNav();
+  const app = $("#app");
+  const view = { home: viewHome, subject: viewSubject, practice: viewPractice, review: viewReview, er: viewER, import: viewImport, graves: viewGraves }[S.tab] || viewHome;
+  app.innerHTML = view();
+  afterRender();
+}
+/* Dữ liệu đổi từ máy khác: chỉ vẽ lại các màn hình "đọc", không phá phiên đang làm hay ô đang gõ. */
+let pendingRender = false;
+function onData() {
+  if (pendingRender) return;
+  pendingRender = true;
+  requestAnimationFrame(() => {
+    pendingRender = false;
+    renderNav();
+    const busy = (S.tab === "practice" && S.practice?.items) || (S.tab === "review" && S.review) || (S.tab === "er" && S.er?.case) || S.tab === "import";
+    if (!busy) render();
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Bảng tử thần                                                  */
+/* ------------------------------------------------------------------ */
+function verdict(d) {
+  if (d < 0) return ["Đã thi. Kết quả thế nào lòng bạn tự biết.", "var(--dim)"];
+  if (d === 0) return ["HÔM NAY. Cầu nguyện đi, học không kịp nữa đâu.", "#e879f9"];
+  if (d <= 3) return ["Vùng tử thần. Ngủ là xa xỉ phẩm.", "var(--alarm)"];
+  if (d <= 7) return ["Một tuần. Đủ để học… nếu bỏ điện thoại xuống.", "#ff9a4f"];
+  if (d <= 14) return ["Còn kịp. Năm nào cũng có người nói câu này, rồi rớt.", "var(--warn)"];
+  return ["Còn xa. Đó chính xác là điều người rớt môn từng nghĩ.", "var(--ecg)"];
+}
+function subjectCounts(code) {
+  const list = qs(code);
+  return { n: list.length, wrong: list.filter((q) => q.wrong > 0).length, due: list.filter((q) => isDue(q)).length };
+}
+function viewHome() {
+  if (!S.loaded.subjects) return `<div class="empty"><p class="eyebrow">Đang tải dữ liệu…</p></div>`;
+  if (!subjectList().length) return `<div class="empty"><h2>Chưa có môn nào</h2><p class="muted">Kho dữ liệu đang trống. Nhắn Claude trong khung chat: “nạp lịch thi và danh sách môn” là xong.</p><button class="btn" data-act="add-subject">+ Thêm môn</button></div>`;
+  const now = new Date();
+  const exams = allExams();
+  const upcoming = exams.filter((e) => !e.done && Date.parse(e.at) > now.getTime());
+  const past = exams.filter((e) => e.done || Date.parse(e.at) <= now.getTime());
+  const next = upcoming[0];
+  const r = rank();
+  const st = S.stats;
+  const due = dueList().length;
+
+  let hero = "";
+  if (next) {
+    const d = daysUntil(next.at, now);
+    const [vt, vc] = verdict(d);
+    const c = subjectCounts(next.code);
+    hero = `<section class="panel hero">
+      <p class="eyebrow" style="color:var(--alarm)">Án tử gần nhất</p>
+      <div class="row between"><h1>${esc(next.title)}</h1><span class="chip">${esc(next.code)}</span></div>
+      <p class="muted">${fmtDate(next.at)}</p>
+      <div class="clock" data-countdown="${esc(next.at)}">${clockCells(next.at)}</div>
+      <p class="verdict" style="color:${vc}">${vt}</p>
+      <p class="note">${c.n ? `Kho đề môn này: <b>${c.n}</b> câu · ${c.wrong} câu từng sai · ${c.due} thẻ đến hạn.` : `Chưa có câu đề cũ nào của môn này. Nạp đề đi, còn ${d} ngày.`}</p>
+      <div class="row"><button class="btn red" data-act="practice-subject" data-code="${next.code}">Luyện đề ${esc(next.title)}</button><button class="btn" data-act="open-subject" data-code="${next.code}">Xem các bài</button></div>
+    </section>`;
+  }
+
+  const list = upcoming.slice(next ? 1 : 0).map((e) => {
+    const d = daysUntil(e.at, now);
+    const c = subjectCounts(e.code);
+    const pressure = Math.min(100, Math.max(4, ((30 - d) / 30) * 100));
+    const col = d <= 7 ? "var(--alarm)" : d <= 14 ? "var(--warn)" : "var(--ecg)";
+    return `<div class="exam" data-act="open-subject" data-code="${e.code}" role="button" tabindex="0">
+      <div style="min-width:0"><h3>${esc(e.title)}</h3><p class="note">${fmtDate(e.at)} · ${c.n} câu${c.due ? ` · <span style="color:var(--warn)">${c.due} đến hạn</span>` : ""}</p></div>
+      <div class="days" style="color:${col}">${d}<small>ngày</small></div>
+      <div class="bar"><i style="width:${pressure}%;background:${col}"></i></div>
+    </div>`;
+  }).join("");
+
+  const noExam = subjectList().filter((s) => !(s.exams || []).some((e) => !e.done && Date.parse(e.at) > now.getTime()));
+
+  return `<div class="row between"><div><h1>Bảng tử thần</h1><p class="muted">Y Việt – Đức · 2026–2027</p></div></div>
+  <div class="grid2">
+    <div class="stack">
+      ${hero}
+      ${list ? `<section class="panel"><p class="eyebrow">Hàng chờ hành quyết</p><div class="exams">${list}</div></section>` : ""}
+      ${noExam.length ? `<section class="panel stack"><p class="eyebrow">Môn chưa có lịch thi</p><div class="row">${noExam.map((s) => `<button class="btn small ghost" data-act="open-subject" data-code="${s.code}">${esc(s.name)} <span class="dim">· ${qs(s.code).length}</span></button>`).join("")}</div></section>` : ""}
+      ${past.length ? `<p class="note">Đã qua: ${past.map((e) => esc(e.title)).join(", ")}. Không ai nhắc lại điểm của bạn đâu. Trừ trang này.</p>` : ""}
+    </div>
+    <aside class="stack">
+      <section class="panel rank"><p class="eyebrow">Danh hiệu hiện tại</p><b style="color:${r.color}">${r.title}</b><p class="note">${r.sub}</p>
+        <p class="eyebrow" style="margin-top:8px">Tỷ lệ sai ${st.total ? Math.round(st.wrong / st.total * 100) : 0}% · ${st.wrong}/${st.total} câu</p></section>
+      <div class="stats">
+        <div class="stat"><b>${liveStreak()}🔥</b><span>Streak · kỷ lục ${st.best || 0}</span></div>
+        <div class="stat"><b style="color:${due ? "var(--warn)" : "inherit"}">${due}</b><span>Thẻ đến hạn</span></div>
+        <div class="stat"><b style="color:${st.killed ? "var(--alarm)" : "inherit"}">${st.killed}🪦</b><span>Đã tiễn</span></div>
+        <div class="stat"><b>${st.saved}</b><span>Xuất viện</span></div>
+      </div>
+      ${due ? `<button class="btn amber big" data-act="tab" data-id="review">🕯️ Thắp nhang · ${due} thẻ</button>` : ""}
+      <button class="btn red big" data-act="tab" data-id="practice">Vào ca trực</button>
+    </aside>
+  </div>`;
+}
+function clockCells(at) {
+  const ms = Math.max(0, Date.parse(at) - Date.now());
+  const p = [[Math.floor(ms / DAY), "ngày"], [Math.floor(ms % DAY / 36e5), "giờ"], [Math.floor(ms % 36e5 / MIN), "phút"], [Math.floor(ms % MIN / 1000), "giây"]];
+  return p.map(([v, l]) => `<div><b>${String(v).padStart(2, "0")}</b><span>${l}</span></div>`).join("");
+}
+setInterval(() => { const el = $("[data-countdown]"); if (el) el.innerHTML = clockCells(el.dataset.countdown); }, 1000);
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Một môn — bài, câu hỏi, quản lý bài                           */
+/* ------------------------------------------------------------------ */
+function viewSubject() {
+  const s = S.subjects[S.subject];
+  if (!s) { S.tab = "home"; return viewHome(); }
+  const list = qs(s.code);
+  const byLesson = {};
+  for (const q of list) (byLesson[q.lesson || "_none"] ||= []).push(q);
+  const lessons = [...(s.lessons || []), ...(byLesson._none ? [{ id: "_none", name: "Chưa xếp bài" }] : [])];
+  const exam = (s.exams || []).find((e) => !e.done && Date.parse(e.at) > Date.now());
+
+  const rows = lessons.map((l) => {
+    const items = byLesson[l.id] || [];
+    const wrong = items.filter((q) => q.wrong > 0).length;
+    const due = items.filter((q) => isDue(q)).length;
+    const open = S.openLesson === l.id;
+    return `<div class="lesson">
+      <div style="min-width:0"><h3>${esc(l.name)}</h3>
+        <div class="row" style="gap:6px;margin-top:4px"><span class="chip">${items.length} câu</span>${wrong ? `<span class="chip red">${wrong} từng sai</span>` : ""}${due ? `<span class="chip amber">${due} đến hạn</span>` : ""}</div></div>
+      <div class="acts">
+        ${items.length ? `<button class="btn small" data-act="toggle-lesson" data-id="${l.id}">${open ? "Đóng" : "Xem câu"}</button><button class="btn small red" data-act="practice-lesson" data-code="${s.code}" data-id="${l.id}">Luyện</button>` : ""}
+        ${l.id !== "_none" ? `<button class="btn small ghost" data-act="rename-lesson" data-id="${l.id}" title="Đổi tên bài">✎</button>` : ""}
+      </div>
+      ${open ? `<div class="qlist">${items.map((q) => qItem(s, q)).join("")}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  return `<div class="row between"><button class="btn small ghost" data-act="tab" data-id="home">← Bảng tử thần</button></div>
+  <div class="row between"><div><h1>${esc(s.name)}</h1><p class="muted">${esc(s.code)}${exam ? ` · thi ${fmtDate(exam.at)} · còn ${daysUntil(exam.at)} ngày` : ""}</p></div>
+    <div class="row"><button class="btn red" data-act="practice-subject" data-code="${s.code}">Luyện cả môn</button><button class="btn" data-act="import-subject" data-code="${s.code}">+ Nạp đề môn này</button></div></div>
+  <section class="panel">
+    <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.length} câu đề cũ</p></div>
+    ${lessons.length ? `<div class="lessons">${rows}</div>` : `<div class="empty"><p>Môn này chưa có danh sách bài.</p><p class="note">Thêm bài bên dưới, hoặc cứ nạp đề — Claude sẽ đề xuất bài.</p></div>`}
+    <form class="row" data-form="add-lesson" style="margin-top:12px"><input type="text" id="new-lesson" placeholder="Tên bài mới, ví dụ: Viêm tai giữa mạn" style="flex:1;min-width:180px" required><button class="btn">+ Thêm bài</button></form>
+  </section>
+  <section class="panel stack">
+    <p class="eyebrow">Lịch thi môn này</p>
+    ${(s.exams || []).map((e, i) => `<div class="row between"><span>${esc(e.title)} · <span class="mono">${fmtDate(e.at)}</span></span><label class="row note"><input type="checkbox" data-act="exam-done" data-code="${s.code}" data-idx="${i}" ${e.done ? "checked" : ""}> đã thi</label></div>`).join("") || `<p class="note">Chưa có.</p>`}
+    <form class="row" data-form="add-exam" data-code="${s.code}"><input type="text" id="exam-title" placeholder="Tên kỳ thi" value="${esc(s.name)}" style="flex:1;min-width:140px" required><input type="datetime-local" id="exam-at" required style="width:auto"><button class="btn small">+ Thêm lịch thi</button></form>
+  </section>`;
+}
+function qItem(s, q) {
+  const lessonOpts = (s.lessons || []).map((l) => `<option value="${l.id}" ${l.id === q.lesson ? "selected" : ""}>${esc(l.name)}</option>`).join("");
+  return `<div class="qitem">
+    <div class="row between" style="gap:6px"><span class="eyebrow">${esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span>
+      <div class="row" style="gap:6px">${q.wrong ? `<span class="chip red">sai ${q.wrong}/${q.seen}</span>` : q.seen ? `<span class="chip green">đúng ${q.seen}</span>` : `<span class="chip">chưa làm</span>`}${q.card ? `<span class="chip amber">thẻ ${q.card.state === "review" ? "ôn " + Math.round(q.card.ivl) + "d" : "đang học"}</span>` : ""}</div></div>
+    <p>${esc(q.stem)}</p>
+    ${q.options?.length ? `<ol>${q.options.map((o) => `<li class="${o.k === q.answer ? "ok" : ""}">${esc(o.k)}. ${esc(o.t)}</li>`).join("")}</ol>` : `<p class="note">Đáp án: ${esc(q.answer)}</p>`}
+    ${q.explanation ? `<p class="note">💡 ${esc(q.explanation)}</p>` : ""}
+    <div class="row" style="gap:6px"><select data-act="move-q" data-code="${s.code}" data-id="${q.id}" style="width:auto;flex:1;min-width:150px;padding:5px 8px;font-size:13px">${lessonOpts}<option value="" ${!q.lesson ? "selected" : ""}>Chưa xếp bài</option></select>
+      <button class="btn small ghost" data-act="del-q" data-code="${s.code}" data-id="${q.id}">Xoá</button></div>
+  </div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Luyện đề                                                      */
+/* ------------------------------------------------------------------ */
+function viewPractice() {
+  const P = S.practice;
+  if (!P?.items) return practiceSetup();
+  if (P.done) return practiceSummary();
+  const it = P.items[P.i];
+  const q = S.questions[it.code]?.[it.id] || it;
+  const ans = P.answered;
+  const max = 100;
+  const pct = Math.max(0, P.hp / max * 100);
+  const hpCol = pct <= 25 ? "var(--alarm)" : pct <= 60 ? "#ff9a4f" : "var(--ecg)";
+  const isMcq = q.options?.length > 0;
+
+  let opts;
+  if (isMcq) {
+    opts = `<div class="opts">${q.options.map((o, i) => {
+      let cls = "";
+      if (ans) cls = o.k === q.answer ? "right" : o.k === ans.choice ? "wrong" : "faded";
+      return `<button class="opt ${cls}" data-act="answer" data-k="${esc(o.k)}" ${ans ? "disabled" : ""}><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></button>`;
+    }).join("")}</div>`;
+  } else {
+    opts = ans || P.revealed
+      ? `<div class="explain" style="border-left-color:var(--ecg)"><b>Đáp án:</b> ${esc(q.answer)}</div>${ans ? "" : `<div class="row"><button class="btn green" data-act="self-grade" data-ok="1">Mình trả lời đúng</button><button class="btn red" data-act="self-grade" data-ok="0">Mình sai</button></div>`}`
+      : `<button class="btn" data-act="reveal">Hiện đáp án (tự chấm)</button>`;
+  }
+
+  return `<div class="row between"><div><p class="eyebrow">${esc(P.title)}</p><h2>Câu ${P.i + 1}/${P.items.length}</h2></div><button class="btn small ghost" data-act="end-practice">Kết thúc phiên</button></div>
+  <section class="monitor ${P.hp <= 0 ? "dead" : ""}" id="mon">
+    <div class="row between"><span><b>${esc(P.patient)}</b> <span class="dim">· bệnh nhân #${P.patientNo}</span></span><span class="mono" style="color:${hpCol}">HP ${P.hp}/${max}</span></div>
+    <div class="hp"><i style="width:${pct}%;background:${hpCol}" class="${pct <= 25 ? "blink" : ""}"></i></div>
+    <p class="note mono">✓ ${P.right} · ✗ ${P.wrongCount} · 🪦 ${P.killed}</p>
+  </section>
+  <section class="panel qcard" id="qcard">
+    <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="eyebrow">${esc(q.source || "")}</span></div>
+    <p class="stem">${esc(q.stem)}</p>
+    ${opts}
+    ${ans ? feedbackBlock(q, ans) : isMcq ? `<p class="kbd">Phím tắt: A–${q.options[q.options.length - 1].k} để chọn</p>` : ""}
+  </section>`;
+}
+function feedbackBlock(q, ans) {
+  const P = S.practice;
+  const last = P.i + 1 >= P.items.length;
+  return `<div class="feedback ${ans.correct ? "good" : "bad"}">
+    <p class="roast">${ans.correct ? "" : `−${ans.penalty} HP · `}${esc(ans.roast)}</p>
+    ${ans.correct ? "" : `<p class="note mono">Đã thêm vào Thắp nhang: ôn lại sau ${ans.card ? Math.max(1, Math.round((ans.card.due - Date.now()) / MIN)) : 1} phút.</p>`}
+    ${!ans.correct || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
+    ${q.aiAnswer ? `<p class="note">⚠ Đáp án câu này do AI giải, đề gốc không có đáp án. Thấy sai thì sửa trong trang môn.</p>` : ""}
+    <div class="row"><button class="btn ${ans.correct ? "green" : "red"}" data-act="next-q" id="next">${last ? "Xem tổng kết" : "Câu tiếp →"}</button><span class="kbd">Enter</span></div>
+  </div>`;
+}
+function practiceSetup() {
+  const subs = subjectList().filter((s) => qs(s.code).length);
+  if (!subs.length) return `<h1>Luyện đề</h1><div class="empty"><h2>Kho đề trống trơn</h2><p class="muted">Chưa có câu đề cũ nào. Bệnh nhân còn chưa kịp nhập viện vì bạn lười quá.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề cũ</button></div>`;
+  const P = S.practice || {};
+  const code = P.code && S.subjects[P.code] ? P.code : (allExams().find((e) => !e.done && Date.parse(e.at) > Date.now() && qs(e.code).length)?.code || subs[0].code);
+  const s = S.subjects[code];
+  const lessonsWithQ = (s.lessons || []).filter((l) => qs(code).some((q) => q.lesson === l.id));
+  return `<h1>Luyện đề cũ</h1>
+  <p class="muted">Mỗi phiên là một bệnh nhân 100 HP. Sai một câu mất 20 HP và câu đó vào hàng Thắp nhang. Chết thì bệnh nhân mới nhập viện, người cũ ra nghĩa trang.</p>
+  <form class="panel stack" data-form="start-practice">
+    <div class="row" style="align-items:end">
+      <label class="field" style="flex:1;min-width:180px">Môn<select id="p-code" data-act="p-code">${subs.map((x) => `<option value="${x.code}" ${x.code === code ? "selected" : ""}>${esc(x.name)} (${qs(x.code).length} câu)</option>`).join("")}</select></label>
+      <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${qs(code).filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
+    </div>
+    <div class="row" style="align-items:end">
+      <label class="field" style="flex:1;min-width:160px">Lọc câu<select id="p-mode">
+        <option value="all">Trộn tất cả</option><option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
+      <label class="field" style="width:120px">Số câu<input type="number" id="p-n" min="1" max="200" value="20"></label>
+      <button class="btn red big" style="flex:1;min-width:160px">Nhận bệnh nhân</button>
+    </div>
+  </form>`;
+}
+function practiceSummary() {
+  const P = S.practice;
+  const pct = P.items.length ? Math.round(P.right / P.answeredCount * 100) : 0;
+  const alive = P.hp > 0;
+  return `<h1>${alive ? "🏥 Xuất viện" : "🪦 Hết ca"}</h1>
+  <section class="panel stack">
+    <p class="mono" style="font-size:22px">${P.right}/${P.answeredCount} đúng · ${pct}%</p>
+    <p>${pct === 100 ? "Không sai câu nào. Đáng ngờ. Có lén mở đáp án không đó?" : pct >= 80 ? `${esc(P.patient)} sống, có di chứng nhẹ. Tạm chấp nhận.` : pct >= 50 ? "Trên trung bình một chút. Đủ để không bị đuổi học, chưa đủ để được gọi là bác sĩ." : "Phiên này là một thảm hoạ y khoa có hệ thống."}</p>
+    <p class="note">Bệnh nhân đã tiễn trong phiên: ${P.killed}. ${P.wrongCount} câu sai đã vào hàng Thắp nhang.</p>
+    <div class="row"><button class="btn red" data-act="restart-practice">Phiên mới</button>${P.wrongCount ? `<button class="btn amber" data-act="tab" data-id="review">Thắp nhang ngay</button>` : ""}<button class="btn ghost" data-act="tab" data-id="home">Về bảng tử thần</button></div>
+  </section>`;
+}
+function startPractice(code, lesson, mode, n) {
+  let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
+  if (mode === "wrong") pool = pool.filter((q) => q.wrong > 0);
+  if (mode === "new") pool = pool.filter((q) => !q.seen);
+  if (!pool.length) { toast(mode === "wrong" ? "Không có câu nào từng sai ở đây. Hiếm có." : "Không còn câu nào khớp bộ lọc."); return; }
+  const items = shuffle(pool).slice(0, n).map((q) => ({ id: q.id, code }));
+  const title = `${S.subjects[code].name}${lesson ? " · " + lessonName(code, lesson) : ""}`;
+  S.practice = { code, lesson, mode, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title };
+  S.tab = "practice";
+  render();
+}
+async function answerPractice(choice, selfOk) {
+  const P = S.practice; if (!P || P.answered) return;
+  const it = P.items[P.i];
+  const q = { ...S.questions[it.code][it.id] };
+  const correct = selfOk !== undefined ? selfOk : choice === q.answer;
+  const ms = Date.now() - P.qStart;
+  const now = Date.now();
+  q.seen = (q.seen || 0) + 1;
+  P.answeredCount++;
+  S.stats.total++;
+  bumpStreak();
+  let card = q.card;
+  let text, penalty = 0;
+  if (correct) {
+    P.right++;
+    if (card) card = schedule(card, ratingFrom(true, ms), now, nextExamAt(it.code));
+    text = fill(pick(PRAISE), { patient: P.patient });
+  } else {
+    penalty = 20;
+    P.wrongCount++;
+    S.stats.wrong++;
+    q.wrong = (q.wrong || 0) + 1;
+    q.lastWrongAt = now;
+    card = schedule(card || newCard(now), "again", now, nextExamAt(it.code));
+    card = { ...card, due: Math.max(card.due, now + 10 * MIN) };   // sai đề cũ: 10 phút sau gặp lại
+    P.hp -= penalty;
+    P.sessionWrong.push(it.id);
+    const sev = severity(P.hp, 100);
+    text = q.wrong >= 3 && sev !== "dead"
+      ? roast("repeat", { times: q.wrong })
+      : roast(sev, { patient: P.patient, hp: Math.max(0, P.hp), penalty, source: q.source || "cũ" });
+  }
+  q.card = card || null;
+  P.answered = { choice, correct, roast: text, penalty, card };
+  if (!correct && P.hp <= 0) {
+    P.killed++;
+    S.stats.killed++;
+    const grave = { patient: P.patient, code: it.code, subject: S.subjects[it.code].name, diedAt: now, qids: [...new Set(P.sessionWrong)], epitaph: `Ra đi lúc ${fmtShort(now)}. Hung thủ: chính bạn.` };
+    if (S.db) S.db.collection("graves").add(grave).catch(() => toast("Không dựng được bia mộ (lỗi lưu)."));
+  }
+  delete q.code;
+  saveQuestion(it.code, q);
+  saveStats();
+  render();
+  if (!correct) { $("#mon")?.classList.add("shake"); navigator.vibrate?.(P.hp <= 0 ? [250, 80, 500] : 100); }
+  if (!correct && !q.explanation && S.sample) explainQuestion(it.code, it.id, choice);
+}
+function nextQuestion() {
+  const P = S.practice; if (!P?.answered) return;
+  if (P.hp <= 0) {           // bệnh nhân mới nhập viện
+    P.hp = 100; P.patient = pick(PATIENTS.filter((x) => x !== P.patient)); P.patientNo++; P.sessionWrong = [];
+    toast(`Bệnh nhân mới nhập viện: ${P.patient}. Lần này cố đừng giết.`);
+  }
+  P.answered = null; P.revealed = false;
+  if (P.i + 1 >= P.items.length) {
+    P.done = true;
+    if (P.hp > 0) { S.stats.saved++; saveStats(); }
+  } else { P.i++; P.qStart = Date.now(); }
+  render();
+}
+
+/* Gọi Claude nêu lại kiến thức cho câu sai; lưu vào câu hỏi để lần sau khỏi gọi lại. */
+async function explainQuestion(code, id, choice) {
+  const q = S.questions[code]?.[id]; if (!q || !S.sample) return;
+  const P = S.practice;
+  if (P?.answered) P.answered.explaining = true;
+  const box = () => $("#explain");
+  if (box()) box().textContent = "Đang gọi Claude nêu lại kiến thức…";
+  const s = S.subjects[code];
+  const prompt = `Bạn là giảng viên lâm sàng ở trường Y Việt Nam, giảng cho sinh viên Y4 đang ôn thi môn ${s.name} (bài: ${lessonName(code, q.lesson)}).
+Sinh viên vừa làm SAI câu đề thi cũ dưới đây.
+
+CÂU HỎI: ${q.stem}
+${q.options?.length ? q.options.map((o) => `${o.k}. ${o.t}`).join("\n") : ""}
+ĐÁP ÁN ĐÚNG: ${q.answer}${q.options?.length ? " — " + (q.options.find((o) => o.k === q.answer)?.t || "") : ""}
+${choice ? `SINH VIÊN CHỌN: ${choice} — ${q.options?.find((o) => o.k === choice)?.t || ""}` : ""}
+
+Viết phần "nêu lại kiến thức" bằng tiếng Việt, tối đa 130 từ, văn bản thuần (không markdown, không tiêu đề):
+- Câu 1: kiến thức cốt lõi mà câu hỏi kiểm tra.
+- Vì sao đáp án đúng là đúng${choice ? ", và vì sao lựa chọn của sinh viên sai" : ""}.
+- Kết bằng một dòng bắt đầu "Mẹo nhớ:".
+Giọng chuyên môn, chính xác, không đùa. Nếu đáp án được cho có vẻ sai về mặt y khoa, nói rõ ở dòng đầu: "Lưu ý: đáp án đề có thể chưa đúng vì…".`;
+  try {
+    const { text } = await S.sample(prompt, { onText: ({ text }) => { if (box()) box().textContent = text; }, cache: { gcTime: 864e5 } });
+    const cur = S.questions[code][id];
+    const updated = { ...cur, explanation: text.trim(), aiExplained: true };
+    saveQuestion(code, updated);
+    if (P?.answered) P.answered.explaining = false;
+  } catch (e) {
+    if (P?.answered) P.answered.explaining = false;
+    if (box()) box().textContent = sampleErr(e, "giảng lại");
+  }
+}
+function sampleErr(e, what) {
+  if (e?.code === "not_granted" || e?.code === "sampling_disabled") { return `Chưa cho phép trang này dùng Claude nên không ${what} được.`; }
+  if (e?.code === "rate_limited") return "Claude đang quá tải hoặc bạn hết lượt dùng. Lát nữa thử lại.";
+  if (e?.code === "invalid_json") return "Claude trả về sai định dạng. Bấm thử lại.";
+  return `Không ${what} được (lỗi ${e?.code || "mạng"}). Thử lại sau.`;
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Thắp nhang (flashcard SRS)                                    */
+/* ------------------------------------------------------------------ */
+function viewReview() {
+  const R = S.review;
+  if (!R) {
+    const due = dueList();
+    const upcoming = allQs().filter((q) => q.card && !isDue(q)).sort((a, b) => a.card.due - b.card.due)[0];
+    const bySub = {};
+    for (const q of due) bySub[q.code] = (bySub[q.code] || 0) + 1;
+    return `<h1>Thắp nhang</h1>
+    <p class="muted">Mỗi câu từng làm sai là một nén nhang chưa thắp. Lật thẻ, tự chấm. Nhớ thì nhang cháy, quên thì thẻ quay lại cuối hàng.</p>
+    ${due.length ? `<section class="panel stack"><p class="mono" style="font-size:22px">${due.length} thẻ đến hạn</p>
+      <div class="row">${Object.entries(bySub).map(([c, n]) => `<span class="chip amber">${esc(S.subjects[c]?.name)} · ${n}</span>`).join("")}</div>
+      <div class="row"><button class="btn amber big" data-act="start-review">Bắt đầu thắp</button>${Object.keys(bySub).length > 1 ? Object.keys(bySub).map((c) => `<button class="btn small" data-act="start-review" data-code="${c}">Chỉ ${esc(S.subjects[c]?.name)}</button>`).join("") : ""}</div></section>`
+      : `<div class="empty"><p style="font-size:30px">🕊️</p><h2>Không còn nén nào cần thắp</h2><p class="muted">${upcoming ? `Thẻ kế tiếp đến hạn lúc ${fmtShort(upcoming.card.due)}.` : "Chưa có thẻ nào. Làm sai vài câu ở Luyện đề là có ngay."}</p></div>`}`;
+  }
+  const it = R.queue[0];
+  if (!it) {
+    return `<h1>Thắp nhang</h1><div class="empty"><p style="font-size:30px">🕊️</p><h2>Siêu thoát hết rồi</h2><p class="muted">${R.done} thẻ đã ôn. Lần sau học trước khi cầm dao kéo nhé.</p><button class="btn" data-act="end-review">Xong</button></div>`;
+  }
+  const q = S.questions[it.code]?.[it.id];
+  if (!q) { R.queue.shift(); return viewReview(); }
+  return `<div class="row between"><div><p class="eyebrow">${esc(S.subjects[it.code]?.name)} · ${esc(lessonName(it.code, q.lesson))}</p><h2>Còn ${R.queue.length} thẻ</h2></div><button class="btn small ghost" data-act="end-review">Dừng</button></div>
+  <section class="panel qcard" id="qcard">
+    <p class="stem">${esc(q.stem)}</p>
+    ${q.options?.length ? `<div class="opts">${q.options.map((o) => `<div class="opt ${R.flipped ? (o.k === q.answer ? "right" : "faded") : ""}"><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></div>`).join("")}</div>` : ""}
+    ${R.flipped ? `
+      ${!q.options?.length ? `<div class="explain" style="border-left-color:var(--ecg)"><b>Đáp án:</b> ${esc(q.answer)}</div>` : ""}
+      ${q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : S.sample ? `<div class="explain" id="explain"><button class="btn small" data-act="explain-review">Nhờ Claude giảng lại</button></div>` : ""}
+      <div class="row">
+        <button class="btn red" data-act="rate" data-r="again">Quên <span class="kbd">1</span></button>
+        <button class="btn" data-act="rate" data-r="hard">Lờ mờ <span class="kbd">2</span></button>
+        <button class="btn green" data-act="rate" data-r="good">Nhớ <span class="kbd">3</span></button>
+        <button class="btn" data-act="rate" data-r="easy" style="border-color:var(--spo2)">Dễ ợt <span class="kbd">4</span></button>
+      </div>` : `<button class="btn amber big" data-act="flip">Lật thẻ <span class="kbd">Space</span></button>`}
+  </section>`;
+}
+function startReview(code) {
+  const queue = dueList().filter((q) => !code || q.code === code).map((q) => ({ id: q.id, code: q.code }));
+  S.review = { queue, flipped: false, done: 0, msg: null };
+  render();
+}
+function rateCard(r) {
+  const R = S.review; const it = R?.queue[0]; if (!it) return;
+  const q = { ...S.questions[it.code][it.id] };
+  const now = Date.now();
+  q.card = schedule(q.card || newCard(now), r, now, nextExamAt(it.code));
+  bumpStreak();
+  saveQuestion(it.code, q);
+  saveStats();
+  R.queue.shift();
+  if (r === "again") { R.queue.push(it); R.msg = roast("incense", { patient: pick(PATIENTS) }); }
+  else { R.done++; R.msg = null; }
+  R.flipped = false;
+  render();
+  if (R.msg) toast(R.msg);
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Nghĩa trang                                                   */
+/* ------------------------------------------------------------------ */
+function graveLit(g) {
+  return g.qids.map((id) => {
+    const q = S.questions[g.code]?.[id];
+    return !q || (q.card && q.card.state === "review" && (q.card.last || 0) > g.diedAt);
+  });
+}
+function viewGraves() {
+  const list = Object.entries(S.graves).map(([id, g]) => ({ id, ...g })).sort((a, b) => b.diedAt - a.diedAt);
+  if (!list.length) return `<h1>Nghĩa trang</h1><div class="empty"><p style="font-size:30px">🌱</p><h2>Nghĩa trang còn trống</h2><p class="muted">Chưa ai chết dưới tay bạn. Chắc tại bạn chưa làm câu nào.</p></div>`;
+  const open = list.filter((g) => !graveLit(g).every(Boolean));
+  return `<h1>Nghĩa trang</h1>
+  <p class="muted">Một nén nhang cháy khi câu sai đó được ôn tới mức nhớ hẳn (thẻ lên trạng thái ôn dài hạn). Cháy hết nhang thì hồn siêu thoát.</p>
+  <p class="note">${open.length} hồn còn oán · ${list.length - open.length} đã siêu thoát</p>
+  <div class="graves">${list.map((g) => {
+    const lit = graveLit(g); const n = lit.filter(Boolean).length; const saved = n === lit.length;
+    return `<div class="grave ${saved ? "saved" : ""}"><div class="stone">${saved ? "🕊️" : "🪦"}</div><b>${esc(g.patient)}</b><span class="note">${esc(g.subject)}</span>
+      <i class="note">“${esc(g.epitaph)}”</i><div class="incense">${lit.map((x) => `<span class="${x ? "" : "off"}">🕯️</span>`).join("")}</div>
+      ${saved ? "" : `<button class="btn small amber" data-act="pray" data-id="${g.id}">Thắp nhang (${lit.length - n})</button>`}</div>`;
+  }).join("")}</div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Nạp đề — dán text / ảnh đề, Claude tách câu và xếp vào bài     */
+/* ------------------------------------------------------------------ */
+function viewImport() {
+  const I = S.imp || (S.imp = { code: "", source: "", text: "", items: null, running: false, progress: 0, log: "" });
+  const subs = subjectList();
+  const head = `<h1>Nạp đề cũ</h1>
+  <p class="muted">Dán nguyên đề (kể cả bảng đáp án ở cuối nếu có) hoặc chụp ảnh đề. Claude tách từng câu, giải câu chưa có đáp án, rồi xếp vào đúng bài của môn. Bạn duyệt lại trước khi lưu.</p>`;
+  if (!S.sample) {
+    return head + `<div class="empty"><h2>Trang chưa được phép dùng Claude</h2><p class="muted">Cho phép khi trang hỏi, hoặc dán đề thẳng vào khung chat với Claude và nhắn “nạp đề này vào Phòng Trực” — Claude sẽ phân loại và ghi vào kho giúp bạn.</p></div>`;
+  }
+  if (I.items) return head + importPreview(I);
+  return head + `<form class="panel stack" data-form="import">
+    <div class="row" style="align-items:end">
+      <label class="field" style="flex:1;min-width:200px">Môn<select id="i-code"><option value="">Để Claude tự nhận môn</option>${subs.map((s) => `<option value="${s.code}" ${I.code === s.code ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
+      <label class="field" style="flex:1;min-width:200px">Nguồn đề<input type="text" id="i-source" placeholder="VD: Đề thi TMH 2024 lần 1" value="${esc(I.source)}"></label>
+    </div>
+    <label class="field">Nội dung đề<textarea id="i-text" placeholder="Câu 1. Dấu hiệu X-quang cổ nghiêng của viêm thanh thiệt cấp?&#10;A. Dấu tháp chuông&#10;B. Dấu ngón tay cái&#10;…&#10;&#10;Đáp án: 1B 2A …">${esc(I.text)}</textarea></label>
+    ${S.canImages ? `<label class="field">Hoặc ảnh chụp đề (nhiều trang được)<input type="file" id="i-img" accept="image/*" multiple></label>` : ""}
+    ${I.running ? `<div class="progress"><i style="width:${Math.round(I.progress * 100)}%"></i></div><p class="note mono">${esc(I.log)}</p>` : ""}
+    <div class="row"><button class="btn red big" ${I.running ? "disabled" : ""}>${I.running ? "Claude đang mổ đề…" : "Phân loại đề"}</button>${I.running ? `<button type="button" class="btn ghost" data-act="cancel-import">Dừng</button>` : ""}</div>
+    ${I.error ? `<p style="color:var(--alarm)">${esc(I.error)}</p>` : ""}
+    <p class="note">Đề dài được cắt thành nhiều phần, mỗi phần vài chục câu. ${S.canImages ? "Ảnh mờ hoặc nghiêng nhiều thì Claude có thể đọc sai, nhớ duyệt kỹ." : ""}</p>
+  </form>`;
+}
+function importPreview(I) {
+  const keep = I.items.filter((x) => x.keep).length;
+  const dup = I.items.filter((x) => x.dup).length;
+  return `<section class="panel stack">
+    <div class="row between"><p class="mono" style="font-size:18px">${I.items.length} câu tách được · giữ ${keep}${dup ? ` · ${dup} trùng kho` : ""}</p>
+      <div class="row"><button class="btn ghost" data-act="discard-import">Huỷ</button><button class="btn green" data-act="save-import" ${keep ? "" : "disabled"}>Lưu ${keep} câu vào kho</button></div></div>
+    <p class="note">Kiểm tra môn, bài và đáp án. Câu gắn “AI giải” là đề gốc không có đáp án, Claude tự giải: nên soát lại.</p>
+    <div class="preview">${I.items.map((x, i) => {
+      const s = S.subjects[x.code];
+      const lessons = s?.lessons || [];
+      return `<div class="pitem ${x.keep ? "" : "off"}">
+        <input type="checkbox" data-act="imp-keep" data-i="${i}" ${x.keep ? "checked" : ""} aria-label="Giữ câu này">
+        <div class="stack" style="gap:6px">
+          <p><b class="mono">${i + 1}.</b> ${esc(x.stem)}</p>
+          ${x.options.length ? `<p class="note">${x.options.map((o) => `<span style="${o.k === x.answer ? "color:var(--ecg);font-weight:700" : ""}">${esc(o.k)}. ${esc(o.t)}</span>`).join(" · ")}</p>` : `<p class="note">Đáp án: ${esc(x.answer)}</p>`}
+          <div class="row" style="gap:6px">${x.aiAnswer ? `<span class="chip blue">AI giải</span>` : `<span class="chip green">đáp án đề</span>`}${x.dup ? `<span class="chip">trùng kho</span>` : ""}${x.confidence < .6 ? `<span class="chip amber">xếp bài chưa chắc</span>` : ""}</div>
+          <div class="meta">
+            <select data-act="imp-code" data-i="${i}" aria-label="Môn">${subjectList().map((m) => `<option value="${m.code}" ${m.code === x.code ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
+            <select data-act="imp-lesson" data-i="${i}" aria-label="Bài">${lessons.map((l) => `<option value="${l.id}" ${l.id === x.lesson ? "selected" : ""}>${esc(l.name)}</option>`).join("")}${x.newLesson ? `<option value="new:${esc(x.newLesson)}" ${x.lesson === "new:" + x.newLesson ? "selected" : ""}>+ Bài mới: ${esc(x.newLesson)}</option>` : ""}<option value="" ${!x.lesson ? "selected" : ""}>Chưa xếp bài</option></select>
+          </div>
+        </div></div>`;
+    }).join("")}</div>
+  </section>`;
+}
+/* Cắt đề dài tại đầu câu ("Câu 12.", "12)", "12.") để không câu nào bị chẻ đôi. */
+function chunkExam(text, max = 9000) {
+  const lines = text.split(/\r?\n/);
+  const chunks = []; let cur = "";
+  for (const line of lines) {
+    const startsQ = /^\s*(câu|cau|question|q)?\s*\d{1,3}\s*[\.\):\-]/i.test(line);
+    if (startsQ && cur.length > max) { chunks.push(cur); cur = ""; }
+    cur += line + "\n";
+  }
+  if (cur.trim()) chunks.push(cur);
+  return chunks;
+}
+function classifyPrompt(I, body, tail, isImage) {
+  const subs = subjectList();
+  const subjBlock = I.code
+    ? `MÔN: ${S.subjects[I.code].name} (mã ${I.code})\nCÁC BÀI CỦA MÔN (id: tên):\n${(S.subjects[I.code].lessons || []).map((l) => `${l.id}: ${l.name}`).join("\n") || "(chưa có bài nào)"}`
+    : `CHƯA BIẾT MÔN. Chọn môn phù hợp nhất cho TỪNG câu trong danh sách sau. Các môn và bài (mã môn > id bài: tên bài):\n${subs.map((s) => `${s.code} — ${s.name}\n${(s.lessons || []).map((l) => `  ${l.id}: ${l.name}`).join("\n")}`).join("\n")}`;
+  return `Bạn là trợ giảng Y khoa, đang số hoá đề thi cũ cho sinh viên Y4 Việt Nam (lớp Y Việt – Đức).
+${isImage ? "Ảnh đính kèm là ảnh chụp các trang đề thi." : "Dưới đây là văn bản đề thi (có thể lỗi xuống dòng, lỗi OCR, lẫn số trang)."}
+
+${subjBlock}
+
+NHIỆM VỤ: tách TỪNG câu hỏi có trong ${isImage ? "ảnh" : "đoạn đề"} này và trả về một JSON array, mỗi phần tử:
+{"stem": "nội dung câu hỏi", "options": [{"k":"A","t":"..."}], "answer": "B", "answer_source": "key" | "ai", "explanation": "1–2 câu vì sao đúng (để trống nếu không chắc)", "subject": "mã môn", "lesson": "id bài có sẵn hoặc null", "new_lesson": "tên bài mới đề xuất hoặc null", "confidence": 0.0–1.0}
+
+LUẬT:
+- Giữ nguyên ý câu hỏi; chỉ sửa lỗi chính tả/OCR/xuống dòng hiển nhiên. Không gộp, không bỏ, không bịa câu.
+- Trắc nghiệm: "options" giữ đúng ký tự A, B, C, D, E như đề; "answer" là MỘT ký tự. Câu tự luận / điền khuyết / đúng-sai không có lựa chọn: "options": [] và "answer" là đáp án ngắn gọn.
+- Đề có bảng đáp án hoặc đánh dấu đáp án: dùng nó, "answer_source": "key". Không có: tự giải theo kiến thức y khoa chuẩn (sách giáo khoa Việt Nam, khuyến cáo hiện hành), "answer_source": "ai".
+- Xếp bài: chọn bài có sẵn khớp nhất về nội dung bệnh lý/chủ đề. Chỉ khi không bài nào phù hợp mới để "lesson": null và đề xuất "new_lesson" (tên ngắn, kiểu tên bài giảng). "confidence" là độ chắc của việc xếp bài.
+- Đánh số câu ("Câu 3.") không đưa vào "stem".
+${tail ? `\nPHẦN CUỐI CỦA TOÀN BỘ ĐỀ (có thể chứa bảng đáp án dùng chung cho mọi phần):\n"""${tail}"""\n` : ""}
+${isImage ? "" : `ĐOẠN ĐỀ CẦN XỬ LÝ:\n"""\n${body}\n"""`}
+
+Chỉ trả về JSON array, không thêm chữ nào khác.`;
+}
+async function runImport(form) {
+  const I = S.imp;
+  I.code = $("#i-code").value; I.source = $("#i-source").value.trim(); I.text = $("#i-text").value;
+  const files = S.canImages ? [...($("#i-img")?.files || [])] : [];
+  if (!I.text.trim() && !files.length) { I.error = "Dán nội dung đề hoặc chọn ảnh trước đã."; render(); return; }
+  I.error = null; I.running = true; I.progress = 0.02; I.ctl = new AbortController();
+  const jobs = [];
+  if (I.text.trim()) {
+    const chunks = chunkExam(I.text);
+    const tail = chunks.length > 1 ? I.text.slice(-1500) : "";
+    chunks.forEach((c, i) => jobs.push({ label: `Phần ${i + 1}/${chunks.length}`, prompt: classifyPrompt(I, c, tail, false) }));
+  }
+  const maxImg = S.imgMax || 5;
+  for (let i = 0; i < files.length; i += maxImg) jobs.push({ label: `Ảnh ${i + 1}–${Math.min(files.length, i + maxImg)}`, prompt: classifyPrompt(I, "", "", true), images: files.slice(i, i + maxImg) });
+  render();
+  const out = [];
+  try {
+    for (let j = 0; j < jobs.length; j++) {
+      I.log = `${jobs[j].label} · Claude đang đọc… (đề dài có thể mất 1–2 phút mỗi phần)`; render();
+      const res = await S.sample.json(jobs[j].prompt, { signal: I.ctl.signal, ...(jobs[j].images ? { images: jobs[j].images } : {}), cache: false });
+      if (Array.isArray(res)) out.push(...res);
+      I.progress = (j + 1) / jobs.length;
+    }
+  } catch (e) {
+    I.running = false;
+    if (e?.code !== "cancelled") I.error = sampleErr(e, "phân loại đề");
+    if (!out.length) { render(); return; }
+  }
+  I.running = false;
+  const known = {};
+  for (const s of subjectList()) known[s.code] = new Set(qs(s.code).map((q) => norm(q.stem)));
+  const seenNow = new Set();
+  I.items = out.filter((x) => x && typeof x.stem === "string" && x.stem.trim()).map((x) => {
+    const code = S.subjects[x.subject] ? x.subject : (I.code || subjectList()[0].code);
+    const lessons = S.subjects[code].lessons || [];
+    const lesson = lessons.some((l) => l.id === x.lesson) ? x.lesson : x.new_lesson ? "new:" + String(x.new_lesson).trim() : "";
+    const options = Array.isArray(x.options) ? x.options.filter((o) => o && o.k && o.t).map((o) => ({ k: String(o.k).trim().toUpperCase().slice(0, 1), t: String(o.t).trim() })) : [];
+    let answer = String(x.answer ?? "").trim();
+    if (options.length) answer = answer.toUpperCase().slice(0, 1);
+    const key = norm(x.stem);
+    const dup = known[code]?.has(key) || seenNow.has(key);
+    seenNow.add(key);
+    return { stem: x.stem.trim(), options, answer, aiAnswer: x.answer_source !== "key", explanation: String(x.explanation || "").trim(), code, lesson, newLesson: x.new_lesson ? String(x.new_lesson).trim() : null, confidence: Number(x.confidence ?? 1), dup, keep: !dup && !!answer };
+  });
+  if (!I.items.length) { I.items = null; I.error = I.error || "Không tách được câu nào. Kiểm tra lại nội dung đề."; }
+  render();
+}
+async function saveImport() {
+  const I = S.imp; if (!I?.items) return;
+  const keep = I.items.filter((x) => x.keep);
+  // tạo bài mới trước (mỗi môn ghi 1 lần)
+  const newBy = {};
+  for (const x of keep) if (x.lesson.startsWith("new:")) (newBy[x.code] ||= new Set()).add(x.lesson.slice(4));
+  const map = {};
+  for (const [code, names] of Object.entries(newBy)) {
+    const s = { ...S.subjects[code], lessons: [...(S.subjects[code].lessons || [])] };
+    for (const name of names) {
+      const existing = s.lessons.find((l) => norm(l.name) === norm(name));
+      const id = existing ? existing.id : uid("l");
+      if (!existing) s.lessons.push({ id, name });
+      map[code + "|" + name] = id;
+    }
+    await saveSubject(s);
+  }
+  let n = 0;
+  const btn = $("[data-act=save-import]"); if (btn) btn.disabled = true;
+  for (const x of keep) {
+    const lesson = x.lesson.startsWith("new:") ? map[x.code + "|" + x.lesson.slice(4)] : x.lesson;
+    const q = { id: uid("q"), stem: x.stem, options: x.options, answer: x.answer, aiAnswer: x.aiAnswer, explanation: x.explanation, lesson: lesson || "", source: I.source || "Đề cũ", createdAt: Date.now(), seen: 0, wrong: 0, card: null };
+    try { await saveQuestion(x.code, q); n++; } catch { break; }
+    if (btn) btn.textContent = `Đang lưu ${n}/${keep.length}…`;
+  }
+  toast(`Đã nạp ${n} câu vào kho. Bệnh nhân đã sẵn sàng.`);
+  const code = keep[0]?.code;
+  S.imp = { code: I.code, source: "", text: "", items: null, running: false };
+  if (code) { S.subject = code; S.tab = "subject"; }
+  render();
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Cấp cứu — Claude dựng ca lâm sàng từ câu đề của một bài        */
+/* ------------------------------------------------------------------ */
+function viewER() {
+  const E = S.er || (S.er = {});
+  if (E.case) return erPlay(E);
+  const subs = subjectList().filter((s) => qs(s.code).length >= 3);
+  const head = `<h1>Phòng cấp cứu</h1><p class="muted">Claude dựng một ca lâm sàng nhập vai từ các câu đề cũ của một bài (ưu tiên câu bạn hay sai). Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
+  if (!subs.length) return head + `<div class="empty"><h2>Chưa đủ chất liệu</h2><p class="muted">Cần ít nhất 3 câu đề trong một môn để dựng ca.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề</button></div>`;
+  if (!S.sample) return head + `<div class="empty"><p class="muted">Trang chưa được phép dùng Claude nên chưa dựng ca được.</p></div>`;
+  const code = E.code && S.subjects[E.code] ? E.code : subs[0].code;
+  const lessons = (S.subjects[code].lessons || []).filter((l) => qs(code).filter((q) => q.lesson === l.id).length >= 3);
+  return head + `<form class="panel stack" data-form="er">
+    <div class="row" style="align-items:end">
+      <label class="field" style="flex:1;min-width:180px">Môn<select id="e-code" data-act="e-code">${subs.map((s) => `<option value="${s.code}" ${s.code === code ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label>
+      <label class="field" style="flex:1;min-width:180px">Bài<select id="e-lesson"><option value="">Trộn cả môn</option>${lessons.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></label>
+    </div>
+    <div class="row"><button class="btn red big" ${E.loading ? "disabled" : ""}>${E.loading ? "Xe cấp cứu đang tới…" : "🚑 Gọi xe cấp cứu"}</button>${E.saved ? `<button type="button" class="btn" data-act="er-replay">Chơi lại ca đã lưu</button>` : ""}</div>
+    ${E.loading ? `<p class="note mono" id="er-log">Claude đang viết kịch bản ca (30–90 giây)…</p>` : ""}
+    ${E.error ? `<p style="color:var(--alarm)">${esc(E.error)}</p>` : ""}
+  </form>`;
+}
+async function buildCase(code, lesson) {
+  const E = S.er;
+  let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
+  pool = [...pool.filter((q) => q.wrong > 0), ...shuffle(pool.filter((q) => !q.wrong))].slice(0, 24);
+  E.loading = true; E.error = null; E.code = code; render();
+  const prompt = `Bạn là bác sĩ cấp cứu kiêm người viết kịch bản mô phỏng cho sinh viên Y4 Việt Nam, môn ${S.subjects[code].name}${lesson ? `, bài ${lessonName(code, lesson)}` : ""}.
+Dưới đây là các câu đề thi cũ (id, câu hỏi, đáp án đúng). Hãy dựng MỘT tình huống cấp cứu nhập vai gồm 4–6 bước quyết định, xoay quanh MỘT bệnh nhân, dùng kiến thức của các câu này.
+
+${pool.map((q) => `[${q.id}] ${q.stem}${q.options?.length ? " | Đáp án: " + q.answer + ". " + (q.options.find((o) => o.k === q.answer)?.t || "") : " | Đáp án: " + q.answer}`).join("\n")}
+
+LUẬT:
+- Mỗi bước kiểm tra kiến thức của 1–3 câu đề ở trên; ghi id các câu đó vào "qids". Đáp án đúng của bước phải nhất quán với đáp án đề.
+- 4 lựa chọn mỗi bước, đúng 1 cái đúng, xáo vị trí; lựa chọn sai là lỗi sinh viên hay mắc, hợp lý về lâm sàng.
+- "narrative": diễn biến mới (triệu chứng, sinh hiệu đổi) — căng thẳng, có nhịp. "why" của mỗi lựa chọn: 1 câu chuyên môn.
+- "penalty": 15–35, càng nguy hiểm thật khi chọn sai thì càng cao.
+- Sinh hiệu nhất quán với bệnh cảnh. Bệnh nhân tên Việt. Tiêu đề ngắn, gây tò mò, hơi đen tối.
+- Không bịa liều thuốc/số liệu không có trong đề.
+
+Chỉ trả về JSON:
+{"title": "...", "patient": {"name": "...", "age": 0, "sex": "Nam|Nữ"}, "opening": "...", "vitals": {"hr":0,"bp":"120/80","spo2":0,"rr":0,"temp":37.0},
+ "steps": [{"narrative": "...", "question": "...", "options": [{"k":"A","t":"...","ok":false,"why":"..."}], "penalty": 20, "qids": ["..."], "vitals": {...}}]}`;
+  try {
+    const c = await S.sample.json(prompt, { cache: false });
+    if (!c?.steps?.length || !c.steps.every((s) => Array.isArray(s.options) && s.options.filter((o) => o.ok).length === 1)) throw { code: "invalid_json" };
+    const valid = new Set(pool.map((q) => q.id));
+    c.steps.forEach((s) => (s.qids = (s.qids || []).filter((id) => valid.has(id))));
+    c.code = code; c.lesson = lesson || "";
+    E.loading = false;
+    if (S.db) write(`cases/${code}__${lesson || "all"}`, () => S.db.doc(`cases/${code}__${lesson || "all"}`).set(c)).catch(() => {});
+    startCase(c);
+  } catch (e) {
+    E.loading = false;
+    E.error = sampleErr(e, "dựng ca");
+    render();
+  }
+}
+function startCase(c) {
+  S.er = { code: c.code, case: c, hp: 100, step: 0, answered: null, wrongQ: new Set(), start: Date.now() };
+  render();
+}
+function erPlay(E) {
+  const c = E.case;
+  const st = c.steps[E.step];
+  const v = (E.step > 0 && c.steps[E.step].vitals) || (E.step > 0 && c.steps[E.step - 1].vitals) || c.vitals || {};
+  const dead = E.hp <= 0;
+  const over = dead || E.finished;
+  const pct = Math.max(0, E.hp);
+  const hpCol = pct <= 25 ? "var(--alarm)" : pct <= 60 ? "#ff9a4f" : "var(--ecg)";
+  const vit = (l, val, cls = "", warn = false) => `<div><dt>${l}</dt><dd class="${cls} ${warn ? "blink" : ""}">${esc(val)}</dd></div>`;
+  return `<div class="row between"><p class="eyebrow">${esc(S.subjects[c.code]?.name)}${c.lesson ? " · " + esc(lessonName(c.code, c.lesson)) : ""}</p><button class="btn small ghost" data-act="er-quit">Rời ca</button></div>
+  <section class="monitor ${dead ? "dead" : ""}" id="mon">
+    <div class="row between"><div><h2>${esc(c.title)}</h2><p class="note">${esc(c.patient?.name)} · ${esc(c.patient?.sex)}, ${esc(c.patient?.age)} tuổi</p></div><span class="mono dim">Bước ${Math.min(E.step + 1, c.steps.length)}/${c.steps.length}</span></div>
+    <div class="row between"><span class="eyebrow">HP bệnh nhân</span><span class="mono" style="color:${hpCol}">${Math.max(0, E.hp)}/100</span></div>
+    <div class="hp"><i style="width:${pct}%;background:${hpCol}" class="${pct <= 25 ? "blink" : ""}"></i></div>
+    <dl class="vitals" style="margin:0">
+      ${vit("HR", dead ? "0" : v.hr ?? "--", "", v.hr > 120 || v.hr < 50)}${vit("BP", dead ? "--/--" : v.bp ?? "--", "small")}${vit("SpO₂", dead ? "--" : (v.spo2 ?? "--") + "%", "", v.spo2 < 92)}${vit("RR", dead ? "0" : v.rr ?? "--", "", v.rr > 28)}${vit("T°", v.temp ?? "--", "", v.temp >= 39)}
+    </dl>
+  </section>
+  ${over ? `<section class="feedback ${dead ? "bad" : "good"}"><h2>${dead ? "🪦 Bệnh nhân đã đăng xuất" : "🏥 Xuất viện"}</h2>
+      <p>${dead ? esc(E.answered?.roast || "") + ` ${E.wrongQ.size} câu đề liên quan đã vào hàng Thắp nhang.` : E.hp === 100 ? "Không mất giọt máu nào. Đáng ngờ. Có tra Google không đó?" : `${esc(c.patient?.name)} sống với ${E.hp} HP. Có di chứng, nhưng sống.`}</p>
+      <div class="row"><button class="btn" data-act="er-again">Chơi lại ca này</button><button class="btn red" data-act="er-new">Ca mới</button>${dead ? `<button class="btn amber" data-act="tab" data-id="review">Thắp nhang</button>` : ""}</div></section>`
+  : `<section class="panel qcard" id="qcard">
+    ${E.step === 0 ? `<p class="muted" style="white-space:pre-line">${esc(c.opening)}</p>` : ""}
+    <p>${esc(st.narrative)}</p>
+    <p class="stem">${esc(st.question)}</p>
+    <div class="opts">${st.options.map((o) => {
+      let cls = ""; if (E.answered) cls = o.ok ? "right" : o.k === E.answered.k ? "wrong" : "faded";
+      return `<button class="opt ${cls}" data-act="er-answer" data-k="${esc(o.k)}" ${E.answered ? "disabled" : ""}><span class="k">${esc(o.k)}</span><span>${esc(o.t)}${E.answered && (o.ok || o.k === E.answered.k) ? `<small>${esc(o.why || "")}</small>` : ""}</span></button>`;
+    }).join("")}</div>
+    ${E.answered ? `<div class="feedback ${E.answered.ok ? "good" : "bad"}"><p class="roast">${E.answered.ok ? "" : `−${st.penalty} HP · `}${esc(E.answered.roast)}</p>
+      ${st.qids?.length ? `<p class="note mono">${st.qids.length} câu đề liên quan → ${E.answered.ok ? "đẩy lịch ôn xa hơn" : "ôn lại sau 10 phút"}</p>` : ""}
+      <div class="row"><button class="btn" data-act="er-next" id="next">${E.step + 1 >= c.steps.length ? "Kết thúc ca" : "Tiếp tục →"}</button><span class="kbd">Enter</span></div></div>` : ""}
+  </section>`}`;
+}
+function erAnswer(k) {
+  const E = S.er; if (!E?.case || E.answered) return;
+  const st = E.case.steps[E.step];
+  const ok = st.options.find((o) => o.k === k)?.ok === true;
+  const now = Date.now();
+  const ms = now - E.start;
+  for (const id of st.qids || []) {
+    const q = S.questions[E.case.code]?.[id]; if (!q) continue;
+    const u = { ...q, seen: (q.seen || 0) + 1 };
+    if (ok) { if (u.card) u.card = schedule(u.card, ratingFrom(true, ms), now, nextExamAt(E.case.code)); }
+    else { u.wrong = (u.wrong || 0) + 1; u.lastWrongAt = now; const c = schedule(u.card || newCard(now), "again", now, nextExamAt(E.case.code)); u.card = { ...c, due: Math.max(c.due, now + 10 * MIN) }; E.wrongQ.add(id); }
+    saveQuestion(E.case.code, u);
+  }
+  S.stats.total++; if (!ok) S.stats.wrong++;
+  bumpStreak();
+  let text;
+  if (ok) text = fill(pick(PRAISE), { patient: E.case.patient?.name || "Bệnh nhân" });
+  else {
+    E.hp -= st.penalty || 20;
+    text = roast(severity(E.hp, 100), { patient: E.case.patient?.name || "Bệnh nhân", hp: Math.max(0, E.hp), penalty: st.penalty || 20, source: "cũ" });
+  }
+  E.answered = { k, ok, roast: text };
+  if (E.hp <= 0) {
+    S.stats.killed++;
+    if (S.db) S.db.collection("graves").add({ patient: `${E.case.patient?.name}, ${E.case.patient?.age}t`, code: E.case.code, subject: S.subjects[E.case.code]?.name || "", diedAt: now, qids: [...E.wrongQ], epitaph: `${E.case.title}. Ra đi lúc ${fmtShort(now)}.` }).catch(() => {});
+  }
+  saveStats();
+  render();
+  if (!ok) { $("#mon")?.classList.add("shake"); navigator.vibrate?.(E.hp <= 0 ? [250, 80, 500] : 100); }
+}
+function erNext() {
+  const E = S.er; if (!E?.answered) return;
+  if (E.step + 1 >= E.case.steps.length) { E.finished = true; if (E.hp > 0) { S.stats.saved++; saveStats(); } }
+  else { E.step++; E.start = Date.now(); }
+  E.answered = null;
+  render();
+}
+
+/* ------------------------------------------------------------------ */
+/* Sự kiện                                                             */
+/* ------------------------------------------------------------------ */
+document.addEventListener("click", async (ev) => {
+  const el = ev.target.closest("[data-act]"); if (!el || el.tagName === "SELECT" || el.type === "checkbox") return;
+  const a = el.dataset.act, d = el.dataset;
+  switch (a) {
+    case "tab": if (d.id === "practice" && S.practice?.done) S.practice = { code: S.practice.code }; go(d.id); break;
+    case "open-subject": S.subject = d.code; S.openLesson = null; go("subject"); break;
+    case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; render(); break;
+    case "practice-subject": S.practice = { code: d.code }; go("practice"); break;
+    case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
+    case "import-subject": S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
+    case "rename-lesson": {
+      const s = S.subjects[S.subject]; const l = s.lessons.find((x) => x.id === d.id);
+      const row = el.closest(".lesson");
+      row.querySelector("h3").outerHTML = `<form class="row" data-form="rename" data-id="${d.id}"><input type="text" id="rn-${d.id}" value="${esc(l.name)}" style="flex:1"><button class="btn small">Lưu</button><button type="button" class="btn small ghost" data-act="del-lesson" data-id="${d.id}">Xoá bài</button></form>`;
+      $(`#rn-${d.id}`)?.focus();
+      break;
+    }
+    case "del-lesson": {
+      const s = { ...S.subjects[S.subject] };
+      const n = qs(s.code).filter((q) => q.lesson === d.id).length;
+      if (n && !el.dataset.confirm) { el.dataset.confirm = "1"; el.textContent = `Xoá? ${n} câu sẽ thành “chưa xếp bài”`; return; }
+      s.lessons = s.lessons.filter((l) => l.id !== d.id);
+      await saveSubject(s);
+      for (const q of qs(s.code).filter((q) => q.lesson === d.id)) saveQuestion(s.code, { ...q, lesson: "" });
+      render(); break;
+    }
+    case "del-q": {
+      if (!el.dataset.confirm) { el.dataset.confirm = "1"; el.textContent = "Chắc chưa? Bấm lần nữa"; return; }
+      delete S.questions[d.code][d.id];
+      if (S.db) write(qPath(d.code, d.id), () => S.db.doc(qPath(d.code, d.id)).delete());
+      render(); break;
+    }
+    case "answer": answerPractice(d.k); break;
+    case "reveal": S.practice.revealed = true; render(); break;
+    case "self-grade": answerPractice(null, d.ok === "1"); break;
+    case "next-q": nextQuestion(); break;
+    case "explain": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice); break; }
+    case "explain-review": { const it = S.review.queue[0]; explainQuestion(it.code, it.id, null); break; }
+    case "end-practice": if (S.practice.answeredCount) { S.practice.done = true; render(); } else { S.practice = { code: S.practice.code }; render(); } break;
+    case "restart-practice": S.practice = { code: S.practice.code, lesson: S.practice.lesson }; render(); break;
+    case "start-review": startReview(d.code); break;
+    case "flip": S.review.flipped = true; render(); break;
+    case "rate": rateCard(d.r); break;
+    case "end-review": S.review = null; render(); break;
+    case "pray": {
+      const g = S.graves[d.id];
+      const queue = g.qids.filter((id) => S.questions[g.code]?.[id]).map((id) => ({ id, code: g.code }));
+      S.review = { queue, flipped: false, done: 0, msg: null }; go("review"); break;
+    }
+    case "save-import": saveImport(); break;
+    case "discard-import": S.imp.items = null; render(); break;
+    case "cancel-import": S.imp.ctl?.abort(); break;
+    case "er-answer": erAnswer(d.k); break;
+    case "er-next": erNext(); break;
+    case "er-again": startCase(S.er.case); break;
+    case "er-new": { const c = S.er.case; S.er = { code: c.code }; buildCase(c.code, c.lesson); break; }
+    case "er-quit": S.er = { code: S.er.case?.code }; render(); break;
+    case "er-replay": startCase(S.er.saved); break;
+    case "add-subject": toast("Nhắn Claude trong khung chat để thêm môn."); break;
+  }
+});
+document.addEventListener("change", async (ev) => {
+  const el = ev.target; const d = el.dataset;
+  if (d.act === "move-q") { const q = S.questions[d.code][d.id]; saveQuestion(d.code, { ...q, lesson: el.value }); render(); }
+  if (d.act === "exam-done") { const s = { ...S.subjects[d.code], exams: S.subjects[d.code].exams.map((e, i) => (i === +d.idx ? { ...e, done: el.checked } : e)) }; await saveSubject(s); render(); }
+  if (d.act === "p-code") { S.practice = { code: el.value }; render(); }
+  if (d.act === "e-code") { S.er = { code: el.value }; loadSavedCase(el.value); render(); }
+  if (d.act === "imp-keep") { S.imp.items[+d.i].keep = el.checked; render(); }
+  if (d.act === "imp-code") { const x = S.imp.items[+d.i]; x.code = el.value; x.lesson = ""; render(); }
+  if (d.act === "imp-lesson") { S.imp.items[+d.i].lesson = el.value; }
+});
+document.addEventListener("submit", async (ev) => {
+  const f = ev.target.closest("[data-form]"); if (!f) return;
+  ev.preventDefault();
+  const k = f.dataset.form;
+  if (k === "start-practice") startPractice($("#p-code").value, $("#p-lesson").value, $("#p-mode").value, Math.max(1, Math.min(200, +$("#p-n").value || 20)));
+  if (k === "import") runImport(f);
+  if (k === "er") buildCase($("#e-code").value, $("#e-lesson").value);
+  if (k === "add-lesson") {
+    const name = $("#new-lesson").value.trim(); if (!name) return;
+    const s = { ...S.subjects[S.subject], lessons: [...(S.subjects[S.subject].lessons || []), { id: uid("l"), name }] };
+    await saveSubject(s); render();
+  }
+  if (k === "rename") {
+    const name = $(`#rn-${f.dataset.id}`).value.trim(); if (!name) return;
+    const s = { ...S.subjects[S.subject], lessons: S.subjects[S.subject].lessons.map((l) => (l.id === f.dataset.id ? { ...l, name } : l)) };
+    await saveSubject(s); render();
+  }
+  if (k === "add-exam") {
+    const code = f.dataset.code; const at = $("#exam-at").value;
+    if (!at) return;
+    const iso = new Date(at + ":00+07:00").toISOString();
+    const s = { ...S.subjects[code], exams: [...(S.subjects[code].exams || []), { title: $("#exam-title").value.trim() || S.subjects[code].name, at: iso, done: false }] };
+    await saveSubject(s); render();
+  }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && ev.target.matches("[role=button][data-act]")) { ev.preventDefault(); ev.target.click(); return; }
+  if (ev.target.matches("input, textarea, select") || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const key = ev.key;
+  if (S.tab === "practice" && S.practice?.items && !S.practice.done) {
+    const P = S.practice;
+    if (!P.answered) {
+      const q = S.questions[P.items[P.i].code]?.[P.items[P.i].id];
+      if (q?.options?.some((o) => o.k === key.toUpperCase())) { ev.preventDefault(); answerPractice(key.toUpperCase()); }
+    } else if (key === "Enter") { ev.preventDefault(); nextQuestion(); }
+  }
+  if (S.tab === "review" && S.review?.queue.length) {
+    if (!S.review.flipped && (key === " " || key === "Enter")) { ev.preventDefault(); S.review.flipped = true; render(); }
+    else if (S.review.flipped && "1234".includes(key) && key.length === 1) { ev.preventDefault(); rateCard(["again", "hard", "good", "easy"][+key - 1]); }
+  }
+  if (S.tab === "er" && S.er?.case) {
+    if (!S.er.answered && /^[a-dA-D]$/.test(key)) { ev.preventDefault(); erAnswer(key.toUpperCase()); }
+    else if (S.er.answered && key === "Enter") { ev.preventDefault(); erNext(); }
+  }
+});
+function afterRender() { $("#next")?.focus({ preventScroll: true }); }
+async function loadSavedCase(code) {
+  if (!S.db || !code) return;
+  S.er = S.er?.code === code ? S.er : { code };
+  try { const snap = await S.db.doc(`cases/${code}__all`).get(); if (snap.exists && S.er && !S.er.case && S.er.code === code) { S.er.saved = snap.data(); render(); } } catch {}
+}
+
+/* ------------------------------------------------------------------ */
+/* Khởi động: nối db + sample                                          */
+/* ------------------------------------------------------------------ */
+const qSubs = {};
+function watchQuestions(code) {
+  if (qSubs[code]) return;
+  qSubs[code] = S.db.collection(`subjects/${code}/questions`).limit(1000).onSnapshot((snap) => {
+    const m = {};
+    for (const d of snap.docs) m[d.id] = { id: d.id, ...d.data() };
+    S.questions[code] = m;
+    onData();
+  }, (e) => console.warn("questions", code, e));
+}
+async function boot() {
+  try { const t = localStorage.getItem("pt.tab"); if (t && TABS.some(([id]) => id === t)) S.tab = t; } catch {}
+  render();
+  const [db, sample] = await Promise.all([window.claude?.use("db") ?? null, window.claude?.use("sample") ?? null]);
+  S.sample = sample;
+  if (sample) {
+    try { const lim = await sample.limits(); S.canImages = !!lim.images; S.imgMax = lim.images?.maxCount; } catch {}
+  }
+  if (!db) {
+    S.loaded.subjects = true;
+    $("#app").innerHTML = `<div class="empty"><h2>Không kết nối được kho dữ liệu</h2><p class="muted">Mở trang này từ claude.ai bằng tài khoản của bạn. Bản tải về máy hoặc mở ngoài Claude sẽ không có dữ liệu.</p></div>`;
+    return;
+  }
+  S.db = db;
+  db.collection("subjects").onSnapshot((snap) => {
+    const m = {};
+    for (const d of snap.docs) { m[d.id] = { code: d.id, ...d.data() }; watchQuestions(d.id); }
+    S.subjects = m;
+    S.loaded.subjects = true;
+    onData();
+  }, () => { S.loaded.subjects = true; onData(); });
+  db.doc("meta/stats").onSnapshot((snap) => { if (snap.exists) { S.stats = { ...S.stats, ...snap.data() }; onData(); } });
+  db.collection("graves").limit(500).onSnapshot((snap) => {
+    const m = {}; for (const d of snap.docs) m[d.id] = d.data(); S.graves = m; onData();
+  });
+}
+boot();
+</script>

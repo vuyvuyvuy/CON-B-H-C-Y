@@ -48,3 +48,9 @@ npm run test:db      # chạy migration + smoke test trên Postgres local có pg
 | `src/lib/outbox.ts`, `device.ts` | Hàng đợi offline, danh tính thiết bị, Web Push |
 | `src/components/` | Countdown, ca cấp cứu, nghĩa trang, import… |
 | `src/app/api/` | Import, chấm đáp án, thắp nhang, duyệt ca, thiết bị, cron |
+
+## Bản Artifact cá nhân (không cần đăng nhập, không cần deploy)
+
+`artifact/phong-truc.html` là bản một trang chạy thẳng trên claude.ai: https://claude.ai/artifact/Dcb23dMtWcJ8sTwkMoz4Z8
+Dữ liệu (môn, bài, câu đề cũ, thẻ ôn, nghĩa trang) lưu trong kho của Artifact, chỉ chủ sở hữu đọc/ghi.
+`artifact/seed.json` là dữ liệu nạp ban đầu (15 môn, lịch thi, danh sách bài nháp, 4 câu ví dụ).
