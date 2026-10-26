@@ -53,4 +53,4 @@ npm run test:db      # chạy migration + smoke test trên Postgres local có pg
 
 `artifact/phong-truc.html` là bản một trang chạy thẳng trên claude.ai: https://claude.ai/artifact/Dcb23dMtWcJ8sTwkMoz4Z8
 Dữ liệu (môn, bài, câu đề cũ, thẻ ôn, nghĩa trang) lưu trong kho của Artifact, chỉ chủ sở hữu đọc/ghi.
-`artifact/seed.json` là dữ liệu nạp ban đầu (15 môn, lịch thi, danh sách bài nháp, 4 câu ví dụ).
+`artifact/seed.json` là dữ liệu nạp ban đầu (15 môn và lịch thi; chưa có bài và câu nào — thêm khi nạp đề).

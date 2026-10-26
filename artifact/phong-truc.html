@@ -936,7 +936,7 @@ function chunkExam(text, max = 9000) {
   if (cur.trim()) chunks.push(cur);
   return chunks;
 }
-function classifyPrompt(I, body, tail, isImage) {
+function classifyPrompt(I, body, tail, isImage, proposed = []) {
   const subs = subjectList();
   const subjBlock = I.code
     ? `MÔN: ${S.subjects[I.code].name} (mã ${I.code})\nCÁC BÀI CỦA MÔN (id: tên):\n${(S.subjects[I.code].lessons || []).map((l) => `${l.id}: ${l.name}`).join("\n") || "(chưa có bài nào)"}`
@@ -953,7 +953,7 @@ LUẬT:
 - Giữ nguyên ý câu hỏi; chỉ sửa lỗi chính tả/OCR/xuống dòng hiển nhiên. Không gộp, không bỏ, không bịa câu.
 - Trắc nghiệm: "options" giữ đúng ký tự A, B, C, D, E như đề; "answer" là MỘT ký tự. Câu tự luận / điền khuyết / đúng-sai không có lựa chọn: "options": [] và "answer" là đáp án ngắn gọn.
 - Đề có bảng đáp án hoặc đánh dấu đáp án: dùng nó, "answer_source": "key". Không có: tự giải theo kiến thức y khoa chuẩn (sách giáo khoa Việt Nam, khuyến cáo hiện hành), "answer_source": "ai".
-- Xếp bài: chọn bài có sẵn khớp nhất về nội dung bệnh lý/chủ đề. Chỉ khi không bài nào phù hợp mới để "lesson": null và đề xuất "new_lesson" (tên ngắn, kiểu tên bài giảng). "confidence" là độ chắc của việc xếp bài.
+- Xếp bài: chọn bài có sẵn khớp nhất về nội dung bệnh lý/chủ đề. Chỉ khi không bài nào phù hợp mới để "lesson": null và đề xuất "new_lesson" (tên ngắn theo kiểu tên bài trong giáo trình, ví dụ "Viêm tai giữa mạn"). Các câu cùng chủ đề phải dùng ĐÚNG CÙNG một tên bài mới, viết y hệt nhau. "confidence" là độ chắc của việc xếp bài.${proposed.length ? `\n- Tên bài mới đã đề xuất ở các phần trước của đề này (dùng lại đúng tên nếu khớp): ${proposed.join("; ")}` : ""}
 - Đánh số câu ("Câu 3.") không đưa vào "stem".
 ${tail ? `\nPHẦN CUỐI CỦA TOÀN BỘ ĐỀ (có thể chứa bảng đáp án dùng chung cho mọi phần):\n"""${tail}"""\n` : ""}
 ${isImage ? "" : `ĐOẠN ĐỀ CẦN XỬ LÝ:\n"""\n${body}\n"""`}
@@ -970,16 +970,17 @@ async function runImport(form) {
   if (I.text.trim()) {
     const chunks = chunkExam(I.text);
     const tail = chunks.length > 1 ? I.text.slice(-1500) : "";
-    chunks.forEach((c, i) => jobs.push({ label: `Phần ${i + 1}/${chunks.length}`, prompt: classifyPrompt(I, c, tail, false) }));
+    chunks.forEach((c, i) => jobs.push({ label: `Phần ${i + 1}/${chunks.length}`, prompt: (names) => classifyPrompt(I, c, tail, false, names) }));
   }
   const maxImg = S.imgMax || 5;
-  for (let i = 0; i < files.length; i += maxImg) jobs.push({ label: `Ảnh ${i + 1}–${Math.min(files.length, i + maxImg)}`, prompt: classifyPrompt(I, "", "", true), images: files.slice(i, i + maxImg) });
+  for (let i = 0; i < files.length; i += maxImg) jobs.push({ label: `Ảnh ${i + 1}–${Math.min(files.length, i + maxImg)}`, prompt: (names) => classifyPrompt(I, "", "", true, names), images: files.slice(i, i + maxImg) });
   render();
   const out = [];
   try {
     for (let j = 0; j < jobs.length; j++) {
       I.log = `${jobs[j].label} · Claude đang đọc… (đề dài có thể mất 1–2 phút mỗi phần)`; render();
-      const res = await S.sample.json(jobs[j].prompt, { signal: I.ctl.signal, ...(jobs[j].images ? { images: jobs[j].images } : {}), cache: false });
+      const names = [...new Set(out.map((x) => x?.new_lesson).filter(Boolean).map(String))];
+      const res = await S.sample.json(jobs[j].prompt(names), { signal: I.ctl.signal, ...(jobs[j].images ? { images: jobs[j].images } : {}), cache: false });
       if (Array.isArray(res)) out.push(...res);
       I.progress = (j + 1) / jobs.length;
     }
