@@ -189,6 +189,17 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .reader { white-space: pre-line; font-size: 15px; line-height: 1.65; background: var(--bg); border-radius: 8px; padding: 14px; border: 1px solid var(--line); overflow-wrap: anywhere; }
 .reader mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; }
 
+/* ---------- tình huống ---------- */
+.cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.casecard { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 6px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.casecard:hover, .casecard:focus-visible { border-color: var(--alarm); }
+.casecard:focus-visible { outline: 2px solid var(--alarm); outline-offset: 2px; }
+.casecard b { font-weight: 600; line-height: 1.35; }
+details.setting > summary, details.covers > summary { cursor: pointer; list-style-position: inside; }
+details.setting .vignette { margin: 8px 0 0; }
+details.covers { display: grid; gap: 8px; }
+details.covers .qlist { margin: 8px 0; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>
 
@@ -212,6 +223,8 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
      subjects/<code>/questions/<id>        câu đề cũ (đủ nội dung) hoặc trạng thái ôn của thẻ Anki
      packs/*.json, notes/*.json, media/*   (file tĩnh đi kèm trang) thẻ Anki, bài soạn, hình
      graves/<id>                           bệnh nhân đã "đăng xuất"
+     cases/<code>.json                     (file tĩnh) ca tình huống soạn sẵn theo từng bài; trạng thái ôn
+                                           của từng câu lưu như thẻ Anki: subjects/<code>/questions/c_…
      cases/<code>__<lesson>                ca cấp cứu AI gen gần nhất của 1 bài
      meta/stats                            tổng câu, câu sai, streak…
    ===================================================================== */
@@ -225,6 +238,8 @@ const S = {
   questions: {},           // code -> { id -> question } (gộp gói thẻ tĩnh + dữ liệu trong kho)
   docs: {},                // code -> { id -> document trong kho }
   pack: {},                // code -> { cards: {id -> thẻ}, notes: {lessonId -> file bài soạn} }
+  cases: {},               // code -> { lessonId -> [ca tình huống soạn sẵn] }
+  caseById: {},            // id ca -> ca (kèm code, lesson)
   notesCache: {},          // file -> [trang]
   reader: null,            // trình đọc bài soạn
   graves: {},
@@ -237,6 +252,7 @@ const S = {
   review: null,            // phiên thắp nhang
   imp: null,               // phiên nạp đề
   er: null,                // ca cấp cứu
+  cs: null,                // tab Tình huống: { code }
 };
 
 /* ------------------------------------------------------------------ */
@@ -273,6 +289,7 @@ function rich(html) {
   const out = root.innerHTML; richCache.set(html, out); return out;
 }
 const isAnki = (q) => q?.kind === "anki";
+const isCase = (q) => q?.kind === "case";
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem);
 const qBack = (q) => isAnki(q) ? rich(q.back) : esc(q.answer);
 const STARS = { 3: "★★★ hay thi", 2: "★★ cần nhớ", 1: "★ ít ra thi" };
@@ -286,7 +303,7 @@ async function loadNotes(code, lesson) {
 }
 const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
 function passages(pages, q, k = 2) {
-  const want = grams(q.stem + " " + q.answer);
+  const want = grams(q.stem + " " + (q.options?.find((o) => o.k === q.answer)?.t || q.answer));
   const out = [];
   pages.forEach((txt, pi) => {
     const slideHit = q.slide && new RegExp(`\\bSlide\\s*${q.slide}\\b`, "i").test(txt);
@@ -334,7 +351,7 @@ function write(path, fn) {
 const qPath = (code, id) => `subjects/${code}/questions/${id}`;
 /* Mỗi câu có b = hash(id) % 8: kho chỉ trả tối đa 1000 câu/truy vấn, môn nhiều câu thì chia nhóm theo b. */
 const bucket = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) % 8; };
-const STATE_FIELDS = ["seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "deleted"];
+const STATE_FIELDS = ["seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "aiNote", "deleted"];
 function rebuild(code) {
   const pack = S.pack[code]?.cards || {}, docs = S.docs[code] || {}, m = {};
   for (const id in pack) { const d = docs[id]; if (d?.deleted) continue; m[id] = { ...pack[id], ...(d || {}), id }; }
@@ -412,6 +429,14 @@ function nextExamAt(code) {
 /* Kho câu chửi                                                        */
 /* ------------------------------------------------------------------ */
 const ROAST = {
+  ward: [   // sai ở ca tình huống (chưa nguy kịch)
+    "{patient} kể bệnh sử rõ như đọc chính tả, bạn vẫn chẩn đoán trật. −{penalty} HP.",
+    "Đáp án nằm ngay trong bệnh cảnh, đọc lại đi. Bệnh nhân đã kể, chỉ có bạn là không nghe.",
+    "Người nhà {patient} đang google lại tên bạn để viết review 1 sao.",
+    "Bệnh án viết dài như đề văn để bạn đọc, không phải để bạn lướt như lướt Facebook.",
+    "Sai câu này ngoài đời thì không có nút 'Câu tiếp'. Còn {hp} HP, liệu mà làm.",
+    "Thầy mà đi buồng gặp câu trả lời này chắc xin nghỉ hưu sớm.",
+  ],
   scratch: [
     "Sai. {patient} mất {penalty} máu. Chắc tối qua lại lướt TikTok tới 2 giờ sáng?",
     "Câu này nằm trong đề {source}. Đề CŨ. Đã từng ra. Người ta đưa đáp án tận tay mà vẫn trật.",
@@ -493,8 +518,10 @@ function rank() {
 /* Truy vấn dữ liệu                                                    */
 /* ------------------------------------------------------------------ */
 const subjectList = () => Object.values(S.subjects).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
-const qs = (code) => Object.values(S.questions[code] || {});
-const allQs = () => subjectList().flatMap((s) => qs(s.code).map((q) => ({ ...q, code: s.code })));
+/* qs: đề cũ + thẻ Anki (kho luyện đề). Câu tình huống soạn sẵn nằm riêng ở tab Tình huống, chỉ gộp vào Thắp nhang. */
+const qsAll = (code) => Object.values(S.questions[code] || {});
+const qs = (code) => qsAll(code).filter((q) => !isCase(q));
+const allQs = () => subjectList().flatMap((s) => qsAll(s.code).map((q) => ({ ...q, code: s.code })));
 const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now;
 const dueList = () => allQs().filter((q) => isDue(q)).sort((a, b) => a.card.due - b.card.due);
 const lessonName = (code, lid) => (S.subjects[code]?.lessons || []).find((l) => l.id === lid)?.name || "Chưa xếp bài";
@@ -524,7 +551,7 @@ function liveStreak() {
 /* Khung + điều hướng                                                  */
 /* ------------------------------------------------------------------ */
 const TABS = [
-  ["home", "Bảng tử thần"], ["practice", "Luyện đề"], ["review", "Thắp nhang"],
+  ["home", "Bảng tử thần"], ["cases", "Tình huống"], ["practice", "Luyện đề"], ["review", "Thắp nhang"],
   ["er", "Cấp cứu"], ["import", "Nạp đề"], ["graves", "Nghĩa trang"],
 ];
 function renderNav() {
@@ -533,6 +560,7 @@ function renderNav() {
     `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && (S.tab === "subject" || S.tab === "reader"))}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
 }
 function go(tab) {
+  if (tab === "practice" && S.practice?.caseRef) S.practice = { code: S.practice.code };
   S.tab = tab;
   if (tab === "er" && !S.er?.case) loadSavedCase(S.er?.code || subjectList().find((x) => qs(x.code).length >= 3)?.code);
   try { localStorage.setItem("pt.tab", tab); } catch {}
@@ -542,7 +570,7 @@ function go(tab) {
 function render() {
   renderNav();
   const app = $("#app");
-  const view = { home: viewHome, subject: viewSubject, practice: viewPractice, review: viewReview, er: viewER, import: viewImport, graves: viewGraves, reader: viewReader }[S.tab] || viewHome;
+  const view = { home: viewHome, cases: viewCases, subject: viewSubject, practice: viewPractice, review: viewReview, er: viewER, import: viewImport, graves: viewGraves, reader: viewReader }[S.tab] || viewHome;
   app.innerHTML = view();
   afterRender();
 }
@@ -554,7 +582,7 @@ function onData() {
   requestAnimationFrame(() => {
     pendingRender = false;
     renderNav();
-    const busy = (S.tab === "practice" && S.practice?.items) || (S.tab === "review" && S.review) || (S.tab === "er" && S.er?.case) || S.tab === "import";
+    const busy = ((S.tab === "practice" || S.tab === "cases") && S.practice?.items && !S.practice.done) || (S.tab === "review" && S.review) || (S.tab === "er" && S.er?.case) || S.tab === "import";
     if (!busy) render();
   });
 }
@@ -672,6 +700,7 @@ function viewSubject() {
         <div class="row" style="gap:6px;margin-top:4px">${nExam ? `<span class="chip blue">${nExam} câu đề</span>` : ""}${nAnki ? `<span class="chip">${nAnki} thẻ Anki</span>` : ""}${!items.length ? `<span class="chip">trống</span>` : ""}${hot ? `<span class="chip amber">★★★ ${hot}</span>` : ""}${wrong ? `<span class="chip red">${wrong} từng sai</span>` : ""}${due ? `<span class="chip amber">${due} đến hạn</span>` : ""}</div></div>
       <div class="acts">
         ${items.length ? `<button class="btn small" data-act="toggle-lesson" data-id="${l.id}">${open ? "Đóng" : "Xem"}</button><button class="btn small red" data-act="practice-lesson" data-code="${s.code}" data-id="${l.id}">Luyện</button>` : ""}
+        ${S.cases[s.code]?.[l.id]?.length ? `<button class="btn small" data-act="open-cases" data-code="${s.code}" data-lesson="${l.id}">🚑 ${S.cases[s.code][l.id].length} ca</button>` : ""}
         ${hasNotes ? `<button class="btn small ghost" data-act="open-reader" data-code="${s.code}" data-lesson="${l.id}" title="Đọc bài soạn">📖</button>` : ""}
         ${l.id !== "_none" ? `<button class="btn small ghost" data-act="rename-lesson" data-id="${l.id}" title="Đổi tên bài">✎</button>` : ""}
       </div>
@@ -763,14 +792,16 @@ function viewPractice() {
     body = `<p class="note">Tự trả lời trong đầu (hoặc nói to lên cho cả phòng nghe) rồi lật.</p><button class="btn amber big" data-act="reveal">Lật thẻ <span class="kbd">Space</span></button>`;
   }
 
-  return `<div class="row between"><div><p class="eyebrow">${esc(P.title)}</p><h2>Câu ${P.i + 1}/${P.items.length}</h2></div><button class="btn small ghost" data-act="end-practice">Kết thúc phiên</button></div>
+  const cs = it.caseId && S.caseById[it.caseId];
+  return `<div class="row between"><div><p class="eyebrow">${esc(P.title)}</p><h2>${cs ? esc(cs.title) + " · " : ""}Câu ${P.i + 1}/${P.items.length}</h2></div><button class="btn small ghost" data-act="end-practice">${cs ? "Rời ca" : "Kết thúc phiên"}</button></div>
+  ${cs ? `<details class="panel setting" open><summary class="eyebrow">Bệnh cảnh</summary><p class="vignette">${esc(cs.setting)}</p></details>` : ""}
   <section class="monitor ${P.hp <= 0 ? "dead" : ""}" id="mon">
     <div class="row between"><span><b>${esc(P.patient)}</b> <span class="dim">· bệnh nhân #${P.patientNo}</span></span><span class="mono" style="color:${hpCol}">HP ${Math.max(0, P.hp)}/100</span></div>
     <div class="hp"><i style="width:${pct}%;background:${hpCol}" class="${pct <= 25 ? "blink" : ""}"></i></div>
     <p class="note mono">✓ ${P.right} · ✗ ${P.wrongCount} · 🪦 ${P.killed}</p>
   </section>
   <section class="panel qcard" id="qcard">
-    <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "")}</span></span></div>
+    <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : isCase(q) ? "Tình huống" : esc(q.source || "")}</span></span></div>
     <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>
     ${body}
     ${ans ? feedbackBlock(q, ans, it.code) : isMcq ? `<p class="kbd">Phím tắt: A–${q.options[q.options.length - 1].k} để chọn</p>` : ""}
@@ -784,10 +815,31 @@ function feedbackBlock(q, ans, code) {
     <p class="roast">${bad ? `−${ans.penalty} HP · ` : ""}${esc(ans.roast)}</p>
     ${bad || ans.rating === "hard" ? `<p class="note mono">Đã thêm vào Thắp nhang: gặp lại sau ${ans.card ? Math.max(1, Math.round((ans.card.due - Date.now()) / MIN)) : 1} phút.</p>` : ""}
     ${bad && S.pack[code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><div class="lecture"><span class="eyebrow">📖 Bài soạn</span>Đang tìm đoạn liên quan…</div></div>` : ""}
-    ${bad || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
+    ${isCase(q) ? `<div class="explain">${esc(q.why)}</div>` : bad || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
+    ${isCase(q) ? caseExtras(q, code, bad) : ""}
     ${q.aiAnswer ? `<p class="note">⚠ Đáp án câu này do AI giải, đề gốc không có đáp án. Thấy sai thì sửa trong trang môn.</p>` : ""}
     <div class="row"><button class="btn ${bad ? "red" : "green"}" data-act="next-q" id="next">${last ? "Xem tổng kết" : "Câu tiếp →"}</button><span class="kbd">Enter</span></div>
   </div>`;
+}
+/* Câu tình huống: thẻ Anki mà câu này phủ + nhờ Claude giảng sâu hơn (lưu riêng, không đè lời giải soạn sẵn). */
+function caseExtras(q, code, bad) {
+  const cards = (q.covers || []).map((id) => S.questions[code]?.[id]).filter(Boolean);
+  const queued = cards.filter((c) => c.card && c.card.due <= Date.now() + DAY).length;
+  return `${cards.length ? `<details class="covers" ${bad ? "open" : ""}><summary class="eyebrow">🗂 ${cards.length} thẻ Anki của bài liên quan câu này</summary>
+      <div class="qlist">${cards.map((c) => `<div class="qitem"><div class="row between">${stars(c)}${c.slide ? `<span class="eyebrow">slide ${esc(c.slide)}</span>` : ""}</div><div class="rich"><b>${rich(c.front)}</b></div><div class="rich note">${rich(c.back)}</div></div>`).join("")}</div>
+      ${queued >= cards.length ? `<p class="note mono">Mấy thẻ này đã nằm trong hàng Thắp nhang.</p>` : `<button class="btn small amber" data-act="cover-review" data-code="${code}" data-id="${q.id}">Đẩy ${cards.length} thẻ này vào Thắp nhang</button>`}</details>` : ""}
+    <div class="explain" id="ainote" ${q.aiNote ? "" : 'style="border-left-color:var(--dim)"'}>${q.aiNote ? esc(q.aiNote) : S.sample ? `<button class="btn small" data-act="explain-deep">Vẫn chưa thông? Nhờ Claude giảng sâu hơn</button>` : ""}</div>`;
+}
+function queueCovers(code, id) {
+  const q = S.questions[code]?.[id]; if (!q) return;
+  const now = Date.now(); let n = 0;
+  for (const cid of q.covers || []) {
+    const c = S.questions[code][cid]; if (!c) continue;
+    if (c.card && c.card.due <= now + DAY) continue;
+    saveQuestion(code, { ...c, card: c.card ? { ...c.card, due: now } : newCard(now) }); n++;
+  }
+  toast(n ? `${n} thẻ đã vào hàng Thắp nhang. Tối nay khỏi ngủ.` : "Mấy thẻ này đã nằm sẵn trong hàng rồi.");
+  render();
 }
 function practiceSetup() {
   const subs = subjectList().filter((s) => qs(s.code).length);
@@ -821,6 +873,7 @@ function practiceSetup() {
 }
 function practiceSummary() {
   const P = S.practice;
+  if (P.caseRef) return caseSummary(P);
   const pct = P.items.length ? Math.round(P.right / P.answeredCount * 100) : 0;
   const alive = P.hp > 0;
   return `<h1>${alive ? "🏥 Xuất viện" : "🪦 Hết ca"}</h1>
@@ -877,7 +930,7 @@ async function answerPractice(choice, self) {
     const sev = severity(P.hp, 100);
     text = q.wrong >= 3 && sev !== "dead"
       ? roast("repeat", { times: q.wrong })
-      : roast(sev, { patient: P.patient, hp: Math.max(0, P.hp), penalty, source: isAnki(q) ? "thẻ Anki của chính bạn" : q.source || "cũ" });
+      : roast(isCase(q) && (sev === "scratch" || sev === "bleeding") ? "ward" : sev, { patient: P.patient, hp: Math.max(0, P.hp), penalty, source: isAnki(q) ? "thẻ Anki của chính bạn" : q.source || "cũ" });
   }
   q.card = card || null;
   P.answered = { choice, correct, roast: text, penalty, card, rating };
@@ -894,12 +947,15 @@ async function answerPractice(choice, self) {
     $("#mon")?.classList.add("shake"); navigator.vibrate?.(P.hp <= 0 ? [250, 80, 500] : 100);
     fillLecture(it.code, q);
     // đề thi cũ: tự gọi Claude giảng lại; thẻ Anki đã có bài soạn hiện sẵn, muốn sâu hơn thì bấm nút
-    if (!isAnki(q) && !q.explanation && S.sample) explainQuestion(it.code, it.id, choice);
+    if (!isAnki(q) && !isCase(q) && !q.explanation && S.sample) explainQuestion(it.code, it.id, choice);
   }
 }
 function nextQuestion() {
   const P = S.practice; if (!P?.answered) return;
-  if (P.hp <= 0) {           // bệnh nhân mới nhập viện
+  if (P.hp <= 0 && P.caseRef) {   // ca soạn sẵn: cùng một bệnh nhân, làm tiếp cho hết ca
+    P.hp = 100; P.patientNo++; P.sessionWrong = [];
+    toast(`Khoa vừa hồi sinh ${P.patient} để bạn làm nốt ca. Đừng quen.`);
+  } else if (P.hp <= 0) {    // bệnh nhân mới nhập viện
     P.hp = 100; P.patient = pick(PATIENTS.filter((x) => x !== P.patient)); P.patientNo++; P.sessionWrong = [];
     toast(`Bệnh nhân mới nhập viện: ${P.patient}. Lần này cố đừng giết.`);
   }
@@ -912,17 +968,19 @@ function nextQuestion() {
 }
 
 /* Gọi Claude nêu lại kiến thức cho câu sai; lưu vào câu hỏi để lần sau khỏi gọi lại. */
-async function explainQuestion(code, id, choice) {
+async function explainQuestion(code, id, choice, field = "explanation") {
   const q = S.questions[code]?.[id]; if (!q || !S.sample) return;
   const P = S.practice;
-  if (P?.answered) P.answered.explaining = true;
-  const box = () => $("#explain");
+  const deep = field === "aiNote";
+  if (P?.answered && !deep) P.answered.explaining = true;
+  const box = () => $(deep ? "#ainote" : "#explain");
   if (box()) box().textContent = "Đang gọi Claude nêu lại kiến thức…";
   const s = S.subjects[code];
   const pages = await loadNotes(code, q.lesson);
   const ctx = pages ? passages(pages, q, 4).map((p) => `[trang ${p.page}] ${p.text}`).join("\n\n").slice(0, 7000) : "";
   const prompt = `Bạn là giảng viên lâm sàng ở trường Y Việt Nam, giảng cho sinh viên Y4 đang ôn thi môn ${s.name} (bài: ${lessonName(code, q.lesson)}).
-Sinh viên vừa làm SAI ${isAnki(q) ? "thẻ ôn tập (tự làm từ bài giảng)" : "câu đề thi cũ"} dưới đây.
+Sinh viên vừa làm ${deep ? "" : "SAI "}${isAnki(q) ? "thẻ ôn tập (tự làm từ bài giảng)" : isCase(q) ? "câu hỏi tình huống lâm sàng" : "câu đề thi cũ"} dưới đây.
+${isCase(q) && S.caseById[q.caseId] ? `\nBỆNH CẢNH: ${S.caseById[q.caseId].setting}\n` : ""}${deep ? `\nSinh viên đã đọc lời giải ngắn dưới đây mà vẫn chưa thông. Đừng lặp lại nguyên văn; giảng từ gốc (cơ chế, sinh lý bệnh, vì sao từng lựa chọn sai):\n"""${q.why}"""\n` : ""}
 ${ctx ? `\nTRÍCH BÀI SOẠN CỦA SINH VIÊN (dùng làm nguồn chính, giữ đúng cách trình bày và mẹo của bài soạn):\n"""\n${ctx}\n"""\n` : ""}
 
 CÂU HỎI: ${q.stem}
@@ -930,7 +988,7 @@ ${q.options?.length ? q.options.map((o) => `${o.k}. ${o.t}`).join("\n") : ""}
 ĐÁP ÁN ĐÚNG: ${q.answer}${q.options?.length ? " — " + (q.options.find((o) => o.k === q.answer)?.t || "") : ""}
 ${choice ? `SINH VIÊN CHỌN: ${choice} — ${q.options?.find((o) => o.k === choice)?.t || ""}` : ""}
 
-Viết phần "nêu lại kiến thức" bằng tiếng Việt, tối đa 130 từ, văn bản thuần (không markdown, không tiêu đề):
+Viết phần "nêu lại kiến thức" bằng tiếng Việt, tối đa ${deep ? 220 : 130} từ, văn bản thuần (không markdown, không tiêu đề):
 - Câu 1: kiến thức cốt lõi mà câu hỏi kiểm tra.
 - Vì sao đáp án đúng là đúng${choice ? ", và vì sao lựa chọn của sinh viên sai" : ""}.
 - Kết bằng một dòng bắt đầu "Mẹo nhớ:"${ctx ? " (ưu tiên mẹo có sẵn trong bài soạn)" : ""}.
@@ -938,11 +996,11 @@ Giọng chuyên môn, chính xác, không đùa. Nếu đáp án được cho c�
   try {
     const { text } = await S.sample(prompt, { onText: ({ text }) => { if (box()) box().textContent = text; }, cache: { gcTime: 864e5 } });
     const cur = S.questions[code][id];
-    const updated = { ...cur, explanation: text.trim(), aiExplained: true };
+    const updated = deep ? { ...cur, aiNote: text.trim() } : { ...cur, explanation: text.trim(), aiExplained: true };
     saveQuestion(code, updated);
-    if (P?.answered) P.answered.explaining = false;
+    if (P?.answered && !deep) P.answered.explaining = false;
   } catch (e) {
-    if (P?.answered) P.answered.explaining = false;
+    if (P?.answered && !deep) P.answered.explaining = false;
     if (box()) box().textContent = sampleErr(e, "giảng lại");
   }
 }
@@ -951,6 +1009,79 @@ function sampleErr(e, what) {
   if (e?.code === "rate_limited") return "Claude đang quá tải hoặc bạn hết lượt dùng. Lát nữa thử lại.";
   if (e?.code === "invalid_json") return "Claude trả về sai định dạng. Bấm thử lại.";
   return `Không ${what} được (lỗi ${e?.code || "mạng"}). Thử lại sau.`;
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Tình huống — ca soạn sẵn theo từng bài, tách riêng khỏi đề cũ  */
+/* ------------------------------------------------------------------ */
+function caseStats(code, list) {
+  const qq = list.flatMap((c) => c.qs).map((x) => S.questions[code]?.[x.id]).filter(Boolean);
+  return { n: qq.length, done: qq.filter((q) => q.seen).length, wrong: qq.filter((q) => q.wrong).length, due: qq.filter((q) => isDue(q)).length };
+}
+function viewCases() {
+  const P = S.practice;
+  if (P?.caseRef && P.items) return P.done ? practiceSummary() : viewPractice();
+  const codes = subjectList().map((s) => s.code).filter((c) => S.cases[c]);
+  const head = `<h1>Tình huống</h1><p class="muted">Ca lâm sàng soạn sẵn từ bài soạn và thẻ Anki của bạn, chia theo từng bài. Mỗi bài có vài ca, mỗi ca vài câu hỏi; các ca của một bài phủ hết ý ★★★ và ★★. Đề cũ nằm riêng ở Luyện đề. Câu tình huống làm sai sẽ vào Thắp nhang.</p>`;
+  if (!codes.length) return head + `<div class="empty"><h2>Chưa có ca nào</h2><p class="muted">Gửi bài soạn và Anki của một môn cho Claude trong khung chat, Claude sẽ soạn ca cho từng bài.</p></div>`;
+  const code = S.cs?.code && S.cases[S.cs.code] ? S.cs.code : codes[0];
+  const s = S.subjects[code], byL = S.cases[code];
+  const lessons = (s.lessons || []).filter((l) => byL[l.id]?.length);
+  const all = caseStats(code, lessons.flatMap((l) => byL[l.id]));
+  const rows = lessons.map((l, li) => {
+    const st = caseStats(code, byL[l.id]);
+    return `<section class="panel stack" id="cl-${l.id}">
+      <div class="row between"><h3><span class="mono dim">${li + 1}.</span> ${esc(l.name)}</h3>
+        <div class="row" style="gap:6px">${S.pack[code]?.notes?.[l.id] ? `<button class="btn small ghost" data-act="open-reader" data-code="${code}" data-lesson="${l.id}" title="Đọc bài soạn">📖</button>` : ""}${st.wrong ? `<button class="btn small amber" data-act="case-wrong" data-code="${code}" data-lesson="${l.id}">Làm lại ${st.wrong} câu sai</button>` : ""}</div></div>
+      <div class="row" style="gap:6px"><span class="chip blue">${byL[l.id].length} ca · ${st.n} câu</span>${st.done ? `<span class="chip ${st.done === st.n ? "green" : ""}">đã làm ${st.done}/${st.n}</span>` : `<span class="chip">chưa đụng tới</span>`}${st.wrong ? `<span class="chip red">${st.wrong} từng sai</span>` : ""}${st.due ? `<span class="chip amber">${st.due} đến hạn</span>` : ""}</div>
+      <div class="cases">${byL[l.id].map((c, ci) => {
+        const cs = caseStats(code, [c]);
+        return `<button class="casecard" data-act="play-case" data-id="${c.id}">
+          <span class="mono dim">Ca ${ci + 1}</span><b>${esc(c.title)}</b>
+          <span class="note">${c.qs.length} câu${cs.done ? ` · đã làm ${cs.done}` : ""}${cs.wrong ? ` · <span style="color:var(--alarm)">sai ${cs.wrong}</span>` : ""}</span>
+          <span class="progress"><i style="width:${Math.round(cs.done / cs.n * 100)}%;background:${cs.wrong ? "var(--warn)" : "var(--ecg)"}"></i></span>
+        </button>`;
+      }).join("")}</div>
+    </section>`;
+  }).join("");
+  return head + `${codes.length > 1 ? `<div class="row">${codes.map((c) => `<button class="btn small ${c === code ? "red" : "ghost"}" data-act="case-subject" data-code="${c}">${esc(S.subjects[c].name)}</button>`).join("")}</div>` : ""}
+    <div class="row between"><h2>${esc(s.name)}</h2><span class="mono dim">${all.done}/${all.n} câu · ${lessons.length} bài</span></div>
+    ${rows}
+    <p class="note">Muốn ca mới hoàn toàn do Claude viết từ câu bạn hay sai? Sang tab <button class="btn small ghost" data-act="tab" data-id="er">Cấp cứu</button></p>`;
+}
+const casePatient = (c) => c.setting.match(/^((?:Bé|Anh|Chị|Ông|Bà|Em|Cô|Chú) [^,.]+, [^,.]+)/)?.[1] || pick(PATIENTS);
+function playItems(code, lesson, items, extra) {
+  S.practice = { code, lesson, mode: "case", kind: "case", prio: 0, items, i: 0, hp: 100, patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title: `${S.subjects[code].name} · ${lessonName(code, lesson)}`, ...extra };
+  S.tab = "cases";
+  render();
+  window.scrollTo({ top: 0 });
+}
+function playCase(id) {
+  const c = S.caseById[id]; if (!c) return;
+  S.cs = { code: c.code };
+  playItems(c.code, c.lesson, c.qs.map((x) => ({ id: x.id, code: c.code, caseId: c.id })), { caseRef: id, patient: casePatient(c) });
+}
+function playWrong(code, lesson) {
+  const items = (S.cases[code]?.[lesson] || []).flatMap((c) => c.qs.map((x) => ({ id: x.id, code, caseId: c.id }))).filter((it) => S.questions[code]?.[it.id]?.wrong);
+  if (!items.length) return toast("Bài này chưa sai câu nào. Đáng ngờ.");
+  playItems(code, lesson, items, { caseRef: "wrong:" + lesson, patient: pick(PATIENTS) });
+}
+function nextCaseId(id) {
+  const c = S.caseById[id]; if (!c) return null;
+  const order = (S.subjects[c.code]?.lessons || []).flatMap((l) => (S.cases[c.code]?.[l.id] || []).map((x) => x.id));
+  return order[order.indexOf(id) + 1] || null;
+}
+function caseSummary(P) {
+  const pct = P.answeredCount ? Math.round(P.right / P.answeredCount * 100) : 0;
+  const c = S.caseById[P.caseRef], nx = c && nextCaseId(c.id), nc = nx && S.caseById[nx];
+  return `<h1>${pct === 100 ? "🏥 Xuất viện" : pct >= 60 ? "🩹 Sống, có di chứng" : "🪦 Ca này toang"}</h1>
+  <section class="panel stack">
+    <p class="eyebrow">${c ? esc(c.title) : "Câu từng sai · " + esc(lessonName(P.code, P.lesson))}</p>
+    <p class="mono" style="font-size:22px">${P.right}/${P.answeredCount} đúng · ${pct}%</p>
+    <p>${pct === 100 ? "Không sai câu nào. Hoặc bạn giỏi thật, hoặc bạn nhớ đáp án từ lần trước. Mình nghiêng về vế sau." : pct >= 80 ? `${esc(P.patient)} xuất viện, về nhà kể với hàng xóm là bác sĩ hơi lóng ngóng.` : pct >= 50 ? "Nửa đúng nửa sai, kiểu tung đồng xu nhưng tốn học phí hơn." : `${esc(P.patient)} xin chuyển viện. Không trách được.`}</p>
+    ${P.wrongCount ? `<p class="note">${P.wrongCount} câu sai đã vào hàng Thắp nhang.</p>` : ""}
+    <div class="row">${nc ? `<button class="btn red" data-act="play-case" data-id="${nx}">Ca tiếp: ${esc(nc.title)} →</button>` : ""}${c ? `<button class="btn" data-act="play-case" data-id="${c.id}">Làm lại ca này</button>` : ""}${P.wrongCount ? `<button class="btn amber" data-act="tab" data-id="review">Thắp nhang</button>` : ""}<button class="btn ghost" data-act="case-list">Danh sách ca</button></div>
+  </section>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -978,13 +1109,14 @@ function viewReview() {
   if (!q) { R.queue.shift(); return viewReview(); }
   return `<div class="row between"><div><p class="eyebrow">${esc(S.subjects[it.code]?.name)} · ${esc(lessonName(it.code, q.lesson))}</p><h2>Còn ${R.queue.length} thẻ</h2></div><button class="btn small ghost" data-act="end-review">Dừng</button></div>
   <section class="panel qcard" id="qcard">
-    <div class="row between">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" : esc(q.source || "")}</span></div>
+    <div class="row between">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" : isCase(q) ? "Tình huống" : esc(q.source || "")}</span></div>
+    ${isCase(q) && S.caseById[q.caseId] ? `<details class="setting" open><summary class="eyebrow">Bệnh cảnh · ${esc(S.caseById[q.caseId].title)}</summary><p class="vignette">${esc(S.caseById[q.caseId].setting)}</p></details>` : ""}
     <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>
     ${q.options?.length ? `<div class="opts">${q.options.map((o) => `<div class="opt ${R.flipped ? (o.k === q.answer ? "right" : "faded") : ""}"><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></div>`).join("")}</div>` : ""}
     ${R.flipped ? `
       ${!q.options?.length ? `<div class="back rich">${qBack(q)}</div>` : ""}
       ${S.pack[it.code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><button class="btn small ghost" data-act="show-lecture" style="justify-self:start">📖 Xem đoạn bài soạn</button></div>` : ""}
-      ${q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : S.sample ? `<div class="explain" id="explain"><button class="btn small" data-act="explain-review">Nhờ Claude giảng lại</button></div>` : ""}
+      ${isCase(q) ? `<div class="explain">${esc(q.why)}</div>${q.aiNote ? `<div class="explain">${esc(q.aiNote)}</div>` : ""}` : q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : S.sample ? `<div class="explain" id="explain"><button class="btn small" data-act="explain-review">Nhờ Claude giảng lại</button></div>` : ""}
       <div class="row">
         <button class="btn red" data-act="rate" data-r="again">Quên <span class="kbd">1</span></button>
         <button class="btn" data-act="rate" data-r="hard">Lờ mờ <span class="kbd">2</span></button>
@@ -1393,8 +1525,20 @@ document.addEventListener("click", async (ev) => {
     case "more-q": S.openLimit = (S.openLimit || 40) + 80; render(); break;
     case "next-q": nextQuestion(); break;
     case "explain": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice); break; }
+    case "explain-deep": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice, "aiNote"); break; }
+    case "cover-review": queueCovers(d.code, d.id); break;
+    case "play-case": playCase(d.id); break;
+    case "case-wrong": playWrong(d.code, d.lesson); break;
+    case "case-subject": S.cs = { code: d.code }; render(); break;
+    case "case-list": S.practice = { code: S.practice?.code }; render(); break;
+    case "open-cases": {
+      S.cs = { code: d.code }; if (S.practice?.caseRef) S.practice = { code: d.code };
+      go("cases");
+      requestAnimationFrame(() => $("#cl-" + d.lesson)?.scrollIntoView({ block: "start" }));
+      break;
+    }
     case "explain-review": { const it = S.review.queue[0]; explainQuestion(it.code, it.id, null); break; }
-    case "end-practice": if (S.practice.answeredCount) { S.practice.done = true; render(); } else { S.practice = { code: S.practice.code }; render(); } break;
+    case "end-practice": if (S.practice.answeredCount) { S.practice.done = true; render(); } else { S.practice = { code: S.practice.code }; render(); } window.scrollTo({ top: 0 }); break;
     case "restart-practice": S.practice = { code: S.practice.code, lesson: S.practice.lesson }; render(); break;
     case "start-review": startReview(d.code); break;
     case "flip": S.review.flipped = true; render(); break;
@@ -1459,7 +1603,7 @@ document.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && ev.target.matches("[role=button][data-act]")) { ev.preventDefault(); ev.target.click(); return; }
   if (ev.target.matches("input, textarea, select") || ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const key = ev.key;
-  if (S.tab === "practice" && S.practice?.items && !S.practice.done) {
+  if ((S.tab === "practice" || S.tab === "cases") && S.practice?.items && !S.practice.done) {
     const P = S.practice;
     if (!P.answered) {
       const q = S.questions[P.items[P.i].code]?.[P.items[P.i].id];
@@ -1508,8 +1652,20 @@ async function loadPacks() {
   try {
     const idx = await fetch("packs/index.json").then((r) => (r.ok ? r.json() : null));
     for (const p of idx?.packs || []) {
-      const pack = await fetch(p.file).then((r) => r.json());
+      const pack = p.file ? await fetch(p.file).then((r) => r.json()) : { cards: [] };
       const cards = {}; for (const c of pack.cards) cards[c.id] = c;
+      if (p.cases) {           // ca tình huống: mỗi câu là một "thẻ" kind "case" để dùng chung SRS
+        const cz = await fetch(p.cases).then((r) => r.json());
+        const byL = {};
+        for (const L of cz.lessons) {
+          byL[L.lesson] = L.cases;
+          for (const c of L.cases) {
+            S.caseById[c.id] = { ...c, code: p.code, lesson: L.lesson };
+            for (const x of c.qs) cards[x.id] = { id: x.id, kind: "case", lesson: L.lesson, caseId: c.id, stem: x.stem, options: x.options, answer: x.answer, why: x.why, covers: x.covers };
+          }
+        }
+        S.cases[p.code] = byL;
+      }
       S.pack[p.code] = { cards, notes: p.notes || {} };
       rebuild(p.code);
     }
