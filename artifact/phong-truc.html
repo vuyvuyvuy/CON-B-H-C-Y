@@ -317,7 +317,7 @@ const stars = (q) => q.prio ? `<span class="stars">${STARS[q.prio]}</span>` : ""
 /* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
 async function loadNotes(code, lesson) {
   const file = S.pack[code]?.notes?.[lesson]; if (!file) return null;
-  if (!S.notesCache[file]) S.notesCache[file] = fetch(file, { cache: "no-cache" }).then((r) => r.ok ? r.json() : null).then((j) => j?.pages || null).catch(() => null);
+  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => j?.pages || null).catch(() => null);
   return S.notesCache[file];
 }
 const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
@@ -571,8 +571,11 @@ function liveStreak() {
 /* ------------------------------------------------------------------ */
 /* Thanh trên cùng chỉ có thứ dùng chung mọi môn; đề cũ, tình huống, cấp cứu, nạp đề nằm trong từng môn. */
 const TABS = [["home", "Các môn"], ["review", "Thắp nhang"], ["graves", "Nghĩa trang"]];
-const SUBTABS = [["subject", "Bài học"], ["practice", "Đề cũ & thẻ"], ["cases", "Tình huống"], ["er", "Cấp cứu"], ["import", "Nạp đề"]];
-const inSubject = () => !!S.subject && !!S.subjects[S.subject] && (S.tab === "reader" || SUBTABS.some(([id]) => id === S.tab));
+const SUBTABS = [["subject", "Bài học"], ["cases", "Tình huống"], ["exams", "Đề cũ"], ["anki", "Thẻ Anki"]];
+const SUBVIEWS = ["subject", "cases", "practice", "er", "import", "reader"];
+const inSubject = () => !!S.subject && !!S.subjects[S.subject] && SUBVIEWS.includes(S.tab);
+/* Mục con nào đang sáng: Cấp cứu nằm trong Tình huống, Nạp đề nằm trong Đề cũ. */
+const curSub = () => S.tab === "practice" ? (S.practice?.kind === "exam" ? "exams" : "anki") : S.tab === "import" ? "exams" : S.tab === "er" ? "cases" : S.tab === "reader" ? "subject" : S.tab;
 const scope = (list) => (S.subject && S.subjects[S.subject] ? list.filter((x) => x.code === S.subject) : list);
 function subjectBar() {
   const s = S.subjects[S.subject];
@@ -580,7 +583,7 @@ function subjectBar() {
   return `<div class="subbar">
     <button class="btn small ghost" data-act="tab" data-id="home">← Các môn</button>
     <div><h1>${esc(s.name)}</h1><p class="muted">${esc(s.code)}${exam ? ` · thi ${fmtDate(exam.at)} · còn ${daysUntil(exam.at)} ngày` : ""}</p></div>
-    <nav class="subtabs" aria-label="Mục của môn">${SUBTABS.map(([id, label]) => `<button data-act="sub" data-id="${id}" aria-current="${S.tab === id}">${label}</button>`).join("")}</nav>
+    <nav class="subtabs" aria-label="Mục của môn">${SUBTABS.map(([id, label]) => `<button data-act="sub" data-id="${id}" aria-current="${curSub() === id}">${label}</button>`).join("")}</nav>
   </div>`;
 }
 function renderNav() {
@@ -589,7 +592,8 @@ function renderNav() {
     `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && inSubject())}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
 }
 function go(tab) {
-  if (tab === "practice" && (S.practice?.caseRef || (S.subject && S.practice?.code !== S.subject))) S.practice = { code: S.subject || S.practice.code };
+  if (tab === "exams" || tab === "anki") { S.practice = { code: S.subject, kind: tab === "exams" ? "exam" : "anki" }; tab = "practice"; }
+  if (tab === "practice" && (S.practice?.caseRef || (S.subject && S.practice?.code !== S.subject))) S.practice = { code: S.subject || S.practice.code, kind: S.practice?.kind === "exam" ? "exam" : "anki" };
   if (S.subject) {          // mục trong môn: trỏ mọi phiên về môn đang mở
     if (tab === "cases") S.cs = { code: S.subject };
     if (tab === "er" && S.er?.code !== S.subject) S.er = { code: S.subject };
@@ -872,27 +876,34 @@ function queueCovers(code, id) {
   toast(n ? `${n} thẻ đã vào hàng Thắp nhang. Tối nay khỏi ngủ.` : "Mấy thẻ này đã nằm sẵn trong hàng rồi.");
   render();
 }
+/* Hai mục riêng của môn: "Đề cũ" (câu thi các năm, kèm nạp đề) và "Thẻ Anki". P.kind khóa loại câu. */
 function practiceSetup() {
-  const subs = scope(subjectList()).filter((s) => qs(s.code).length);
-  if (!subs.length) return `<h2>Đề cũ & thẻ Anki</h2><div class="empty"><h2>Kho đề trống trơn</h2><p class="muted">Chưa có câu nào. Bệnh nhân còn chưa kịp nhập viện vì bạn lười quá.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề cũ</button></div>`;
   const P = S.practice || {};
-  const code = P.code && S.subjects[P.code] && qs(P.code).length ? P.code : (allExams().find((e) => !e.done && Date.parse(e.at) > Date.now() && qs(e.code).length)?.code || subs[0].code);
+  const code = S.subject && S.subjects[S.subject] ? S.subject : P.code;
   const s = S.subjects[code];
-  const list = qs(code);
+  if (!s) return `<div class="empty"><p class="muted">Chọn một môn trước.</p></div>`;
+  const exam = P.kind === "exam";
+  const list = qs(code).filter((q) => (exam ? !isAnki(q) : isAnki(q)));
+  const head = exam
+    ? `<div class="row between"><h2>Đề cũ</h2><button class="btn small" data-act="sub" data-id="import">+ Nạp đề năm khác</button></div><p class="muted">Câu thi các năm trước, đã xếp vào từng bài. Làm lại nguyên một đề theo đúng thứ tự, hoặc trộn câu theo bài. Sai câu nào thì câu đó vào Thắp nhang.</p>`
+    : `<h2>Thẻ Anki</h2><p class="muted">Thẻ của bạn, mặt sau có câu cà khịa. Mỗi phiên là một bệnh nhân 100 HP; sai một thẻ mất 20 HP và thẻ đó vào Thắp nhang.</p>`;
+  if (!list.length) return head + (exam
+    ? `<div class="empty"><h2>Chưa có đề cũ nào</h2><p class="muted">Dán đề các năm trước vào, Claude tách câu và xếp vào đúng bài.</p><button class="btn red" data-act="sub" data-id="import">Nạp đề cũ</button></div>`
+    : `<div class="empty"><h2>Môn này chưa có thẻ Anki</h2><p class="muted">Gửi file .apkg cho Claude trong khung chat.</p></div>`);
   const lessonsWithQ = (s.lessons || []).filter((l) => list.some((q) => q.lesson === l.id));
-  const nExam = list.filter((q) => !isAnki(q)).length, nAnki = list.length - nExam;
-  return `<h2>Đề cũ & thẻ Anki</h2>
-  <p class="muted">Mỗi phiên là một bệnh nhân 100 HP. Sai một câu mất 20 HP và câu đó vào hàng Thắp nhang. Chết thì bệnh nhân mới nhập viện, người cũ ra nghĩa trang.</p>
+  const sources = exam ? Object.entries(list.reduce((m, q) => { const k = q.source || "Không rõ nguồn"; (m[k] ||= []).push(q); return m; }, {})) : [];
+  return head + `
+  ${sources.length ? `<section class="panel stack"><p class="eyebrow">Làm lại nguyên đề</p><div class="cases">${sources.map(([src, qq]) => {
+    const wrong = qq.filter((q) => q.wrong).length, done = qq.filter((q) => q.seen).length;
+    return `<button class="casecard" data-act="redo-source" data-code="${code}" data-src="${esc(src)}"><b>${esc(src)}</b><span class="note">${qq.length} câu${done ? ` · đã làm ${done}` : ""}${wrong ? ` · <span style="color:var(--alarm)">sai ${wrong}</span>` : ""}</span></button>`;
+  }).join("")}</div></section>` : ""}
   <form class="panel stack" data-form="start-practice">
+    <p class="eyebrow">${exam ? "Hoặc trộn câu theo bài" : "Luyện thẻ"}</p>
+    <input type="hidden" id="p-code" value="${code}"><input type="hidden" id="p-kind" value="${exam ? "exam" : "anki"}">
     <div class="row" style="align-items:end">
-      ${subs.length > 1 ? `<label class="field" style="flex:1;min-width:180px">Môn<select id="p-code" data-act="p-code">${subs.map((x) => `<option value="${x.code}" ${x.code === code ? "selected" : ""}>${esc(x.name)} (${qs(x.code).length})</option>`).join("")}</select></label>` : `<input type="hidden" id="p-code" value="${code}">`}
-      <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${list.filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
-    </div>
-    <div class="row" style="align-items:end">
-      <label class="field" style="flex:1;min-width:150px">Loại câu<select id="p-kind">
-        <option value="all">Tất cả (${list.length})</option><option value="exam" ${nExam ? "" : "disabled"}>Đề thi cũ (${nExam})</option><option value="anki" ${nAnki ? "" : "disabled"}>Thẻ Anki (${nAnki})</option></select></label>
-      <label class="field" style="flex:1;min-width:150px">Mức<select id="p-prio">
-        <option value="0">Mọi mức</option><option value="3">Chỉ ★★★ hay thi</option><option value="2">Bỏ câu ít ra thi</option></select></label>
+      <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn (${list.length})</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${list.filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
+      ${exam ? `<input type="hidden" id="p-prio" value="0">` : `<label class="field" style="flex:1;min-width:150px">Mức<select id="p-prio">
+        <option value="0">Mọi mức</option><option value="3">Chỉ ★★★ hay thi</option><option value="2">Bỏ câu ít ra thi</option></select></label>`}
       <label class="field" style="flex:1;min-width:150px">Lọc<select id="p-mode">
         <option value="all">Trộn tất cả</option><option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
     </div>
@@ -901,6 +912,17 @@ function practiceSetup() {
       <button class="btn red big" style="flex:1;min-width:160px">Nhận bệnh nhân</button>
     </div>
   </form>`;
+}
+/* Làm lại nguyên một đề cũ, giữ thứ tự câu như trong đề. */
+function redoSource(code, src) {
+  const items = qs(code).filter((q) => !isAnki(q) && (q.source || "Không rõ nguồn") === src)
+    .sort((a, b) => ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0))).map((q) => ({ id: q.id, code }));
+  if (!items.length) return;
+  S.subject = code;
+  S.practice = { code, lesson: "", mode: "all", kind: "exam", prio: 0, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title: `${S.subjects[code].name} · ${src}` };
+  S.tab = "practice";
+  render();
+  window.scrollTo({ top: 0 });
 }
 function practiceSummary() {
   const P = S.practice;
@@ -1081,7 +1103,7 @@ function viewCases() {
   return head + `${codes.length > 1 ? `<div class="row">${codes.map((c) => `<button class="btn small ${c === code ? "red" : "ghost"}" data-act="case-subject" data-code="${c}">${esc(S.subjects[c].name)}</button>`).join("")}</div>` : ""}
     <div class="row between"><h2>${esc(s.name)}</h2><span class="mono dim">${all.done}/${all.n} câu · ${lessons.length} bài</span></div>
     ${rows}
-    <p class="note">Muốn ca mới hoàn toàn do Claude viết từ câu bạn hay sai? Sang mục <button class="btn small ghost" data-act="sub" data-id="er">Cấp cứu</button></p>`;
+    <section class="panel stack"><p class="eyebrow">Ca do Claude viết thêm</p><p class="muted">40 ca ở trên là cố định. Muốn ca mới mỗi lần, bám vào những câu bạn hay sai, thì nhờ Claude viết một ca (mất 1–2 phút).</p><button class="btn red" data-act="sub" data-id="er" style="justify-self:start">🚑 Nhờ Claude viết ca mới</button></section>`;
 }
 const casePatient = (c) => c.setting.match(/^((?:Bé|Anh|Chị|Ông|Bà|Em|Cô|Chú) [^,.]+, [^,.]+)/)?.[1] || pick(PATIENTS);
 function playItems(code, lesson, items, extra) {
@@ -1211,7 +1233,7 @@ function viewGraves() {
 function viewImport() {
   const I = S.imp || (S.imp = { code: "", source: "", text: "", items: null, running: false, progress: 0, log: "" });
   const subs = subjectList();
-  const head = `<h2>Nạp đề cũ</h2>
+  const head = `<button class="btn small ghost" data-act="sub" data-id="exams">← Đề cũ</button><h2>Nạp đề cũ</h2>
   <p class="muted">Dán nguyên đề (kể cả bảng đáp án ở cuối nếu có) hoặc chụp ảnh đề. Claude tách từng câu, giải câu chưa có đáp án, rồi xếp vào đúng bài của môn. Bạn duyệt lại trước khi lưu.</p>`;
   if (!S.sample) {
     return head + `<div class="empty"><h2>Trang chưa được phép dùng Claude</h2><p class="muted">Cho phép khi trang hỏi, hoặc dán đề thẳng vào khung chat với Claude và nhắn “nạp đề này vào Phòng Trực” — Claude sẽ phân loại và ghi vào kho giúp bạn.</p></div>`;
@@ -1377,7 +1399,7 @@ function viewER() {
   const E = S.er || (S.er = {});
   if (E.case) return erPlay(E);
   const subs = scope(subjectList()).filter((s) => qs(s.code).length >= 3);
-  const head = `<h2>Phòng cấp cứu</h2><p class="muted">Claude viết một ca tình huống dài kiểu đề thi (bệnh sử, khám, cận lâm sàng, chi tiết gây nhiễu) từ các câu đề và thẻ của một bài, ưu tiên câu bạn hay sai, bám theo bài soạn. Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
+  const head = `<button class="btn small ghost" data-act="sub" data-id="cases">← Ca soạn sẵn</button><h2>Ca do Claude viết</h2><p class="muted">Claude viết một ca tình huống dài kiểu đề thi (bệnh sử, khám, cận lâm sàng, chi tiết gây nhiễu) từ các câu đề và thẻ của một bài, ưu tiên câu bạn hay sai, bám theo bài soạn. Mỗi quyết định sai trừ máu bệnh nhân và đẩy các câu liên quan vào Thắp nhang.</p>`;
   if (!subs.length) return head + `<div class="empty"><h2>Chưa đủ chất liệu</h2><p class="muted">Cần ít nhất 3 câu đề trong một môn để dựng ca.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề</button></div>`;
   if (!S.sample) return head + `<div class="empty"><p class="muted">Trang chưa được phép dùng Claude nên chưa dựng ca được.</p></div>`;
   const code = E.code && S.subjects[E.code] ? E.code : subs[0].code;
@@ -1525,10 +1547,10 @@ document.addEventListener("click", async (ev) => {
   const el = ev.target.closest("[data-act]"); if (!el || el.tagName === "SELECT" || el.type === "checkbox") return;
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case "tab": if (d.id === "practice" && S.practice?.done) S.practice = { code: S.practice.code }; go(d.id); break;
+    case "tab": go(d.id); break;
     case "open-subject": S.subject = d.code; S.openLesson = null; go("subject"); break;
     case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; S.openLimit = 40; render(); break;
-    case "practice-subject": S.subject = d.code; S.practice = { code: d.code }; go("practice"); break;
+    case "practice-subject": S.subject = d.code; go("anki"); break;
     case "sub": go(d.id); break;
     case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
     case "import-subject": S.subject = d.code; S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
@@ -1574,8 +1596,9 @@ document.addEventListener("click", async (ev) => {
       break;
     }
     case "explain-review": { const it = S.review.queue[0]; explainQuestion(it.code, it.id, null); break; }
-    case "end-practice": if (S.practice.answeredCount) { S.practice.done = true; render(); } else { S.practice = { code: S.practice.code }; render(); } window.scrollTo({ top: 0 }); break;
-    case "restart-practice": S.practice = { code: S.practice.code, lesson: S.practice.lesson }; render(); break;
+    case "end-practice": if (S.practice.answeredCount) { S.practice.done = true; render(); } else { S.practice = { code: S.practice.code, kind: S.practice.kind === "exam" ? "exam" : "anki" }; render(); } window.scrollTo({ top: 0 }); break;
+    case "restart-practice": S.practice = { code: S.practice.code, lesson: S.practice.lesson, kind: S.practice.kind === "exam" ? "exam" : "anki" }; render(); break;
+    case "redo-source": redoSource(d.code, d.src); break;
     case "start-review": startReview(d.code); break;
     case "flip": S.review.flipped = true; render(); break;
     case "show-lecture": { const it = S.review.queue[0]; fillLecture(it.code, S.questions[it.code][it.id]); break; }
@@ -1684,15 +1707,18 @@ function watchQuestions(code, nb = 1) {
   }, (e) => console.warn("questions", code, e)));
   qSubs[code] = { nb, unsubs };
 }
-/* File tĩnh đổi theo mỗi lần publish: luôn hỏi lại server (no-cache) để không kẹt bản cũ trong bộ nhớ đệm. */
-const getJSON = (url) => fetch(url, { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(url + " " + r.status); return r.json(); });
+/* File tĩnh: fetch thường (app iPad trả 403 nếu đổi chế độ cache). Danh mục đọc từ packs/catalog.json — tên mới
+   để không dính bản index.json cũ trong bộ nhớ đệm; không có thì quay về index.json. Thiếu trường cases thì đoán theo quy ước. */
+const getJSON = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url + " " + r.status); return r.json(); });
 async function loadPacks() {
   try {
-    const idx = await getJSON("packs/index.json");
+    const idx = await getJSON("packs/catalog.json").catch(() => getJSON("packs/index.json"));
     for (const p of idx?.packs || []) {
       const pack = p.file ? await getJSON(p.file) : { cards: [] };
       const cards = {}; for (const c of pack.cards) cards[c.id] = c;
-      if (p.cases) try {       // ca tình huống: mỗi câu là một "thẻ" kind "case" để dùng chung SRS
+      const explicitCases = !!p.cases;
+      if (!p.cases) p.cases = `cases/${p.code}.json`;
+      try {       // ca tình huống: mỗi câu là một "thẻ" kind "case" để dùng chung SRS
         const cz = await getJSON(p.cases);
         const byL = {};
         for (const L of cz.lessons) {
@@ -1703,7 +1729,7 @@ async function loadPacks() {
           }
         }
         S.cases[p.code] = byL;
-      } catch (e) { console.warn("cases", e); S.casesErr = String(e.message || e); }
+      } catch (e) { console.warn("cases", e); if (explicitCases) S.casesErr = String(e.message || e); }
       S.pack[p.code] = { cards, notes: p.notes || {} };
       rebuild(p.code);
     }
