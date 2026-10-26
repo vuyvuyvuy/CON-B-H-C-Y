@@ -317,7 +317,7 @@ const stars = (q) => q.prio ? `<span class="stars">${STARS[q.prio]}</span>` : ""
 /* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
 async function loadNotes(code, lesson) {
   const file = S.pack[code]?.notes?.[lesson]; if (!file) return null;
-  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => j?.pages || null).catch(() => null);
+  if (!S.notesCache[file]) S.notesCache[file] = fetch(file, { cache: "no-cache" }).then((r) => r.ok ? r.json() : null).then((j) => j?.pages || null).catch(() => null);
   return S.notesCache[file];
 }
 const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
@@ -1055,6 +1055,8 @@ function viewCases() {
   if (P?.caseRef && P.items) return P.done ? practiceSummary() : viewPractice();
   const codes = scope(subjectList()).map((s) => s.code).filter((c) => S.cases[c]);
   const head = `<h2>Tình huống</h2><p class="muted">Ca lâm sàng soạn sẵn từ bài soạn và thẻ Anki của bạn, chia theo từng bài. Mỗi bài có vài ca, mỗi ca vài câu hỏi; các ca của một bài phủ hết ý ★★★ và ★★. Đề cũ nằm riêng ở Luyện đề. Câu tình huống làm sai sẽ vào Thắp nhang.</p>`;
+  if (!codes.length && !S.packsLoaded) return head + `<div class="empty"><p class="eyebrow">Đang tải ca tình huống…</p></div>`;
+  if (!codes.length && S.casesErr) return head + `<div class="empty"><h2>Không tải được ca tình huống</h2><p class="muted">Lỗi: ${esc(S.casesErr)}. Đóng trang rồi mở lại; còn lỗi thì chụp màn hình gửi Claude.</p></div>`;
   if (!codes.length) return head + `<div class="empty"><h2>Chưa có ca nào</h2><p class="muted">Gửi bài soạn và Anki của một môn cho Claude trong khung chat, Claude sẽ soạn ca cho từng bài.</p></div>`;
   const code = S.cs?.code && S.cases[S.cs.code] ? S.cs.code : codes[0];
   const s = S.subjects[code], byL = S.cases[code];
@@ -1682,14 +1684,16 @@ function watchQuestions(code, nb = 1) {
   }, (e) => console.warn("questions", code, e)));
   qSubs[code] = { nb, unsubs };
 }
+/* File tĩnh đổi theo mỗi lần publish: luôn hỏi lại server (no-cache) để không kẹt bản cũ trong bộ nhớ đệm. */
+const getJSON = (url) => fetch(url, { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(url + " " + r.status); return r.json(); });
 async function loadPacks() {
   try {
-    const idx = await fetch("packs/index.json").then((r) => (r.ok ? r.json() : null));
+    const idx = await getJSON("packs/index.json");
     for (const p of idx?.packs || []) {
-      const pack = p.file ? await fetch(p.file).then((r) => r.json()) : { cards: [] };
+      const pack = p.file ? await getJSON(p.file) : { cards: [] };
       const cards = {}; for (const c of pack.cards) cards[c.id] = c;
-      if (p.cases) {           // ca tình huống: mỗi câu là một "thẻ" kind "case" để dùng chung SRS
-        const cz = await fetch(p.cases).then((r) => r.json());
+      if (p.cases) try {       // ca tình huống: mỗi câu là một "thẻ" kind "case" để dùng chung SRS
+        const cz = await getJSON(p.cases);
         const byL = {};
         for (const L of cz.lessons) {
           byL[L.lesson] = L.cases;
@@ -1699,11 +1703,12 @@ async function loadPacks() {
           }
         }
         S.cases[p.code] = byL;
-      }
+      } catch (e) { console.warn("cases", e); S.casesErr = String(e.message || e); }
       S.pack[p.code] = { cards, notes: p.notes || {} };
       rebuild(p.code);
     }
-  } catch (e) { console.warn("packs", e); }
+  } catch (e) { console.warn("packs", e); S.casesErr = String(e.message || e); }
+  S.packsLoaded = true;
   onData();
 }
 async function boot() {
