@@ -170,6 +170,24 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .progress { height: 6px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--alarm); transition: width .4s; }
 
+/* ---------- thẻ Anki (HTML đã làm sạch) ---------- */
+.rich { overflow-wrap: anywhere; }
+.rich mark { background: none; color: #ff8f80; font-weight: 700; }
+.rich b { color: var(--fg); }
+.rich small { color: var(--muted); font-size: 13px; }
+.rich blockquote { margin: 8px 0 0; padding: 6px 10px; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 9%, transparent); color: #f1dfb6; font-size: 13.5px; border-radius: 0 6px 6px 0; }
+.rich img { display: block; max-width: 100%; height: auto; margin-top: 8px; border-radius: 8px; background: #fff; }
+.rich ul, .rich ol { margin: 4px 0; padding-left: 20px; }
+.rich table { border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
+.rich td, .rich th { border: 1px solid var(--line); padding: 3px 6px; }
+.stem.rich { font-weight: 600; }
+.back { border-top: 1px dashed var(--line); padding-top: 12px; font-size: 16px; }
+.stars { font: 700 11px var(--font-mono); color: var(--warn); letter-spacing: 1px; }
+.lecture { background: var(--bg); border-left: 3px solid var(--ecg); border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 14px; white-space: pre-line; display: grid; gap: 6px; }
+.lecture .eyebrow { color: var(--ecg); }
+.reader { white-space: pre-line; font-size: 15px; line-height: 1.65; background: var(--bg); border-radius: 8px; padding: 14px; border: 1px solid var(--line); overflow-wrap: anywhere; }
+.reader mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>
 
@@ -190,7 +208,8 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
    PHÒNG TRỰC Y4 — ngân hàng đề cũ + flashcard SRS + ca cấp cứu, giọng mỏ hỗn.
    Lưu trữ: capability `db` (chỉ chủ artifact đọc/ghi). Gọi Claude: `sample`.
      subjects/<code>                       môn: tên, lịch thi, danh sách bài
-     subjects/<code>/questions/<id>        câu hỏi + thẻ SRS gắn kèm
+     subjects/<code>/questions/<id>        câu đề cũ (đủ nội dung) hoặc trạng thái ôn của thẻ Anki
+     packs/*.json, notes/*.json, media/*   (file tĩnh đi kèm trang) thẻ Anki, bài soạn, hình
      graves/<id>                           bệnh nhân đã "đăng xuất"
      cases/<code>__<lesson>                ca cấp cứu AI gen gần nhất của 1 bài
      meta/stats                            tổng câu, câu sai, streak…
@@ -202,7 +221,11 @@ const MIN = 60e3, DAY = 864e5;
 const S = {
   db: null, sample: null, canImages: false,
   subjects: {},            // code -> subject
-  questions: {},           // code -> { id -> question }
+  questions: {},           // code -> { id -> question } (gộp gói thẻ tĩnh + dữ liệu trong kho)
+  docs: {},                // code -> { id -> document trong kho }
+  pack: {},                // code -> { cards: {id -> thẻ}, notes: {lessonId -> file bài soạn} }
+  notesCache: {},          // file -> [trang]
+  reader: null,            // trình đọc bài soạn
   graves: {},
   stats: { total: 0, wrong: 0, killed: 0, saved: 0, streak: 0, best: 0, lastDay: null },
   loaded: { subjects: false },
@@ -229,6 +252,65 @@ const daysUntil = (iso, now = new Date()) => Math.round((Date.parse(ymd(new Date
 const fmtDate = (iso) => new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 const fmtShort = (ms) => new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }).format(new Date(ms));
 
+/* Làm sạch HTML thẻ Anki trước khi hiển thị: chỉ giữ thẻ định dạng, hình chỉ lấy từ media/ đi kèm trang. */
+const RICH_OK = new Set(["B", "I", "U", "BR", "MARK", "BLOCKQUOTE", "UL", "OL", "LI", "SUB", "SUP", "IMG", "DIV", "P", "SMALL", "TABLE", "TBODY", "THEAD", "TR", "TD", "TH"]);
+const richCache = new Map();
+function rich(html) {
+  if (richCache.has(html)) return richCache.get(html);
+  const doc = new DOMParser().parseFromString(`<div>${html || ""}</div>`, "text/html");
+  const clean = (el) => {
+    for (const c of [...el.childNodes]) {
+      if (c.nodeType === 3) continue;
+      if (c.nodeType !== 1 || !RICH_OK.has(c.tagName)) { c.replaceWith(document.createTextNode(c.textContent || "")); continue; }
+      const src = c.tagName === "IMG" ? c.getAttribute("src") : null;
+      for (const a of [...c.attributes]) c.removeAttribute(a.name);
+      if (c.tagName === "IMG") { if (src && /^media\/[\w.\-]+$/.test(src)) { c.setAttribute("src", src); c.setAttribute("alt", ""); c.setAttribute("loading", "lazy"); } else { c.remove(); continue; } }
+      clean(c);
+    }
+  };
+  const root = doc.body.firstChild; clean(root);
+  const out = root.innerHTML; richCache.set(html, out); return out;
+}
+const isAnki = (q) => q?.kind === "anki";
+const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem);
+const qBack = (q) => isAnki(q) ? rich(q.back) : esc(q.answer);
+const STARS = { 3: "★★★ hay thi", 2: "★★ cần nhớ", 1: "★ ít ra thi" };
+const stars = (q) => q.prio ? `<span class="stars">${STARS[q.prio]}</span>` : "";
+
+/* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
+async function loadNotes(code, lesson) {
+  const file = S.pack[code]?.notes?.[lesson]; if (!file) return null;
+  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => j?.pages || null).catch(() => null);
+  return S.notesCache[file];
+}
+const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
+function passages(pages, q, k = 2) {
+  const want = grams(q.stem + " " + q.answer);
+  const out = [];
+  pages.forEach((txt, pi) => {
+    const slideHit = q.slide && new RegExp(`\\bSlide\\s*${q.slide}\\b`, "i").test(txt);
+    for (const para of txt.split(/\n\s*\n/)) {
+      const t = para.trim(); if (t.length < 40) continue;
+      const g = grams(t); let hit = 0;
+      for (const x of want) if (g.has(x)) hit += x.includes(" ") ? 2 : 1;
+      out.push({ page: pi + 1, text: t, score: hit / Math.sqrt(g.size + 20) + (slideHit ? 0.6 : 0) });
+    }
+  });
+  return out.sort((a, b) => b.score - a.score).slice(0, k).filter((x) => x.score > 0.4);
+}
+async function lectureHTML(code, q, k = 2) {
+  const pages = await loadNotes(code, q.lesson);
+  if (!pages) return "";
+  const ps = passages(pages, q, k);
+  if (!ps.length) return `<div class="lecture"><span class="eyebrow">📖 Bài soạn</span><span class="note">Không tìm thấy đoạn khớp. <button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}">Mở bài soạn</button></span></div>`;
+  return ps.map((p) => `<div class="lecture"><span class="eyebrow">📖 Bài soạn · trang ${p.page}</span>${esc(p.text.length > 900 ? p.text.slice(0, 900) + "…" : p.text)}<span><button class="btn small ghost" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${p.page}">Mở trang ${p.page}</button></span></div>`).join("");
+}
+async function fillLecture(code, q) {
+  const box = $("#lecture"); if (!box) return;
+  const h = await lectureHTML(code, q);
+  if ($("#lecture") === box) box.innerHTML = h;
+}
+
 let toastTimer;
 function toast(msg) {
   const t = $("#toast");
@@ -249,12 +331,34 @@ function write(path, fn) {
   return next;
 }
 const qPath = (code, id) => `subjects/${code}/questions/${id}`;
+/* Mỗi câu có b = hash(id) % 8: kho chỉ trả tối đa 1000 câu/truy vấn, môn nhiều câu thì chia nhóm theo b. */
+const bucket = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) % 8; };
+const STATE_FIELDS = ["seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "deleted"];
+function rebuild(code) {
+  const pack = S.pack[code]?.cards || {}, docs = S.docs[code] || {}, m = {};
+  for (const id in pack) { const d = docs[id]; if (d?.deleted) continue; m[id] = { ...pack[id], ...(d || {}), id }; }
+  for (const id in docs) if (!pack[id] && !docs[id].deleted) m[id] = { ...docs[id], id };
+  S.questions[code] = m;
+}
 function saveQuestion(code, q) {
-  S.questions[code] = S.questions[code] || {};
-  S.questions[code][q.id] = q;               // cập nhật lạc quan
+  const packCard = S.pack[code]?.cards?.[q.id];
+  let body;
+  if (packCard) {            // thẻ Anki: nội dung nằm trong gói, kho chỉ giữ trạng thái ôn
+    body = {};
+    for (const k of STATE_FIELDS) if (q[k] !== undefined) body[k] = q[k];
+    if (q.lesson !== packCard.lesson) body.lesson = q.lesson;
+  } else { body = { ...q }; delete body.id; }
+  body.b = bucket(q.id);
+  (S.docs[code] ||= {})[q.id] = body;          // cập nhật lạc quan
+  rebuild(code);
   if (!S.db) return Promise.resolve();
-  const body = { ...q }; delete body.id;
   return write(qPath(code, q.id), () => S.db.doc(qPath(code, q.id)).set(body));
+}
+function deleteQuestion(code, id) {
+  if (S.pack[code]?.cards?.[id]) return saveQuestion(code, { ...S.questions[code][id], deleted: true });
+  delete (S.docs[code] || {})[id];
+  rebuild(code);
+  if (S.db) return write(qPath(code, id), () => S.db.doc(qPath(code, id)).delete());
 }
 function saveSubject(s) {
   S.subjects[s.code] = s;
@@ -425,7 +529,7 @@ const TABS = [
 function renderNav() {
   const due = dueList().length;
   $("#nav").innerHTML = TABS.map(([id, label]) =>
-    `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && S.tab === "subject")}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
+    `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && (S.tab === "subject" || S.tab === "reader"))}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
 }
 function go(tab) {
   S.tab = tab;
@@ -437,7 +541,7 @@ function go(tab) {
 function render() {
   renderNav();
   const app = $("#app");
-  const view = { home: viewHome, subject: viewSubject, practice: viewPractice, review: viewReview, er: viewER, import: viewImport, graves: viewGraves }[S.tab] || viewHome;
+  const view = { home: viewHome, subject: viewSubject, practice: viewPractice, review: viewReview, er: viewER, import: viewImport, graves: viewGraves, reader: viewReader }[S.tab] || viewHome;
   app.innerHTML = view();
   afterRender();
 }
@@ -467,7 +571,8 @@ function verdict(d) {
 }
 function subjectCounts(code) {
   const list = qs(code);
-  return { n: list.length, wrong: list.filter((q) => q.wrong > 0).length, due: list.filter((q) => isDue(q)).length };
+  const anki = list.filter(isAnki).length;
+  return { n: list.length, anki, exam: list.length - anki, wrong: list.filter((q) => q.wrong > 0).length, due: list.filter((q) => isDue(q)).length };
 }
 function viewHome() {
   if (!S.loaded.subjects) return `<div class="empty"><p class="eyebrow">Đang tải dữ liệu…</p></div>`;
@@ -492,7 +597,7 @@ function viewHome() {
       <p class="muted">${fmtDate(next.at)}</p>
       <div class="clock" data-countdown="${esc(next.at)}">${clockCells(next.at)}</div>
       <p class="verdict" style="color:${vc}">${vt}</p>
-      <p class="note">${c.n ? `Kho đề môn này: <b>${c.n}</b> câu · ${c.wrong} câu từng sai · ${c.due} thẻ đến hạn.` : `Chưa có câu đề cũ nào của môn này. Nạp đề đi, còn ${d} ngày.`}</p>
+      <p class="note">${c.n ? `Kho môn này: <b>${c.exam}</b> câu đề cũ · <b>${c.anki}</b> thẻ Anki · ${c.wrong} câu từng sai · ${c.due} thẻ đến hạn.` : `Chưa có câu nào của môn này. Nạp đề đi, còn ${d} ngày.`}</p>
       <div class="row"><button class="btn red" data-act="practice-subject" data-code="${next.code}">Luyện đề ${esc(next.title)}</button><button class="btn" data-act="open-subject" data-code="${next.code}">Xem các bài</button></div>
     </section>`;
   }
@@ -552,19 +657,24 @@ function viewSubject() {
   const lessons = [...(s.lessons || []), ...(byLesson._none ? [{ id: "_none", name: "Chưa xếp bài" }] : [])];
   const exam = (s.exams || []).find((e) => !e.done && Date.parse(e.at) > Date.now());
 
-  const rows = lessons.map((l) => {
-    const items = byLesson[l.id] || [];
+  const rows = lessons.map((l, li) => {
+    const items = (byLesson[l.id] || []).sort((a, b) => (isAnki(a) - isAnki(b)) || ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0)));
+    const nAnki = items.filter(isAnki).length, nExam = items.length - nAnki;
     const wrong = items.filter((q) => q.wrong > 0).length;
     const due = items.filter((q) => isDue(q)).length;
+    const hot = items.filter((q) => q.prio === 3).length;
     const open = S.openLesson === l.id;
+    const limit = S.openLimit || 40;
+    const hasNotes = !!S.pack[s.code]?.notes?.[l.id];
     return `<div class="lesson">
-      <div style="min-width:0"><h3>${esc(l.name)}</h3>
-        <div class="row" style="gap:6px;margin-top:4px"><span class="chip">${items.length} câu</span>${wrong ? `<span class="chip red">${wrong} từng sai</span>` : ""}${due ? `<span class="chip amber">${due} đến hạn</span>` : ""}</div></div>
+      <div style="min-width:0"><h3>${l.id === "_none" ? "" : `<span class="mono dim">${li + 1}.</span> `}${esc(l.name)}</h3>
+        <div class="row" style="gap:6px;margin-top:4px">${nExam ? `<span class="chip blue">${nExam} câu đề</span>` : ""}${nAnki ? `<span class="chip">${nAnki} thẻ Anki</span>` : ""}${!items.length ? `<span class="chip">trống</span>` : ""}${hot ? `<span class="chip amber">★★★ ${hot}</span>` : ""}${wrong ? `<span class="chip red">${wrong} từng sai</span>` : ""}${due ? `<span class="chip amber">${due} đến hạn</span>` : ""}</div></div>
       <div class="acts">
-        ${items.length ? `<button class="btn small" data-act="toggle-lesson" data-id="${l.id}">${open ? "Đóng" : "Xem câu"}</button><button class="btn small red" data-act="practice-lesson" data-code="${s.code}" data-id="${l.id}">Luyện</button>` : ""}
+        ${items.length ? `<button class="btn small" data-act="toggle-lesson" data-id="${l.id}">${open ? "Đóng" : "Xem"}</button><button class="btn small red" data-act="practice-lesson" data-code="${s.code}" data-id="${l.id}">Luyện</button>` : ""}
+        ${hasNotes ? `<button class="btn small ghost" data-act="open-reader" data-code="${s.code}" data-lesson="${l.id}" title="Đọc bài soạn">📖</button>` : ""}
         ${l.id !== "_none" ? `<button class="btn small ghost" data-act="rename-lesson" data-id="${l.id}" title="Đổi tên bài">✎</button>` : ""}
       </div>
-      ${open ? `<div class="qlist">${items.map((q) => qItem(s, q)).join("")}</div>` : ""}
+      ${open ? `<div class="qlist">${items.slice(0, limit).map((q) => qItem(s, q)).join("")}${items.length > limit ? `<button class="btn small" data-act="more-q">Hiện thêm (còn ${items.length - limit})</button>` : ""}</div>` : ""}
     </div>`;
   }).join("");
 
@@ -572,7 +682,7 @@ function viewSubject() {
   <div class="row between"><div><h1>${esc(s.name)}</h1><p class="muted">${esc(s.code)}${exam ? ` · thi ${fmtDate(exam.at)} · còn ${daysUntil(exam.at)} ngày` : ""}</p></div>
     <div class="row"><button class="btn red" data-act="practice-subject" data-code="${s.code}">Luyện cả môn</button><button class="btn" data-act="import-subject" data-code="${s.code}">+ Nạp đề môn này</button></div></div>
   <section class="panel">
-    <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.length} câu đề cũ</p></div>
+    <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.filter((q) => !isAnki(q)).length} câu đề cũ · ${list.filter(isAnki).length} thẻ Anki</p></div>
     ${lessons.length ? `<div class="lessons">${rows}</div>` : `<div class="empty"><p>Môn này chưa có danh sách bài.</p><p class="note">Thêm bài bên dưới, hoặc cứ nạp đề — Claude sẽ đề xuất bài.</p></div>`}
     <form class="row" data-form="add-lesson" style="margin-top:12px"><input type="text" id="new-lesson" placeholder="Tên bài mới, ví dụ: Viêm tai giữa mạn" style="flex:1;min-width:180px" required><button class="btn">+ Thêm bài</button></form>
   </section>
@@ -585,14 +695,41 @@ function viewSubject() {
 function qItem(s, q) {
   const lessonOpts = (s.lessons || []).map((l) => `<option value="${l.id}" ${l.id === q.lesson ? "selected" : ""}>${esc(l.name)}</option>`).join("");
   return `<div class="qitem">
-    <div class="row between" style="gap:6px"><span class="eyebrow">${esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span>
+    <div class="row between" style="gap:6px"><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span></span>
       <div class="row" style="gap:6px">${q.wrong ? `<span class="chip red">sai ${q.wrong}/${q.seen}</span>` : q.seen ? `<span class="chip green">đúng ${q.seen}</span>` : `<span class="chip">chưa làm</span>`}${q.card ? `<span class="chip amber">thẻ ${q.card.state === "review" ? "ôn " + Math.round(q.card.ivl) + "d" : "đang học"}</span>` : ""}</div></div>
-    <p>${esc(q.stem)}</p>
-    ${q.options?.length ? `<ol>${q.options.map((o) => `<li class="${o.k === q.answer ? "ok" : ""}">${esc(o.k)}. ${esc(o.t)}</li>`).join("")}</ol>` : `<p class="note">Đáp án: ${esc(q.answer)}</p>`}
+    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${rich(q.back)}</div>` : `<p>${esc(q.stem)}</p>
+    ${q.options?.length ? `<ol>${q.options.map((o) => `<li class="${o.k === q.answer ? "ok" : ""}">${esc(o.k)}. ${esc(o.t)}</li>`).join("")}</ol>` : `<p class="note">Đáp án: ${esc(q.answer)}</p>`}`}
     ${q.explanation ? `<p class="note">💡 ${esc(q.explanation)}</p>` : ""}
     <div class="row" style="gap:6px"><select data-act="move-q" data-code="${s.code}" data-id="${q.id}" style="width:auto;flex:1;min-width:150px;padding:5px 8px;font-size:13px">${lessonOpts}<option value="" ${!q.lesson ? "selected" : ""}>Chưa xếp bài</option></select>
       <button class="btn small ghost" data-act="del-q" data-code="${s.code}" data-id="${q.id}">Xoá</button></div>
   </div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEW: Đọc bài soạn                                                  */
+/* ------------------------------------------------------------------ */
+function viewReader() {
+  const R = S.reader; const s = R && S.subjects[R.code];
+  if (!s) { S.tab = "home"; return viewHome(); }
+  const lessons = (s.lessons || []).filter((l) => S.pack[R.code]?.notes?.[l.id]);
+  const key = S.pack[R.code]?.notes?.[R.lesson];
+  const pages = key && S.notesCache[key];
+  if (!pages || typeof pages.then === "function") {
+    loadNotes(R.code, R.lesson).then((pg) => { S.notesCache[key] = pg || []; if (S.tab === "reader") render(); });
+    return `<div class="empty"><p class="eyebrow">Đang mở bài soạn…</p></div>`;
+  }
+  const qn = norm(R.q || "");
+  const hits = qn ? pages.map((t, i) => [i + 1, norm(t).includes(qn)]).filter(([, h]) => h).map(([i]) => i) : [];
+  const page = Math.min(Math.max(1, R.page), pages.length || 1);
+  let text = esc(pages[page - 1] || "");
+  if (R.q) text = text.replace(new RegExp(R.q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`);
+  return `<div class="row between"><button class="btn small ghost" data-act="open-subject" data-code="${R.code}">← ${esc(s.name)}</button></div>
+  <div class="row between"><h1>Bài soạn</h1>
+    <select data-act="reader-lesson" style="width:auto;max-width:100%">${lessons.map((l) => `<option value="${l.id}" ${l.id === R.lesson ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></div>
+  <form class="row" data-form="reader-search"><input type="text" id="r-q" placeholder="Tìm trong bài, ví dụ: Rosenmüller" value="${esc(R.q || "")}" style="flex:1;min-width:160px"><button class="btn small">Tìm</button></form>
+  ${R.q ? `<p class="note">${hits.length ? `Có ở trang: ${hits.map((h) => `<button class="btn small ghost" data-act="reader-page" data-page="${h}">${h}</button>`).join(" ")}` : "Không thấy trong bài này."}</p>` : ""}
+  <div class="row between"><button class="btn small" data-act="reader-page" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>← Trang trước</button><span class="mono">Trang ${page}/${pages.length}</span><button class="btn small" data-act="reader-page" data-page="${page + 1}" ${page >= pages.length ? "disabled" : ""}>Trang sau →</button></div>
+  <article class="reader">${text}</article>`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -605,66 +742,78 @@ function viewPractice() {
   const it = P.items[P.i];
   const q = S.questions[it.code]?.[it.id] || it;
   const ans = P.answered;
-  const max = 100;
-  const pct = Math.max(0, P.hp / max * 100);
+  const pct = Math.max(0, P.hp);
   const hpCol = pct <= 25 ? "var(--alarm)" : pct <= 60 ? "#ff9a4f" : "var(--ecg)";
   const isMcq = q.options?.length > 0;
 
-  let opts;
+  let body;
   if (isMcq) {
-    opts = `<div class="opts">${q.options.map((o, i) => {
+    body = `<div class="opts">${q.options.map((o) => {
       let cls = "";
       if (ans) cls = o.k === q.answer ? "right" : o.k === ans.choice ? "wrong" : "faded";
       return `<button class="opt ${cls}" data-act="answer" data-k="${esc(o.k)}" ${ans ? "disabled" : ""}><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></button>`;
     }).join("")}</div>`;
+  } else if (ans || P.revealed) {
+    body = `<div class="back rich">${qBack(q)}</div>${ans ? "" : `<div class="row">
+      <button class="btn red" data-act="self-grade" data-r="again">Quên <span class="kbd">1</span></button>
+      <button class="btn" data-act="self-grade" data-r="hard">Lờ mờ <span class="kbd">2</span></button>
+      <button class="btn green" data-act="self-grade" data-r="good">Nhớ <span class="kbd">3</span></button></div>`}`;
   } else {
-    opts = ans || P.revealed
-      ? `<div class="explain" style="border-left-color:var(--ecg)"><b>Đáp án:</b> ${esc(q.answer)}</div>${ans ? "" : `<div class="row"><button class="btn green" data-act="self-grade" data-ok="1">Mình trả lời đúng</button><button class="btn red" data-act="self-grade" data-ok="0">Mình sai</button></div>`}`
-      : `<button class="btn" data-act="reveal">Hiện đáp án (tự chấm)</button>`;
+    body = `<p class="note">Tự trả lời trong đầu (hoặc nói to lên cho cả phòng nghe) rồi lật.</p><button class="btn amber big" data-act="reveal">Lật thẻ <span class="kbd">Space</span></button>`;
   }
 
   return `<div class="row between"><div><p class="eyebrow">${esc(P.title)}</p><h2>Câu ${P.i + 1}/${P.items.length}</h2></div><button class="btn small ghost" data-act="end-practice">Kết thúc phiên</button></div>
   <section class="monitor ${P.hp <= 0 ? "dead" : ""}" id="mon">
-    <div class="row between"><span><b>${esc(P.patient)}</b> <span class="dim">· bệnh nhân #${P.patientNo}</span></span><span class="mono" style="color:${hpCol}">HP ${P.hp}/${max}</span></div>
+    <div class="row between"><span><b>${esc(P.patient)}</b> <span class="dim">· bệnh nhân #${P.patientNo}</span></span><span class="mono" style="color:${hpCol}">HP ${Math.max(0, P.hp)}/100</span></div>
     <div class="hp"><i style="width:${pct}%;background:${hpCol}" class="${pct <= 25 ? "blink" : ""}"></i></div>
     <p class="note mono">✓ ${P.right} · ✗ ${P.wrongCount} · 🪦 ${P.killed}</p>
   </section>
   <section class="panel qcard" id="qcard">
-    <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="eyebrow">${esc(q.source || "")}</span></div>
-    <p class="stem">${esc(q.stem)}</p>
-    ${opts}
-    ${ans ? feedbackBlock(q, ans) : isMcq ? `<p class="kbd">Phím tắt: A–${q.options[q.options.length - 1].k} để chọn</p>` : ""}
+    <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "")}</span></span></div>
+    <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>
+    ${body}
+    ${ans ? feedbackBlock(q, ans, it.code) : isMcq ? `<p class="kbd">Phím tắt: A–${q.options[q.options.length - 1].k} để chọn</p>` : ""}
   </section>`;
 }
-function feedbackBlock(q, ans) {
+function feedbackBlock(q, ans, code) {
   const P = S.practice;
   const last = P.i + 1 >= P.items.length;
-  return `<div class="feedback ${ans.correct ? "good" : "bad"}">
-    <p class="roast">${ans.correct ? "" : `−${ans.penalty} HP · `}${esc(ans.roast)}</p>
-    ${ans.correct ? "" : `<p class="note mono">Đã thêm vào Thắp nhang: ôn lại sau ${ans.card ? Math.max(1, Math.round((ans.card.due - Date.now()) / MIN)) : 1} phút.</p>`}
-    ${!ans.correct || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
+  const bad = !ans.correct;
+  return `<div class="feedback ${bad ? "bad" : "good"}">
+    <p class="roast">${bad ? `−${ans.penalty} HP · ` : ""}${esc(ans.roast)}</p>
+    ${bad || ans.rating === "hard" ? `<p class="note mono">Đã thêm vào Thắp nhang: gặp lại sau ${ans.card ? Math.max(1, Math.round((ans.card.due - Date.now()) / MIN)) : 1} phút.</p>` : ""}
+    ${bad && S.pack[code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><div class="lecture"><span class="eyebrow">📖 Bài soạn</span>Đang tìm đoạn liên quan…</div></div>` : ""}
+    ${bad || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
     ${q.aiAnswer ? `<p class="note">⚠ Đáp án câu này do AI giải, đề gốc không có đáp án. Thấy sai thì sửa trong trang môn.</p>` : ""}
-    <div class="row"><button class="btn ${ans.correct ? "green" : "red"}" data-act="next-q" id="next">${last ? "Xem tổng kết" : "Câu tiếp →"}</button><span class="kbd">Enter</span></div>
+    <div class="row"><button class="btn ${bad ? "red" : "green"}" data-act="next-q" id="next">${last ? "Xem tổng kết" : "Câu tiếp →"}</button><span class="kbd">Enter</span></div>
   </div>`;
 }
 function practiceSetup() {
   const subs = subjectList().filter((s) => qs(s.code).length);
-  if (!subs.length) return `<h1>Luyện đề</h1><div class="empty"><h2>Kho đề trống trơn</h2><p class="muted">Chưa có câu đề cũ nào. Bệnh nhân còn chưa kịp nhập viện vì bạn lười quá.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề cũ</button></div>`;
+  if (!subs.length) return `<h1>Luyện đề</h1><div class="empty"><h2>Kho đề trống trơn</h2><p class="muted">Chưa có câu nào. Bệnh nhân còn chưa kịp nhập viện vì bạn lười quá.</p><button class="btn red" data-act="tab" data-id="import">Nạp đề cũ</button></div>`;
   const P = S.practice || {};
-  const code = P.code && S.subjects[P.code] ? P.code : (allExams().find((e) => !e.done && Date.parse(e.at) > Date.now() && qs(e.code).length)?.code || subs[0].code);
+  const code = P.code && S.subjects[P.code] && qs(P.code).length ? P.code : (allExams().find((e) => !e.done && Date.parse(e.at) > Date.now() && qs(e.code).length)?.code || subs[0].code);
   const s = S.subjects[code];
-  const lessonsWithQ = (s.lessons || []).filter((l) => qs(code).some((q) => q.lesson === l.id));
-  return `<h1>Luyện đề cũ</h1>
+  const list = qs(code);
+  const lessonsWithQ = (s.lessons || []).filter((l) => list.some((q) => q.lesson === l.id));
+  const nExam = list.filter((q) => !isAnki(q)).length, nAnki = list.length - nExam;
+  return `<h1>Luyện đề</h1>
   <p class="muted">Mỗi phiên là một bệnh nhân 100 HP. Sai một câu mất 20 HP và câu đó vào hàng Thắp nhang. Chết thì bệnh nhân mới nhập viện, người cũ ra nghĩa trang.</p>
   <form class="panel stack" data-form="start-practice">
     <div class="row" style="align-items:end">
-      <label class="field" style="flex:1;min-width:180px">Môn<select id="p-code" data-act="p-code">${subs.map((x) => `<option value="${x.code}" ${x.code === code ? "selected" : ""}>${esc(x.name)} (${qs(x.code).length} câu)</option>`).join("")}</select></label>
-      <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${qs(code).filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
+      <label class="field" style="flex:1;min-width:180px">Môn<select id="p-code" data-act="p-code">${subs.map((x) => `<option value="${x.code}" ${x.code === code ? "selected" : ""}>${esc(x.name)} (${qs(x.code).length})</option>`).join("")}</select></label>
+      <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${list.filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
     </div>
     <div class="row" style="align-items:end">
-      <label class="field" style="flex:1;min-width:160px">Lọc câu<select id="p-mode">
+      <label class="field" style="flex:1;min-width:150px">Loại câu<select id="p-kind">
+        <option value="all">Tất cả (${list.length})</option><option value="exam" ${nExam ? "" : "disabled"}>Đề thi cũ (${nExam})</option><option value="anki" ${nAnki ? "" : "disabled"}>Thẻ Anki (${nAnki})</option></select></label>
+      <label class="field" style="flex:1;min-width:150px">Mức<select id="p-prio">
+        <option value="0">Mọi mức</option><option value="3">Chỉ ★★★ hay thi</option><option value="2">Bỏ câu ít ra thi</option></select></label>
+      <label class="field" style="flex:1;min-width:150px">Lọc<select id="p-mode">
         <option value="all">Trộn tất cả</option><option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
-      <label class="field" style="width:120px">Số câu<input type="number" id="p-n" min="1" max="200" value="20"></label>
+    </div>
+    <div class="row" style="align-items:end">
+      <label class="field" style="width:120px">Số câu<input type="number" id="p-n" min="1" max="300" value="20"></label>
       <button class="btn red big" style="flex:1;min-width:160px">Nhận bệnh nhân</button>
     </div>
   </form>`;
@@ -681,22 +830,26 @@ function practiceSummary() {
     <div class="row"><button class="btn red" data-act="restart-practice">Phiên mới</button>${P.wrongCount ? `<button class="btn amber" data-act="tab" data-id="review">Thắp nhang ngay</button>` : ""}<button class="btn ghost" data-act="tab" data-id="home">Về bảng tử thần</button></div>
   </section>`;
 }
-function startPractice(code, lesson, mode, n) {
+function startPractice(code, lesson, mode, n, kind = "all", prio = 0) {
   let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
+  if (kind === "exam") pool = pool.filter((q) => !isAnki(q));
+  if (kind === "anki") pool = pool.filter(isAnki);
+  if (prio) pool = pool.filter((q) => !q.prio || q.prio >= prio);
   if (mode === "wrong") pool = pool.filter((q) => q.wrong > 0);
   if (mode === "new") pool = pool.filter((q) => !q.seen);
   if (!pool.length) { toast(mode === "wrong" ? "Không có câu nào từng sai ở đây. Hiếm có." : "Không còn câu nào khớp bộ lọc."); return; }
   const items = shuffle(pool).slice(0, n).map((q) => ({ id: q.id, code }));
   const title = `${S.subjects[code].name}${lesson ? " · " + lessonName(code, lesson) : ""}`;
-  S.practice = { code, lesson, mode, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title };
+  S.practice = { code, lesson, mode, kind, prio, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title };
   S.tab = "practice";
   render();
 }
-async function answerPractice(choice, selfOk) {
+/* choice: đáp án trắc nghiệm; self: "again" | "hard" | "good" khi tự chấm thẻ lật. */
+async function answerPractice(choice, self) {
   const P = S.practice; if (!P || P.answered) return;
   const it = P.items[P.i];
   const q = { ...S.questions[it.code][it.id] };
-  const correct = selfOk !== undefined ? selfOk : choice === q.answer;
+  const correct = self ? self !== "again" : choice === q.answer;
   const ms = Date.now() - P.qStart;
   const now = Date.now();
   q.seen = (q.seen || 0) + 1;
@@ -705,10 +858,11 @@ async function answerPractice(choice, selfOk) {
   bumpStreak();
   let card = q.card;
   let text, penalty = 0;
+  const rating = self || ratingFrom(correct, ms);
   if (correct) {
     P.right++;
-    if (card) card = schedule(card, ratingFrom(true, ms), now, nextExamAt(it.code));
-    text = fill(pick(PRAISE), { patient: P.patient });
+    if (card || rating === "hard") card = schedule(card || newCard(now), rating, now, nextExamAt(it.code));
+    text = rating === "hard" ? "Lờ mờ thì cũng như không. Cho qua lần này, nhưng thẻ này sẽ quay lại tìm bạn." : fill(pick(PRAISE), { patient: P.patient });
   } else {
     penalty = 20;
     P.wrongCount++;
@@ -716,28 +870,31 @@ async function answerPractice(choice, selfOk) {
     q.wrong = (q.wrong || 0) + 1;
     q.lastWrongAt = now;
     card = schedule(card || newCard(now), "again", now, nextExamAt(it.code));
-    card = { ...card, due: Math.max(card.due, now + 10 * MIN) };   // sai đề cũ: 10 phút sau gặp lại
+    card = { ...card, due: Math.max(card.due, now + 10 * MIN) };   // sai: 10 phút sau gặp lại
     P.hp -= penalty;
     P.sessionWrong.push(it.id);
     const sev = severity(P.hp, 100);
     text = q.wrong >= 3 && sev !== "dead"
       ? roast("repeat", { times: q.wrong })
-      : roast(sev, { patient: P.patient, hp: Math.max(0, P.hp), penalty, source: q.source || "cũ" });
+      : roast(sev, { patient: P.patient, hp: Math.max(0, P.hp), penalty, source: isAnki(q) ? "thẻ Anki của chính bạn" : q.source || "cũ" });
   }
   q.card = card || null;
-  P.answered = { choice, correct, roast: text, penalty, card };
+  P.answered = { choice, correct, roast: text, penalty, card, rating };
   if (!correct && P.hp <= 0) {
     P.killed++;
     S.stats.killed++;
     const grave = { patient: P.patient, code: it.code, subject: S.subjects[it.code].name, diedAt: now, qids: [...new Set(P.sessionWrong)], epitaph: `Ra đi lúc ${fmtShort(now)}. Hung thủ: chính bạn.` };
     if (S.db) S.db.collection("graves").add(grave).catch(() => toast("Không dựng được bia mộ (lỗi lưu)."));
   }
-  delete q.code;
   saveQuestion(it.code, q);
   saveStats();
   render();
-  if (!correct) { $("#mon")?.classList.add("shake"); navigator.vibrate?.(P.hp <= 0 ? [250, 80, 500] : 100); }
-  if (!correct && !q.explanation && S.sample) explainQuestion(it.code, it.id, choice);
+  if (!correct) {
+    $("#mon")?.classList.add("shake"); navigator.vibrate?.(P.hp <= 0 ? [250, 80, 500] : 100);
+    fillLecture(it.code, q);
+    // đề thi cũ: tự gọi Claude giảng lại; thẻ Anki đã có bài soạn hiện sẵn, muốn sâu hơn thì bấm nút
+    if (!isAnki(q) && !q.explanation && S.sample) explainQuestion(it.code, it.id, choice);
+  }
 }
 function nextQuestion() {
   const P = S.practice; if (!P?.answered) return;
@@ -761,8 +918,11 @@ async function explainQuestion(code, id, choice) {
   const box = () => $("#explain");
   if (box()) box().textContent = "Đang gọi Claude nêu lại kiến thức…";
   const s = S.subjects[code];
+  const pages = await loadNotes(code, q.lesson);
+  const ctx = pages ? passages(pages, q, 4).map((p) => `[trang ${p.page}] ${p.text}`).join("\n\n").slice(0, 7000) : "";
   const prompt = `Bạn là giảng viên lâm sàng ở trường Y Việt Nam, giảng cho sinh viên Y4 đang ôn thi môn ${s.name} (bài: ${lessonName(code, q.lesson)}).
-Sinh viên vừa làm SAI câu đề thi cũ dưới đây.
+Sinh viên vừa làm SAI ${isAnki(q) ? "thẻ ôn tập (tự làm từ bài giảng)" : "câu đề thi cũ"} dưới đây.
+${ctx ? `\nTRÍCH BÀI SOẠN CỦA SINH VIÊN (dùng làm nguồn chính, giữ đúng cách trình bày và mẹo của bài soạn):\n"""\n${ctx}\n"""\n` : ""}
 
 CÂU HỎI: ${q.stem}
 ${q.options?.length ? q.options.map((o) => `${o.k}. ${o.t}`).join("\n") : ""}
@@ -772,7 +932,7 @@ ${choice ? `SINH VIÊN CHỌN: ${choice} — ${q.options?.find((o) => o.k === ch
 Viết phần "nêu lại kiến thức" bằng tiếng Việt, tối đa 130 từ, văn bản thuần (không markdown, không tiêu đề):
 - Câu 1: kiến thức cốt lõi mà câu hỏi kiểm tra.
 - Vì sao đáp án đúng là đúng${choice ? ", và vì sao lựa chọn của sinh viên sai" : ""}.
-- Kết bằng một dòng bắt đầu "Mẹo nhớ:".
+- Kết bằng một dòng bắt đầu "Mẹo nhớ:"${ctx ? " (ưu tiên mẹo có sẵn trong bài soạn)" : ""}.
 Giọng chuyên môn, chính xác, không đùa. Nếu đáp án được cho có vẻ sai về mặt y khoa, nói rõ ở dòng đầu: "Lưu ý: đáp án đề có thể chưa đúng vì…".`;
   try {
     const { text } = await S.sample(prompt, { onText: ({ text }) => { if (box()) box().textContent = text; }, cache: { gcTime: 864e5 } });
@@ -817,10 +977,12 @@ function viewReview() {
   if (!q) { R.queue.shift(); return viewReview(); }
   return `<div class="row between"><div><p class="eyebrow">${esc(S.subjects[it.code]?.name)} · ${esc(lessonName(it.code, q.lesson))}</p><h2>Còn ${R.queue.length} thẻ</h2></div><button class="btn small ghost" data-act="end-review">Dừng</button></div>
   <section class="panel qcard" id="qcard">
-    <p class="stem">${esc(q.stem)}</p>
+    <div class="row between">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" : esc(q.source || "")}</span></div>
+    <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>
     ${q.options?.length ? `<div class="opts">${q.options.map((o) => `<div class="opt ${R.flipped ? (o.k === q.answer ? "right" : "faded") : ""}"><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></div>`).join("")}</div>` : ""}
     ${R.flipped ? `
-      ${!q.options?.length ? `<div class="explain" style="border-left-color:var(--ecg)"><b>Đáp án:</b> ${esc(q.answer)}</div>` : ""}
+      ${!q.options?.length ? `<div class="back rich">${qBack(q)}</div>` : ""}
+      ${S.pack[it.code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><button class="btn small ghost" data-act="show-lecture" style="justify-self:start">📖 Xem đoạn bài soạn</button></div>` : ""}
       ${q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : S.sample ? `<div class="explain" id="explain"><button class="btn small" data-act="explain-review">Nhờ Claude giảng lại</button></div>` : ""}
       <div class="row">
         <button class="btn red" data-act="rate" data-r="again">Quên <span class="kbd">1</span></button>
@@ -1065,12 +1227,12 @@ function viewER() {
 async function buildCase(code, lesson) {
   const E = S.er;
   let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
-  pool = [...pool.filter((q) => q.wrong > 0), ...shuffle(pool.filter((q) => !q.wrong))].slice(0, 24);
+  pool = [...shuffle(pool.filter((q) => q.wrong > 0)), ...shuffle(pool.filter((q) => !q.wrong && (q.prio || 3) >= 3)), ...shuffle(pool.filter((q) => !q.wrong && (q.prio || 3) < 3))].slice(0, 24);
   E.loading = true; E.error = null; E.code = code; render();
   const prompt = `Bạn là bác sĩ cấp cứu kiêm người viết kịch bản mô phỏng cho sinh viên Y4 Việt Nam, môn ${S.subjects[code].name}${lesson ? `, bài ${lessonName(code, lesson)}` : ""}.
 Dưới đây là các câu đề thi cũ (id, câu hỏi, đáp án đúng). Hãy dựng MỘT tình huống cấp cứu nhập vai gồm 4–6 bước quyết định, xoay quanh MỘT bệnh nhân, dùng kiến thức của các câu này.
 
-${pool.map((q) => `[${q.id}] ${q.stem}${q.options?.length ? " | Đáp án: " + q.answer + ". " + (q.options.find((o) => o.k === q.answer)?.t || "") : " | Đáp án: " + q.answer}`).join("\n")}
+${pool.map((q) => `[${q.id}] ${q.stem.replace(/\s+/g, " ")}${q.options?.length ? " | Đáp án: " + q.answer + ". " + (q.options.find((o) => o.k === q.answer)?.t || "") : " | Đáp án: " + q.answer.replace(/\s+/g, " ")}`).join("\n")}
 
 LUẬT:
 - Mỗi bước kiểm tra kiến thức của 1–3 câu đề ở trên; ghi id các câu đó vào "qids". Đáp án đúng của bước phải nhất quán với đáp án đề.
@@ -1183,7 +1345,7 @@ document.addEventListener("click", async (ev) => {
   switch (a) {
     case "tab": if (d.id === "practice" && S.practice?.done) S.practice = { code: S.practice.code }; go(d.id); break;
     case "open-subject": S.subject = d.code; S.openLesson = null; go("subject"); break;
-    case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; render(); break;
+    case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; S.openLimit = 40; render(); break;
     case "practice-subject": S.practice = { code: d.code }; go("practice"); break;
     case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
     case "import-subject": S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
@@ -1205,13 +1367,15 @@ document.addEventListener("click", async (ev) => {
     }
     case "del-q": {
       if (!el.dataset.confirm) { el.dataset.confirm = "1"; el.textContent = "Chắc chưa? Bấm lần nữa"; return; }
-      delete S.questions[d.code][d.id];
-      if (S.db) write(qPath(d.code, d.id), () => S.db.doc(qPath(d.code, d.id)).delete());
+      deleteQuestion(d.code, d.id);
       render(); break;
     }
     case "answer": answerPractice(d.k); break;
     case "reveal": S.practice.revealed = true; render(); break;
-    case "self-grade": answerPractice(null, d.ok === "1"); break;
+    case "self-grade": answerPractice(null, d.r); break;
+    case "open-reader": S.reader = { code: d.code, lesson: d.lesson, page: +d.page || 1, q: "" }; go("reader"); break;
+    case "reader-page": S.reader.page = +d.page; render(); break;
+    case "more-q": S.openLimit = (S.openLimit || 40) + 80; render(); break;
     case "next-q": nextQuestion(); break;
     case "explain": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice); break; }
     case "explain-review": { const it = S.review.queue[0]; explainQuestion(it.code, it.id, null); break; }
@@ -1219,6 +1383,7 @@ document.addEventListener("click", async (ev) => {
     case "restart-practice": S.practice = { code: S.practice.code, lesson: S.practice.lesson }; render(); break;
     case "start-review": startReview(d.code); break;
     case "flip": S.review.flipped = true; render(); break;
+    case "show-lecture": { const it = S.review.queue[0]; fillLecture(it.code, S.questions[it.code][it.id]); break; }
     case "rate": rateCard(d.r); break;
     case "end-review": S.review = null; render(); break;
     case "pray": {
@@ -1243,6 +1408,7 @@ document.addEventListener("change", async (ev) => {
   if (d.act === "move-q") { const q = S.questions[d.code][d.id]; saveQuestion(d.code, { ...q, lesson: el.value }); render(); }
   if (d.act === "exam-done") { const s = { ...S.subjects[d.code], exams: S.subjects[d.code].exams.map((e, i) => (i === +d.idx ? { ...e, done: el.checked } : e)) }; await saveSubject(s); render(); }
   if (d.act === "p-code") { S.practice = { code: el.value }; render(); }
+  if (d.act === "reader-lesson") { S.reader = { ...S.reader, lesson: el.value, page: 1 }; render(); }
   if (d.act === "e-code") { S.er = { code: el.value }; loadSavedCase(el.value); render(); }
   if (d.act === "imp-keep") { S.imp.items[+d.i].keep = el.checked; render(); }
   if (d.act === "imp-code") { const x = S.imp.items[+d.i]; x.code = el.value; x.lesson = ""; render(); }
@@ -1252,7 +1418,8 @@ document.addEventListener("submit", async (ev) => {
   const f = ev.target.closest("[data-form]"); if (!f) return;
   ev.preventDefault();
   const k = f.dataset.form;
-  if (k === "start-practice") startPractice($("#p-code").value, $("#p-lesson").value, $("#p-mode").value, Math.max(1, Math.min(200, +$("#p-n").value || 20)));
+  if (k === "start-practice") startPractice($("#p-code").value, $("#p-lesson").value, $("#p-mode").value, Math.max(1, Math.min(300, +$("#p-n").value || 20)), $("#p-kind").value, +$("#p-prio").value);
+  if (k === "reader-search") { S.reader.q = $("#r-q").value.trim(); render(); }
   if (k === "import") runImport(f);
   if (k === "er") buildCase($("#e-code").value, $("#e-lesson").value);
   if (k === "add-lesson") {
@@ -1281,7 +1448,9 @@ document.addEventListener("keydown", (ev) => {
     const P = S.practice;
     if (!P.answered) {
       const q = S.questions[P.items[P.i].code]?.[P.items[P.i].id];
-      if (q?.options?.some((o) => o.k === key.toUpperCase())) { ev.preventDefault(); answerPractice(key.toUpperCase()); }
+      if (q?.options?.length) { if (q.options.some((o) => o.k === key.toUpperCase())) { ev.preventDefault(); answerPractice(key.toUpperCase()); } }
+      else if (!P.revealed && (key === " " || key === "Enter")) { ev.preventDefault(); P.revealed = true; render(); }
+      else if (P.revealed && "123".includes(key) && key.length === 1) { ev.preventDefault(); answerPractice(null, ["again", "hard", "good"][+key - 1]); }
     } else if (key === "Enter") { ev.preventDefault(); nextQuestion(); }
   }
   if (S.tab === "review" && S.review?.queue.length) {
@@ -1303,15 +1472,34 @@ async function loadSavedCase(code) {
 /* ------------------------------------------------------------------ */
 /* Khởi động: nối db + sample                                          */
 /* ------------------------------------------------------------------ */
+/* Câu hỏi của 1 môn: chia theo b (0–7) thành nb nhóm, mỗi nhóm 1 truy vấn ≤1000 câu.
+   Nhóm nào đầy 1000 thì tự chia đôi. */
 const qSubs = {};
-function watchQuestions(code) {
-  if (qSubs[code]) return;
-  qSubs[code] = S.db.collection(`subjects/${code}/questions`).limit(1000).onSnapshot((snap) => {
-    const m = {};
-    for (const d of snap.docs) m[d.id] = { id: d.id, ...d.data() };
-    S.questions[code] = m;
+function watchQuestions(code, nb = 1) {
+  if (qSubs[code]?.nb >= nb) return;
+  qSubs[code]?.unsubs.forEach((u) => u());
+  const groups = Array.from({ length: nb }, (_, g) => Array.from({ length: 8 / nb }, (_, i) => g * (8 / nb) + i));
+  const parts = groups.map(() => ({}));
+  const unsubs = groups.map((vals, g) => S.db.collection(`subjects/${code}/questions`).where("b", "in", vals).limit(1000).onSnapshot((snap) => {
+    const m = {}; for (const d of snap.docs) m[d.id] = d.data(); parts[g] = m;
+    S.docs[code] = Object.assign({}, ...parts);
+    rebuild(code);
     onData();
-  }, (e) => console.warn("questions", code, e));
+    if (snap.size >= 1000 && nb < 8) setTimeout(() => watchQuestions(code, nb * 2), 0);
+  }, (e) => console.warn("questions", code, e)));
+  qSubs[code] = { nb, unsubs };
+}
+async function loadPacks() {
+  try {
+    const idx = await fetch("packs/index.json").then((r) => (r.ok ? r.json() : null));
+    for (const p of idx?.packs || []) {
+      const pack = await fetch(p.file).then((r) => r.json());
+      const cards = {}; for (const c of pack.cards) cards[c.id] = c;
+      S.pack[p.code] = { cards, notes: p.notes || {} };
+      rebuild(p.code);
+    }
+  } catch (e) { console.warn("packs", e); }
+  onData();
 }
 async function boot() {
   try { const t = localStorage.getItem("pt.tab"); if (t && TABS.some(([id]) => id === t)) S.tab = t; } catch {}
@@ -1327,6 +1515,7 @@ async function boot() {
     return;
   }
   S.db = db;
+  loadPacks();
   db.collection("subjects").onSnapshot((snap) => {
     const m = {};
     for (const d of snap.docs) { m[d.id] = { code: d.id, ...d.data() }; watchQuestions(d.id); }

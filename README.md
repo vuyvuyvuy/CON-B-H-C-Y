@@ -54,3 +54,6 @@ npm run test:db      # chạy migration + smoke test trên Postgres local có pg
 `artifact/phong-truc.html` là bản một trang chạy thẳng trên claude.ai: https://claude.ai/artifact/Dcb23dMtWcJ8sTwkMoz4Z8
 Dữ liệu (môn, bài, câu đề cũ, thẻ ôn, nghĩa trang) lưu trong kho của Artifact, chỉ chủ sở hữu đọc/ghi.
 `artifact/seed.json` là dữ liệu nạp ban đầu (15 môn và lịch thi; chưa có bài và câu nào — thêm khi nạp đề).
+
+`artifact/tools/` chứa script chuyển một bộ `.apkg` + bài soạn PDF thành gói tĩnh (`packs/`, `notes/`, `media/`) đi kèm trang.
+Bản thân thẻ Anki và bài soạn không nằm trong repo (tài liệu học cá nhân); chúng chỉ được publish cùng Artifact riêng tư.
