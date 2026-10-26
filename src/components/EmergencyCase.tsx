@@ -12,14 +12,23 @@ export interface AnswerResult {
   rating: SrsRating;
 }
 
+/** submit ném lỗi này khi máy khác đã xử lý bước này trước (409 từ server). */
+export class RunConflictError extends Error {}
+
 interface Props {
   data: ClinicalCase;
+  /** Chơi tiếp lượt đang dở (bắt đầu trên máy khác) */
+  initialHp?: number;
+  initialStep?: number;
   /**
    * Gửi đáp án lên server (POST /api/runs/:id/answer). Nếu bỏ trống => chấm local (chế độ demo).
    * Component luôn tự sinh opId để server dedupe khi mạng chập chờn.
    */
   submit?: (args: { opId: string; stepId: string; optionId: string; elapsedMs: number; reviewedAt: string }) => Promise<AnswerResult>;
   onFinish?: (outcome: "discharged" | "dead", wrongCardIds: string[]) => void;
+  /** Bấm "Làm lại ca này": trang cha mở lượt mới trên server. Bỏ trống => reset local. */
+  onRestart?: () => void;
+  onConflict?: () => void;
 }
 
 type Feedback = { kind: "praise" | "insult"; text: string; severity?: Severity; option: CaseOption; rating: SrsRating };
@@ -31,9 +40,10 @@ const RATING_LABEL: Record<SrsRating, string> = {
   easy: "EASY · đẩy lịch rất xa",
 };
 
-export function EmergencyCase({ data, submit, onFinish }: Props) {
-  const [hp, setHp] = useState(data.max_hp);
-  const [stepIdx, setStepIdx] = useState(0);
+export function EmergencyCase({ data, initialHp, initialStep, submit, onFinish, onRestart, onConflict }: Props) {
+  const [hp, setHp] = useState(initialHp ?? data.max_hp);
+  const [stepIdx, setStepIdx] = useState(initialStep ?? 0);
+  const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [status, setStatus] = useState<"playing" | "discharged" | "dead">("playing");
@@ -60,13 +70,20 @@ export function EmergencyCase({ data, submit, onFinish }: Props) {
 
       let result: AnswerResult;
       try {
+        // Không có submit = DEMO, chấm local. Có submit: trang cha lo việc offline (outbox).
         result = submit
           ? await submit({ opId: crypto.randomUUID(), stepId: step.id, optionId: opt.id, elapsedMs, reviewedAt: new Date().toISOString() })
           : { correct: opt.is_correct, hpDelta: opt.is_correct ? 0 : -step.hp_penalty, rating: ratingFromAnswer(opt.is_correct, elapsedMs) };
-      } catch {
-        // Mất mạng: vẫn chấm local để không phá nhịp chơi; outbox sẽ đồng bộ sau
-        result = { correct: opt.is_correct, hpDelta: opt.is_correct ? 0 : -step.hp_penalty, rating: ratingFromAnswer(opt.is_correct, elapsedMs) };
+      } catch (e) {
+        setBusy(false);
+        setPicked(null);
+        if (e instanceof RunConflictError) {
+          setError("Ca này vừa được xử lý trên thiết bị khác.");
+          onConflict?.();
+        } else setError("Không gửi được đáp án. Thử lại.");
+        return;
       }
+      setError(null);
 
       const hpAfter = Math.max(0, hp + result.hpDelta);
       const vars = { patient: data.patient.name, hp: hpAfter, penalty: -result.hpDelta };
@@ -90,7 +107,7 @@ export function EmergencyCase({ data, submit, onFinish }: Props) {
       }
       setBusy(false);
     },
-    [picked, busy, status, submit, step, hp, data, onFinish],
+    [picked, busy, status, submit, step, hp, data, onFinish, onConflict],
   );
 
   const next = () => {
@@ -105,6 +122,7 @@ export function EmergencyCase({ data, submit, onFinish }: Props) {
   };
 
   const restart = () => {
+    if (onRestart) return onRestart();
     setHp(data.max_hp);
     setStepIdx(0);
     setPicked(null);
@@ -147,12 +165,14 @@ export function EmergencyCase({ data, submit, onFinish }: Props) {
 
         <dl className="mt-4 grid grid-cols-5 gap-2 font-mono">
           <Vital label="HR" value={status === "dead" ? "0" : vitals.hr} warn={vitals.hr > 120 || vitals.hr < 50} color="text-emerald-400" />
-          <Vital label="BP" value={status === "dead" ? "--/--" : vitals.bp} color="text-red-400" />
+          <Vital label="BP" value={status === "dead" ? "--/--" : vitals.bp} color="text-red-400" small />
           <Vital label="SpO₂" value={status === "dead" ? "--" : `${vitals.spo2}%`} warn={vitals.spo2 < 92} color="text-sky-400" />
           <Vital label="RR" value={status === "dead" ? "0" : vitals.rr} warn={vitals.rr > 28} color="text-yellow-300" />
           <Vital label="T°" value={vitals.temp.toFixed(1)} warn={vitals.temp >= 39} color="text-orange-300" />
         </dl>
       </div>
+
+      {error && <p className="rounded-xl bg-amber-950/60 p-3 text-sm text-amber-300 ring-1 ring-amber-800">{error}</p>}
 
       {/* ---------- Kết thúc ---------- */}
       {status === "dead" && (
@@ -179,7 +199,7 @@ export function EmergencyCase({ data, submit, onFinish }: Props) {
       {/* ---------- Bước hiện tại ---------- */}
       {status === "playing" && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 sm:p-5">
-          {stepIdx === 0 && <p className="mb-3 whitespace-pre-line leading-relaxed text-zinc-300">{data.opening}</p>}
+          {stepIdx === (initialStep ?? 0) && <p className="mb-3 whitespace-pre-line leading-relaxed text-zinc-300">{data.opening}</p>}
           <p className="leading-relaxed text-zinc-200">{step.narrative}</p>
           <p className="mt-4 text-lg font-bold">{step.question}</p>
 
@@ -231,11 +251,12 @@ export function EmergencyCase({ data, submit, onFinish }: Props) {
   );
 }
 
-function Vital({ label, value, color, warn }: { label: string; value: string | number; color: string; warn?: boolean }) {
+function Vital({ label, value, color, warn, small }: { label: string; value: string | number; color: string; warn?: boolean; small?: boolean }) {
   return (
     <div className="rounded-lg bg-zinc-900 px-2 py-2 text-center">
       <dt className="text-[10px] text-zinc-500">{label}</dt>
-      <dd className={`text-base font-bold tabular-nums sm:text-xl ${color} ${warn ? "animate-flatline" : ""}`}>{value}</dd>
+      {/* "130/80" dài gấp đôi các số khác => chữ nhỏ hơn trên điện thoại để khỏi xuống dòng */}
+      <dd className={`whitespace-nowrap font-bold tabular-nums sm:text-xl ${small ? "text-xs leading-6" : "text-base"} ${color} ${warn ? "animate-flatline" : ""}`}>{value}</dd>
     </div>
   );
 }

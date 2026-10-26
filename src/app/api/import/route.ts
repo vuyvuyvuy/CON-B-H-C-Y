@@ -8,12 +8,14 @@
  */
 import { NextResponse, after } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
-import { parseApkg, ApkgError } from "@/lib/import/apkg";
+import { parseApkg, ApkgError, type ParsedCard } from "@/lib/import/apkg";
+import { pdfToCards } from "@/lib/import/pdf";
 import { cardsToCases } from "@/lib/ai/generate-cases";
 import { PROMPT_VERSION } from "@/lib/ai/prompts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+const MAX_BYTES = 50 * 1024 * 1024;
 
 export async function POST(req: Request) {
   const supabase = await supabaseServer();
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
   const isApkg = file.name.toLowerCase().endsWith(".apkg");
   const isPdf = file.name.toLowerCase().endsWith(".pdf");
   if (!isApkg && !isPdf) return NextResponse.json({ error: "Chỉ nhận .apkg hoặc .pdf" }, { status: 415 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: "File quá 50MB. Bỏ bớt media trong deck rồi export lại." }, { status: 413 });
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const path = `${userId}/${crypto.randomUUID()}-${file.name}`;
@@ -54,12 +57,26 @@ export async function POST(req: Request) {
   after(async () => {
     const setJob = (patch: Record<string, unknown>) => supabase.from("import_jobs").update(patch).eq("id", job!.id);
     try {
+      let parsed: ParsedCard[];
+      let scannedPages: number[] = [];
       if (isPdf) {
-        // PDF: trích text -> LLM sinh thẻ Q/A (front/back + tag) -> đi tiếp y như apkg.
-        // Tách riêng vì cần OCR fallback cho slide scan; xem docs/ARCHITECTURE.md §2.
-        throw new Error("PDF pipeline: xem docs/ARCHITECTURE.md (pdf -> cards)");
+        // PDF: trích text -> LLM sinh thẻ Q/A (front/back + tag) -> đi tiếp y như apkg
+        await setJob({ status: "parsing", progress: 0.02 });
+        const { data: subj } = deck.subject_id
+          ? await supabase.from("subjects").select("name").eq("id", deck.subject_id).maybeSingle()
+          : { data: null };
+        ({ cards: parsed, scannedPages } = await pdfToCards(bytes, subj?.name ?? deck.name));
+        if (!parsed.length) {
+          throw new ApkgError(
+            scannedPages.length
+              ? `PDF toàn ảnh scan (${scannedPages.length} trang), không trích được chữ. Hãy dùng bản PDF có text.`
+              : "Không tạo được thẻ nào từ PDF này.",
+          );
+        }
+      } else {
+        parsed = await parseApkg(bytes);
       }
-      const parsed = await parseApkg(bytes);
+      if (!parsed.length) throw new ApkgError("File không có thẻ nào.");
 
       const { data: inserted, error } = await supabase
         .from("cards")
@@ -67,8 +84,8 @@ export async function POST(req: Request) {
           parsed.map((c) => ({
             user_id: userId,
             deck_id: deck.id,
-            anki_note_id: c.ankiNoteId,
-            anki_card_id: c.ankiCardId,
+            anki_note_id: c.ankiNoteId || null,
+            anki_card_id: c.ankiCardId || null,
             front: c.front,
             back: c.back,
             extra: c.extra,
@@ -114,10 +131,11 @@ export async function POST(req: Request) {
       await setJob({
         status: "done",
         progress: 1,
-        stats: { cards: inserted.length, clusters: clusterCount, cases: cases.length, skipped },
+        stats: { cards: inserted.length, clusters: clusterCount, cases: cases.length, skipped, scannedPages },
       });
     } catch (e) {
-      await setJob({ status: "failed", error: e instanceof ApkgError ? e.message : String(e) });
+      console.error("import failed", e);
+      await setJob({ status: "failed", error: e instanceof ApkgError ? e.message : "Lỗi hệ thống khi xử lý file. Thử lại sau." });
     }
   });
 

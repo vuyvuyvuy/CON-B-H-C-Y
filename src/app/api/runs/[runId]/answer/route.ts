@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ runId: 
     rating,
   }));
 
-  const { data, error } = await supabase.rpc("submit_case_answer", {
+  const { data, error } = await supabase.rpc("submit_case_answer_v2", {
     p_op_id: b.opId,
     p_run_id: runId,
     p_step_id: b.stepId,

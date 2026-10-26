@@ -23,8 +23,8 @@ function verdict(days: number): { text: string; tone: string } {
   return { text: "Còn xa. Đó chính xác là điều sinh viên rớt môn nghĩ.", tone: "text-emerald-400" };
 }
 
-function useExams(): Exam[] {
-  const [exams, setExams] = useState<Exam[]>(SEED_EXAMS);
+function useExams(initial: Exam[]) {
+  const [exams, setExams] = useState<Exam[]>(initial);
 
   useEffect(() => {
     if (!supabaseEnabled) return;
@@ -38,7 +38,12 @@ function useExams(): Exam[] {
     return () => void sb.removeChannel(ch);
   }, []);
 
-  return exams;
+  const toggleDone = async (id: string, isDone: boolean) => {
+    setExams((xs) => xs.map((e) => (e.id === id ? { ...e, is_done: isDone } : e)));
+    if (supabaseEnabled) await supabaseBrowser().from("exams").update({ is_done: isDone }).eq("id", id);
+  };
+
+  return { exams, toggleDone };
 }
 
 function useNow(ms = 1000) {
@@ -54,8 +59,8 @@ function useNow(ms = 1000) {
 const fmtDate = (iso: string) =>
   new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, weekday: "long", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
-export function ExamCountdown() {
-  const exams = useExams();
+export function ExamCountdown({ initial = SEED_EXAMS }: { initial?: Exam[] }) {
+  const { exams, toggleDone } = useExams(initial);
   const now = useNow();
 
   const { next, upcoming, past } = useMemo(() => {
@@ -80,7 +85,14 @@ export function ExamCountdown() {
             // Thanh "áp lực": 30 ngày trở lên = trống, càng gần càng đầy
             const pressure = Math.min(100, Math.max(4, ((30 - d) / 30) * 100));
             return (
-              <li key={e.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3">
+              <li key={e.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={e.is_done}
+                  onChange={(ev) => toggleDone(e.id, ev.target.checked)}
+                  title="Đánh dấu đã thi"
+                  className="h-4 w-4 accent-red-600"
+                />
                 <div className="min-w-0">
                   <p className="truncate font-semibold">{e.title}</p>
                   <p className="text-xs text-zinc-500">{fmtDate(e.exam_at)}{e.total_slides ? ` · ${e.total_slides} slide` : ""}</p>
@@ -88,7 +100,7 @@ export function ExamCountdown() {
                 <p className={`text-right font-mono text-2xl font-bold tabular-nums ${v.tone}`}>
                   {d}<span className="ml-1 text-xs font-normal text-zinc-500">ngày</span>
                 </p>
-                <div className="col-span-2 h-1 overflow-hidden rounded bg-zinc-800">
+                <div className="col-span-3 h-1 overflow-hidden rounded bg-zinc-800">
                   <div className={`h-full ${d <= 7 ? "bg-red-500" : d <= 14 ? "bg-orange-400" : "bg-emerald-500"}`} style={{ width: `${pressure}%` }} />
                 </div>
               </li>
@@ -99,7 +111,16 @@ export function ExamCountdown() {
 
       {past.length > 0 && (
         <p className="text-xs text-zinc-600">
-          Đã qua: {past.map((e) => e.title).join(", ")}. Không ai nhắc lại điểm của bạn đâu. Trừ app này.
+          Đã qua:{" "}
+          {past.map((e, i) => (
+            <span key={e.id}>
+              {i > 0 && ", "}
+              <button className="underline decoration-dotted hover:text-zinc-400" title="Bỏ đánh dấu đã thi" onClick={() => toggleDone(e.id, false)}>
+                {e.title}
+              </button>
+            </span>
+          ))}
+          . Không ai nhắc lại điểm của bạn đâu. Trừ app này.
         </p>
       )}
     </section>

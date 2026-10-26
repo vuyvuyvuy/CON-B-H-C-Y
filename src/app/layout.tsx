@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";
+import { SyncAgent } from "@/components/SyncAgent";
 
 export const metadata: Metadata = {
   title: "Con Bệnh Cấp Cứu",
@@ -16,6 +17,7 @@ const NAV = [
   { href: "/dashboard", label: "Bảng tử thần" },
   { href: "/er", label: "Phòng cấp cứu" },
   { href: "/graveyard", label: "Nghĩa trang" },
+  { href: "/import", label: "Nạp thẻ" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh ecg-grid">
         <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
           <nav className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-4 py-3 text-sm">
-            <span className="mr-3 font-mono font-bold text-red-500">✚ CẤP CỨU</span>
+            <span className="mr-3 whitespace-nowrap font-mono font-bold text-red-500">✚ CẤP CỨU</span>
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} className="whitespace-nowrap rounded-md px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 hover:text-white">
                 {n.label}
@@ -34,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">{children}</main>
         <RegisterSW />
+        <SyncAgent />
       </body>
     </html>
   );

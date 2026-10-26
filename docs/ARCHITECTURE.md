@@ -93,9 +93,13 @@ Prompt ngầm nằm ở [`src/lib/ai/prompts.ts`](../src/lib/ai/prompts.ts). Ý 
 
 `/api/cron/nag` (mỗi 30 phút) → với từng user: bỏ qua giờ yên lặng (`quiet_hours`), giới hạn 1 lần / 3 giờ, dựng `NagContext` (thẻ đến hạn, HP ca đang dở, ngày tới kỳ thi, mộ chưa thắp, streak) → `pickNag` chọn template có trọng số theo `nag_level` (0 hiền … 3 cục súc). Subscription 404/410 tự dọn.
 
-## 6. Việc còn lại để lên production
+## 6. Đã có / giới hạn còn lại
 
-- PDF → cards (đang để TODO trong `/api/import`): `pdfjs-dist` trích text, OCR (Tesseract / model vision) cho slide scan.
-- Hỗ trợ `collection.anki21b` (zstd) để khỏi bắt user export legacy.
-- Đẩy pipeline gen ra queue (Supabase Edge Function / Inngest) — 150 thẻ ≈ 10–15 case ≈ 30–45 lời gọi LLM, dễ vượt timeout serverless.
-- Outbox IndexedDB + màn hình đăng nhập + nối `EmergencyCase.submit` vào API thật.
+Đã có: đăng nhập OTP email, đăng ký thiết bị + Web Push, outbox IndexedDB (gửi lại đúng thứ tự khi có mạng),
+chơi tiếp ca trên máy khác, nghĩa trang + thắp nhang, duyệt ca nháp, import `.apkg` (cả `anki21b` zstd) và `.pdf` có text,
+lịch thi YVD nạp sẵn khi đăng ký, CI chạy unit test + migration + smoke test SQL.
+
+Giới hạn:
+- PDF toàn ảnh scan không trích được chữ → báo số trang lỗi, chưa OCR.
+- Pipeline gen chạy trong `after()` của route (tối đa `maxDuration = 300s`). Deck rất lớn (> ~300 thẻ) nên tách file hoặc chuyển sang queue (Inngest / Supabase Edge Function).
+- Media (ảnh) trong thẻ Anki được thay bằng `[hình]`.

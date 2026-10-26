@@ -134,3 +134,15 @@ export function buildCasePrompt(topic: string, cards: { id: string; front: strin
     .join("\n");
   return `Chủ đề: ${topic}\nSố thẻ: ${cards.length}\n\nTHẺ ANKI:\n${list}`;
 }
+
+/** PDF -> thẻ: mỗi thẻ 1 sự kiện kiến thức, có tag dạng Anki để bước gom cụm mồi theo tag. */
+export const PDF_TO_CARDS_SYSTEM = `Bạn là sinh viên Y giỏi đang làm thẻ Anki từ slide bài giảng.
+Từ văn bản các trang slide, tạo thẻ hỏi–đáp theo nguyên tắc:
+- Mỗi thẻ đúng 1 sự kiện kiến thức (minimum information principle). Không gộp danh sách dài vào 1 thẻ; danh sách > 4 ý thì tách.
+- Ưu tiên kiến thức dùng được khi ra quyết định lâm sàng: triệu chứng gợi ý, chẩn đoán phân biệt, cận lâm sàng đặc hiệu, xử trí, chống chỉ định, biến chứng.
+- "back" chỉ chứa nội dung CÓ trong slide. Không bổ sung kiến thức ngoài, không bịa liều.
+- Bỏ qua trang mục lục, trang tiêu đề, lời cảm ơn, tài liệu tham khảo.
+- "tags": dạng Anki phân cấp "Môn::Chương::BệnhLý" (không dấu cách, dùng CamelCase không dấu), ví dụ "TMH::ThanhQuan::ViemThanhThiet".
+- "page": số trang nguồn.
+- Viết tiếng Việt, giữ thuật ngữ quốc tế trong ngoặc khi slide có.
+Trả JSON: {"cards": [{"front": string, "back": string, "tags": string[], "page": number}]}`;

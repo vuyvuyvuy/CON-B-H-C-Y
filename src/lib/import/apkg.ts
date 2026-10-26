@@ -1,11 +1,14 @@
 /**
  * Đọc file .apkg (zip chứa SQLite của Anki) => danh sách thẻ sạch.
  *
- *   collection.anki21b : Anki >= 2.1.50, nén zstd  -> yêu cầu user export "Support older Anki versions"
+ *   collection.anki21b : Anki >= 2.1.50, SQLite nén zstd
  *   collection.anki21  : Anki 2.1.x
- *   collection.anki2   : bản cũ (đôi khi chỉ là placeholder nếu có anki21)
+ *   collection.anki2   : bản cũ — nếu file có anki21/anki21b thì anki2 chỉ là placeholder
+ *                        ("Please update to the latest Anki version...") nên phải ưu tiên bản mới.
+ * Bảng notes/cards giữ nguyên cột id/nid/flds/tags qua các phiên bản schema nên dùng chung 1 query.
  */
 import { unzipSync } from "fflate";
+import { decompress as zstdDecompress } from "fzstd";
 import initSqlJs from "sql.js";
 import { createHash } from "node:crypto";
 
@@ -37,14 +40,23 @@ export function stripHtml(html: string): string {
 }
 
 export async function parseApkg(buf: Uint8Array): Promise<ParsedCard[]> {
-  const files = unzipSync(buf);
-  const db =
-    files["collection.anki21"] ?? (files["collection.anki21b"] ? null : files["collection.anki2"]);
-  if (!db) {
-    throw new ApkgError(
-      "File .apkg dùng định dạng mới (anki21b). Trong Anki: Export → tick 'Support older Anki versions' rồi thử lại.",
-    );
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(buf);
+  } catch {
+    throw new ApkgError("File không phải .apkg hợp lệ (không giải nén được).");
   }
+  let db: Uint8Array | undefined;
+  if (files["collection.anki21b"]) {
+    try {
+      db = zstdDecompress(files["collection.anki21b"]);
+    } catch {
+      throw new ApkgError("Không giải nén được collection.anki21b. Thử Export lại với 'Support older Anki versions'.");
+    }
+  } else {
+    db = files["collection.anki21"] ?? files["collection.anki2"];
+  }
+  if (!db) throw new ApkgError("Không tìm thấy collection trong file .apkg.");
 
   const SQL = await initSqlJs();
   const sqlite = new SQL.Database(db);

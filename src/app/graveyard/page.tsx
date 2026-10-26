@@ -1,38 +1,57 @@
-const DEMO_GRAVES = [
-  { id: "1", name: "Bà Lan, 67t", cause: "Sốc phản vệ — quên Adrenalin tiêm bắp", died: "24/10 23:41", lit: 1, need: 4 },
-  { id: "2", name: "Bé Na, 4t", cause: "Viêm thanh khí phế quản — cho nằm ngửa khám họng", died: "25/10 01:12", lit: 0, need: 3 },
-  { id: "3", name: "Ông Ba, 72t", cause: "Đột quỵ — tiêu sợi huyết ngoài cửa sổ", died: "19/10 22:03", lit: 5, need: 5 },
+import { hasSupabase } from "@/lib/env";
+import { supabaseServer } from "@/lib/supabase/server";
+import { Graveyard, type Grave } from "@/components/Graveyard";
+
+const DEMO_GRAVES: Grave[] = [
+  {
+    id: "demo-1", name: "Bà Lan, 67t", cause: "Sốc phản vệ", epitaph: "Ra đi lúc 23:41 24/10. Hung thủ: chính bạn.", diedAt: "2026-10-24T23:41:00+07:00", redeemed: false,
+    cards: [
+      { id: "d1", front: "Thuốc đầu tay trong sốc phản vệ?", back: "Adrenalin tiêm bắp (mặt trước ngoài đùi).", lit: true },
+      { id: "d2", front: "Liều Adrenalin TB cho người lớn trong sốc phản vệ?", back: "0,5 mg (0,5 ml dung dịch 1 mg/ml), nhắc lại sau 5 phút nếu cần.", lit: false },
+    ],
+  },
+  {
+    id: "demo-2", name: "Ông Ba, 72t", cause: "Đột quỵ thiếu máu não", epitaph: "Ra đi lúc 22:03 19/10. Hung thủ: chính bạn.", diedAt: "2026-10-19T22:03:00+07:00", redeemed: true,
+    cards: [{ id: "d3", front: "Cửa sổ tiêu sợi huyết TM với alteplase?", back: "Trong vòng 4,5 giờ từ lúc khởi phát.", lit: true }],
+  },
 ];
 
-export default function GraveyardPage() {
+export default async function GraveyardPage() {
+  let graves = DEMO_GRAVES;
+
+  if (hasSupabase) {
+    const supabase = await supabaseServer();
+    const { data: rows } = await supabase
+      .from("tombstones")
+      .select("id, epitaph, cause_card_ids, died_at, redeemed_at, clinical_cases(topic, patient), incense_offerings(card_id)")
+      .order("redeemed_at", { ascending: true, nullsFirst: true })
+      .order("died_at", { ascending: false })
+      .limit(60);
+    const ids = [...new Set((rows ?? []).flatMap((r) => r.cause_card_ids as string[]))];
+    const { data: cards } = ids.length ? await supabase.from("cards").select("id, front, back").in("id", ids) : { data: [] };
+    const byId = new Map((cards ?? []).map((c) => [c.id, c]));
+
+    graves = (rows ?? []).map((r: any) => {
+      const lit = new Set((r.incense_offerings ?? []).map((o: { card_id: string }) => o.card_id));
+      return {
+        id: r.id,
+        name: `${r.clinical_cases?.patient?.name ?? "Vô danh"}, ${r.clinical_cases?.patient?.age ?? "?"}t`,
+        cause: r.clinical_cases?.topic ?? "",
+        epitaph: r.epitaph,
+        diedAt: r.died_at,
+        redeemed: !!r.redeemed_at,
+        cards: (r.cause_card_ids as string[]).filter((id) => byId.has(id)).map((id) => ({ ...byId.get(id)!, lit: lit.has(id) })),
+      };
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-3xl font-black tracking-tight">Nghĩa trang</h1>
-        <p className="text-zinc-400">Mỗi nén nhang = ôn lại 1 thẻ đã làm sai (trả lời ≥ GOOD). Thắp đủ thì hồn siêu thoát.</p>
+        <p className="text-zinc-400">Mỗi nén nhang = ôn lại 1 thẻ đã làm sai và nhớ được (≥ GOOD). Thắp đủ thì hồn siêu thoát.</p>
       </div>
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {DEMO_GRAVES.map((g) => {
-          const redeemed = g.lit >= g.need;
-          return (
-            <li key={g.id} className={`rounded-t-[2rem] rounded-b-lg border p-4 ${redeemed ? "border-zinc-800 bg-zinc-900/30 opacity-60" : "border-zinc-700 bg-zinc-900"}`}>
-              <p className="text-center text-3xl">{redeemed ? "🕊️" : "🪦"}</p>
-              <p className="mt-1 text-center font-bold">{g.name}</p>
-              <p className="text-center text-sm text-zinc-400">{g.cause}</p>
-              <p className="mt-1 text-center font-mono text-xs text-zinc-600">Mất lúc {g.died}</p>
-              <p className="mt-3 text-center text-lg tracking-widest">
-                {"🕯️".repeat(g.lit)}
-                <span className="opacity-20">{"🕯️".repeat(Math.max(0, g.need - g.lit))}</span>
-              </p>
-              {!redeemed && (
-                <button className="mt-3 w-full rounded-lg bg-amber-600 py-2 font-semibold text-black hover:bg-amber-500">
-                  Thắp nhang ({g.need - g.lit} thẻ)
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <Graveyard graves={graves} demo={!hasSupabase} />
     </div>
   );
 }

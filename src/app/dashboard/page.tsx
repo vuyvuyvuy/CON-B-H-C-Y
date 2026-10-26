@@ -1,29 +1,68 @@
+import Link from "next/link";
 import { ExamCountdown } from "@/components/ExamCountdown";
 import { RankCard } from "@/components/RankCard";
-import Link from "next/link";
+import { LiveRefresh } from "@/components/LiveRefresh";
+import { PushToggle } from "@/components/PushToggle";
+import { hasSupabase } from "@/lib/env";
+import { supabaseServer } from "@/lib/supabase/server";
+import { SEED_EXAMS } from "@/data/exams";
+import type { Exam } from "@/lib/types";
 
-// Demo stats; khi có Supabase thì lấy từ bảng profiles (realtime)
-const DEMO_STATS = { total: 214, wrong: 61, killed: 4, saved: 9, streak: 6, due: 87, graves: 2 };
+const DEMO = { total: 214, wrong: 61, killed: 4, saved: 9, streak: 6, best: 9, due: 87, graves: 2, name: "Demo" };
 
-export default function DashboardPage() {
-  const s = DEMO_STATS;
+async function load() {
+  if (!hasSupabase) return { s: DEMO, exams: SEED_EXAMS };
+  const supabase = await supabaseServer();
+  const now = new Date().toISOString();
+  const [{ data: p }, due, graves, { data: exams }] = await Promise.all([
+    supabase.from("profiles").select("*").maybeSingle(),
+    supabase.from("card_srs").select("card_id", { count: "exact", head: true }).lte("due_at", now).neq("state", "suspended"),
+    supabase.from("tombstones").select("id", { count: "exact", head: true }).is("redeemed_at", null),
+    supabase.from("exams").select("id, title, exam_at, total_slides, slides_done, is_done").order("exam_at"),
+  ]);
+  return {
+    s: {
+      total: p?.total_answers ?? 0,
+      wrong: p?.wrong_answers ?? 0,
+      killed: p?.patients_killed ?? 0,
+      saved: p?.patients_saved ?? 0,
+      // streak đã đứt nhưng chưa ai cập nhật (chưa học hôm nay lẫn hôm qua)
+      streak: isAlive(p?.last_study_date, p?.timezone) ? p?.streak_current ?? 0 : 0,
+      best: p?.streak_best ?? 0,
+      due: due.count ?? 0,
+      graves: graves.count ?? 0,
+      name: p?.display_name ?? "",
+    },
+    exams: (exams ?? []) as Exam[],
+  };
+}
+
+function isAlive(last?: string | null, tz = "Asia/Ho_Chi_Minh") {
+  if (!last) return false;
+  const today = Date.parse(new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date()));
+  return today - Date.parse(last) <= 86_400_000;
+}
+
+export default async function DashboardPage() {
+  const { s, exams } = await load();
   return (
     <div className="space-y-6">
+      {hasSupabase && <LiveRefresh tables={["profiles", "card_srs", "tombstones"]} />}
       <div>
         <h1 className="text-3xl font-black tracking-tight">Bảng tử thần</h1>
-        <p className="text-zinc-400">Y Việt – Đức · Năm học 2026–2027 · Học kỳ 1</p>
+        <p className="text-zinc-400">{s.name ? `${s.name} · ` : ""}Y Việt – Đức · Năm học 2026–2027</p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <ExamCountdown />
+        <ExamCountdown initial={exams} />
 
         <aside className="space-y-4">
           <RankCard total={s.total} wrong={s.wrong} killed={s.killed} saved={s.saved} />
 
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="Streak" value={`${s.streak}🔥`} hint="Đứt là về 0" />
+            <Stat label="Streak" value={`${s.streak}🔥`} hint={`Kỷ lục ${s.best} · đứt là về 0`} />
             <Stat label="Thẻ đến hạn" value={s.due} hint="Đang đợi bạn" warn={s.due > 50} />
-            <Stat label="Đã tiễn" value={`${s.killed}🪦`} hint="Linh hồn" warn />
+            <Stat label="Đã tiễn" value={`${s.killed}🪦`} hint="Linh hồn" warn={s.killed > 0} />
             <Stat label="Xuất viện" value={s.saved} hint="May mắn" />
           </div>
 
@@ -35,6 +74,7 @@ export default function DashboardPage() {
               🕯️ {s.graves} ngôi mộ chưa được thắp nhang
             </Link>
           )}
+          {hasSupabase && <PushToggle />}
         </aside>
       </div>
     </div>

@@ -1,28 +1,50 @@
 # ✚ Con Bệnh Cấp Cứu
 
 Ôn Anki bằng cách cứu bệnh nhân. Chọn sai thì bệnh nhân mất máu, thẻ bị đánh `AGAIN`, và app chửi bạn.
-Chọn sai đủ nhiều thì bệnh nhân ra nghĩa trang, và bạn phải "thắp nhang" (ôn lại thẻ sai) để chuộc lỗi.
+Bệnh nhân chết thì vào nghĩa trang, bạn phải "thắp nhang" (ôn lại thẻ sai) để chuộc lỗi.
+
+## Chạy thử (không cần cấu hình)
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000 — không cần .env, chạy chế độ DEMO
+npm run dev          # http://localhost:3000 — chế độ DEMO: dữ liệu mẫu, chấm điểm local
 ```
 
-Có Supabase: chạy `supabase/migrations/0001_init.sql`, tạo bucket Storage `imports`, điền `.env.local` theo `.env.example`.
+## Chạy thật (đồng bộ điện thoại / iPad / PC)
+
+1. **Supabase**: tạo project → SQL Editor → chạy lần lượt `supabase/migrations/0001_init.sql`, `0002_gameplay.sql`.
+   Authentication → Providers → Email: bật. Authentication → Email Templates → Magic Link: thêm `{{ .Token }}` để email có mã 6 số.
+2. **Khoá**: `cp .env.example .env.local` rồi điền:
+   - Supabase URL / anon key / service role key (Project Settings → API)
+   - `OPENAI_API_KEY`
+   - VAPID: `npx web-push generate-vapid-keys`
+   - `CRON_SECRET`: chuỗi ngẫu nhiên bất kỳ
+3. **Deploy** lên Vercel (khai báo cùng biến môi trường). Cron nhắc học:
+   - Vercel Pro: `vercel.json` đã cấu hình 30 phút/lần.
+   - Vercel Hobby: chạy `supabase/cron.sql` để Supabase gọi thay.
+4. Trên iPhone/iPad: mở web bằng Safari → Chia sẻ → **Thêm vào MH chính** → mở từ icon → Dashboard → "Bật thông báo cục súc".
+
+Đăng ký xong là có sẵn 15 học phần + 9 lịch thi Y Việt – Đức 2026–2027. Vào **Nạp thẻ** để thả file `.apkg` / `.pdf`.
+
+## Kiểm thử
+
+```bash
+npm test             # unit test: SRS, câu chửi, danh hiệu, gom cụm, đọc .apkg
+npm run typecheck
+npm run test:db      # chạy migration + smoke test trên Postgres local có pgvector (DB_URL=...)
+```
 
 ## Bản đồ code
 
 | Đường dẫn | Nội dung |
 |---|---|
-| `supabase/migrations/0001_init.sql` | Schema: deck, card, SRS, ca lâm sàng, nghĩa trang, log sync, RLS, Realtime, RPC `submit_case_answer` |
+| `supabase/migrations/` | Schema, RLS, Realtime, RPC chấm đáp án / mở lượt / thắp nhang / hàng đợi ca, seed lịch thi |
+| `supabase/tests/` | Giả lập Supabase + smoke test toàn bộ vòng chơi |
 | `docs/ARCHITECTURE.md` | Kiến trúc, sơ đồ luồng AI, cơ chế sync đa thiết bị |
-| `src/lib/ai/prompts.ts` | Prompt ngầm + JSON schema gen ca |
-| `src/lib/ai/generate-cases.ts` | Embed → gom cụm → gen → validate → audit |
-| `src/lib/import/apkg.ts` | Đọc `.apkg` |
+| `src/lib/ai/` | Prompt ngầm, pipeline embed → gom cụm → gen → validate → audit |
+| `src/lib/import/` | Đọc `.apkg` (anki2/anki21/anki21b), PDF → thẻ |
 | `src/lib/srs.ts` | SM-2 + map quyết định lâm sàng → Again/Hard/Good/Easy |
-| `src/lib/insults.ts` | Kho câu chửi theo mức độ nguy kịch, random không lặp |
-| `src/lib/ranks.ts` | Danh hiệu: Lang băm, Sát thủ blouse trắng… |
-| `src/lib/push/messages.ts` | Template push notification cục súc |
-| `src/components/ExamCountdown.tsx` | Đếm ngược lịch thi (seed từ lịch YVD 26–27) |
-| `src/components/EmergencyCase.tsx` | Màn hình ca cấp cứu: monitor, HP, chửi |
-| `src/app/api/*` | Import, chấm đáp án, cron nhắc học |
+| `src/lib/insults.ts`, `ranks.ts`, `push/messages.ts` | Câu chửi, danh hiệu, thông báo |
+| `src/lib/outbox.ts`, `device.ts` | Hàng đợi offline, danh tính thiết bị, Web Push |
+| `src/components/` | Countdown, ca cấp cứu, nghĩa trang, import… |
+| `src/app/api/` | Import, chấm đáp án, thắp nhang, duyệt ca, thiết bị, cron |
