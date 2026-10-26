@@ -189,6 +189,12 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .reader { white-space: pre-line; font-size: 15px; line-height: 1.65; background: var(--bg); border-radius: 8px; padding: 14px; border: 1px solid var(--line); overflow-wrap: anywhere; }
 .reader mark { background: color-mix(in srgb, var(--warn) 35%, transparent); color: inherit; }
 
+/* ---------- câu bựa ---------- */
+.fun { margin: 0; font-size: 16.5px; line-height: 1.6; }
+.fun mark { background: none; color: #ff8f80; font-weight: 700; }
+details.orig { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; color: var(--muted); }
+details.orig > summary { cursor: pointer; }
+
 /* ---------- tình huống ---------- */
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .casecard { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 6px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
@@ -291,7 +297,11 @@ function rich(html) {
 const isAnki = (q) => q?.kind === "anki";
 const isCase = (q) => q?.kind === "case";
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem);
-const qBack = (q) => isAnki(q) ? rich(q.back) : esc(q.answer);
+/* Thẻ Anki có câu "bựa" (fun, **đậm** = keyword) thì hiện câu bựa trước, bản gốc gập lại bên dưới (mở sẵn nếu có hình). */
+const funHTML = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<mark>$1</mark>");
+const qBack = (q) => !isAnki(q) ? esc(q.answer)
+  : q.fun ? `<p class="fun">${funHTML(q.fun)}</p><details class="orig" ${/<img|<table/.test(q.back) ? "open" : ""}><summary class="eyebrow">Bản gốc (Anki)</summary>${rich(q.back)}</details>`
+  : rich(q.back);
 const STARS = { 3: "★★★ hay thi", 2: "★★ cần nhớ", 1: "★ ít ra thi" };
 const stars = (q) => q.prio ? `<span class="stars">${STARS[q.prio]}</span>` : "";
 
@@ -727,7 +737,7 @@ function qItem(s, q) {
   return `<div class="qitem">
     <div class="row between" style="gap:6px"><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span></span>
       <div class="row" style="gap:6px">${q.wrong ? `<span class="chip red">sai ${q.wrong}/${q.seen}</span>` : q.seen ? `<span class="chip green">đúng ${q.seen}</span>` : `<span class="chip">chưa làm</span>`}${q.card ? `<span class="chip amber">thẻ ${q.card.state === "review" ? "ôn " + Math.round(q.card.ivl) + "d" : "đang học"}</span>` : ""}</div></div>
-    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${rich(q.back)}</div>` : `<p>${esc(q.stem)}</p>
+    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${qBack(q)}</div>` : `<p>${esc(q.stem)}</p>
     ${q.options?.length ? `<ol>${q.options.map((o) => `<li class="${o.k === q.answer ? "ok" : ""}">${esc(o.k)}. ${esc(o.t)}</li>`).join("")}</ol>` : `<p class="note">Đáp án: ${esc(q.answer)}</p>`}`}
     ${q.explanation ? `<p class="note">💡 ${esc(q.explanation)}</p>` : ""}
     <div class="row" style="gap:6px"><select data-act="move-q" data-code="${s.code}" data-id="${q.id}" style="width:auto;flex:1;min-width:150px;padding:5px 8px;font-size:13px">${lessonOpts}<option value="" ${!q.lesson ? "selected" : ""}>Chưa xếp bài</option></select>
@@ -826,7 +836,7 @@ function caseExtras(q, code, bad) {
   const cards = (q.covers || []).map((id) => S.questions[code]?.[id]).filter(Boolean);
   const queued = cards.filter((c) => c.card && c.card.due <= Date.now() + DAY).length;
   return `${cards.length ? `<details class="covers" ${bad ? "open" : ""}><summary class="eyebrow">🗂 ${cards.length} thẻ Anki của bài liên quan câu này</summary>
-      <div class="qlist">${cards.map((c) => `<div class="qitem"><div class="row between">${stars(c)}${c.slide ? `<span class="eyebrow">slide ${esc(c.slide)}</span>` : ""}</div><div class="rich"><b>${rich(c.front)}</b></div><div class="rich note">${rich(c.back)}</div></div>`).join("")}</div>
+      <div class="qlist">${cards.map((c) => `<div class="qitem"><div class="row between">${stars(c)}${c.slide ? `<span class="eyebrow">slide ${esc(c.slide)}</span>` : ""}</div><div class="rich"><b>${rich(c.front)}</b></div><div class="rich note">${qBack(c)}</div></div>`).join("")}</div>
       ${queued >= cards.length ? `<p class="note mono">Mấy thẻ này đã nằm trong hàng Thắp nhang.</p>` : `<button class="btn small amber" data-act="cover-review" data-code="${code}" data-id="${q.id}">Đẩy ${cards.length} thẻ này vào Thắp nhang</button>`}</details>` : ""}
     <div class="explain" id="ainote" ${q.aiNote ? "" : 'style="border-left-color:var(--dim)"'}>${q.aiNote ? esc(q.aiNote) : S.sample ? `<button class="btn small" data-act="explain-deep">Vẫn chưa thông? Nhờ Claude giảng sâu hơn</button>` : ""}</div>`;
 }
