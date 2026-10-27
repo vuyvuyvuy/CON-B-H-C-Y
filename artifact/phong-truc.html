@@ -438,6 +438,13 @@ function saveStats() {
 /* ------------------------------------------------------------------ */
 const SRS = { learn: [1, 10], relearn: [10], grad: 1, easyIvl: 4, ease: 2.5, minEase: 1.3, easyBonus: 1.3, hard: 1.2, lapse: 0.2, maxIvl: 365 };
 const newCard = (now = Date.now()) => ({ state: "new", due: now, ivl: 0, ease: SRS.ease, reps: 0, lapses: 0, step: 0, last: null });
+/* Câu đề cũ / tình huống làm đúng lần đầu vẫn được hẹn ôn lại (2–3 ngày sau), để không "đúng hôm nay, quên tuần sau".
+   Mọi lịch ôn bị kẹp trước ngày thi 1 hôm (trong schedule) nên câu nào cũng quay lại ít nhất 1 lần trước khi thi. */
+function firstPassCard(now, rating, examAt) {
+  const ivl = rating === "easy" ? 3 : 2;
+  const lim = examAt ? examAt - DAY : Infinity;
+  return { ...newCard(now), state: "review", ivl, reps: 1, last: now, due: lim > now ? Math.min(now + ivl * DAY, lim) : now + ivl * DAY };
+}
 function ratingFrom(correct, ms) { return !correct ? "again" : ms < 8000 ? "easy" : ms > 45000 ? "hard" : "good"; }
 
 function schedule(prev, rating, now = Date.now(), examAt = null) {
@@ -686,8 +693,11 @@ function debtPlan(code, now = new Date()) {
   const yest = ymd(new Date(t0 - DAY / 2));
   const k = {};
   for (const [id] of DEBT_KINDS) k[id] = { total: 0, left: 0, today: 0 };
-  let doneYest = 0;
+  let doneYest = 0, dueRev = 0, revToday = 0;
+  const eod = t0 + DAY - 7 * 3600e3;   // hết ngày hôm nay (giờ VN)
   for (const q of list) {
+    if (q.seen && isDue(q, eod)) dueRev++;
+    if (q.card?.last && ymd(new Date(q.card.last)) === today && dayOf(q) !== today) revToday++;
     const c = k[kindOf(q)]; c.total++;
     const d = dayOf(q);
     if (!q.seen) c.left++;
@@ -706,21 +716,32 @@ function debtPlan(code, now = new Date()) {
   const quotaYest = Math.ceil((left + doneToday + doneYest) / (days + 1));
   const trackedYest = S.stats.debtStart && S.stats.debtStart <= yest;
   const skippedYest = trackedYest && doneYest < quotaYest ? quotaYest - doneYest : 0;
-  return { code, examAt, examIn, days, total, left, doneToday, quota, owe: Math.max(0, quota - doneToday), k, doneYest, skippedYest };
+  const oweNew = Math.max(0, quota - doneToday);
+  return { code, examAt, examIn, days, total, left, doneToday, quota, oweNew, dueRev, revToday, owe: oweNew + dueRev, k, doneYest, skippedYest };
+}
+const backfilled = {};
+function backfillCards(code) {
+  if (backfilled[code] || !S.loaded.subjects || !S.packsLoaded) return;
+  backfilled[code] = true;
+  const now = Date.now(), ex = nextExamAt(code);
+  qsAll(code).filter((q) => !isAnki(q) && q.seen && !q.card && !q.deleted)
+    .forEach((q, i) => saveQuestion(code, { ...q, card: { ...firstPassCard(now, "good", ex), due: now + (i % 2 ? 1 : 2) * DAY } }));
 }
 function debtRoast(p) {
   const name = esc(S.subjects[p.code]?.name || p.code);
   if (!p.left && !p.doneToday) return `Làm hết ${p.total} câu rồi. Giờ thì ôn lại câu sai đi, đừng có ngồi tự hào.`;
-  if (p.days <= 0) return p.left
+  const rev = p.dueRev ? ` Cộng ${p.dueRev} câu đến hạn ôn lại — câu đúng hôm trước không có nghĩa là hôm nay còn nhớ.` : "";
+  if (!p.oweNew && p.dueRev) return `Câu mới đã trả đủ, nhưng còn ${p.dueRev} câu đến hạn ôn trong Thắp nhang. Nhớ được 3 ngày chưa phải là thuộc.`;
+  if (p.days <= 0) return (p.left
     ? `Quá hạn trả nợ. Đáng lẽ giờ này chỉ ôn câu sai, vậy mà còn ${p.left} câu chưa đụng tới, ${p.examIn} ngày nữa thi ${name}. Làm cho xong rồi đi Thắp nhang, hôm nay ${p.quota} câu.`
-    : `Hết nợ mới. ${p.examIn} ngày cuối chỉ việc ôn câu sai trong Thắp nhang — đừng có tưởng làm xong là thuộc.`;
+    : `Hết nợ mới. ${p.examIn} ngày cuối chỉ việc ôn câu sai trong Thắp nhang — đừng có tưởng làm xong là thuộc.`) + rev;
   if (!p.owe) return p.doneToday > p.quota * 1.5
     ? `Hôm nay trả dư ${p.doneToday - p.quota} câu. Lạ thật. Có ai cầm súng sau lưng không?`
     : `Đủ chỉ tiêu hôm nay. Không phải giỏi, chỉ là không lười. Mai lại ${p.quota} câu nữa.`;
   const hard = p.quota >= 120;
   const lines = !p.doneToday ? [
     `Hôm nay 0/${p.quota}. Bệnh nhân không chờ bạn "lấy cảm hứng".`,
-    `Chưa làm câu nào. ${p.days} ngày nữa thi mà vẫn bình thản thế này, chắc định thi bằng tâm linh.`,
+    `Chưa làm câu nào. ${p.examIn} ngày nữa thi mà vẫn bình thản thế này, chắc định thi bằng tâm linh.`,
     `0 câu. Điện thoại còn pin, sao não thì không?`,
     `Nợ ${p.quota} câu hôm nay, trả 0. Chủ nợ là ${name}, và nó không biết thương lượng.`,
   ] : [
@@ -728,7 +749,7 @@ function debtRoast(p) {
     `Còn nợ ${p.owe} câu hôm nay. Đừng đi ngủ với cái nợ này.`,
     `${p.doneToday} câu rồi nghỉ? Bệnh nhân mổ được một nửa cũng không gọi là xong.`,
   ];
-  let t = lines[Math.floor(Date.parse(ymd(new Date())) / DAY + p.doneToday) % lines.length];   // cố định trong ngày, không nhảy mỗi lần vẽ lại
+  let t = lines[Math.floor(Date.parse(ymd(new Date())) / DAY + p.doneToday) % lines.length] + rev;   // cố định trong ngày, không nhảy mỗi lần vẽ lại
   if (p.skippedYest) t += ` Hôm qua còn quỵt ${p.skippedYest} câu, đã cộng lãi vào chỉ tiêu hôm nay.`;
   if (hard) t += ` ${p.quota} câu/ngày — đây là hậu quả của những ngày "mai học".`;
   return t;
@@ -740,14 +761,14 @@ function debtCard(p, withName = true) {
   return `<div class="debt">
     <div class="row between" style="align-items:baseline">
       <div style="min-width:0">${withName ? `<h3>${esc(s?.name || p.code)}</h3>` : ""}<p class="note">${p.days ? `Còn ${p.days} ngày để trả (xong trước thi ${REVIEW_DAYS} ngày, ${REVIEW_DAYS} ngày cuối ôn câu sai)` : `Đang trong ${REVIEW_DAYS} ngày ôn câu sai · thi sau ${p.examIn} ngày`} · chưa làm ${p.left}/${p.total}</p></div>
-      <div class="debt-n" style="color:${col}">${p.owe}<small>${p.owe ? "câu còn nợ hôm nay" : "nợ hôm nay"}</small></div>
+      <div class="debt-n" style="color:${col}">${p.owe}<small>${p.owe ? (p.dueRev ? "câu nợ (mới + ôn)" : "câu còn nợ hôm nay") : "nợ hôm nay"}</small></div>
     </div>
     <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
-    <p class="note">Hôm nay ${p.doneToday}/${p.quota} câu mới</p>
+    <p class="note">Hôm nay ${p.doneToday}/${p.quota} câu mới${p.revToday ? ` · đã ôn lại ${p.revToday} câu` : ""}${p.dueRev ? ` · còn <b>${p.dueRev}</b> câu đến hạn ôn` : ""}</p>
     <div class="debt-kinds">${DEBT_KINDS.filter(([id]) => p.k[id].total).map(([id, label, tab]) => {
       const c = p.k[id], owe = Math.max(0, c.quota - c.today);
       return `<button class="debt-k" data-act="pay-debt" data-code="${p.code}" data-id="${tab}"><b>${label}</b><span>${c.today}/${c.quota} hôm nay</span><span class="dim">còn ${c.left} câu${owe ? ` · nợ ${owe}` : " · xong"}</span></button>`;
-    }).join("")}</div>
+    }).join("")}<button class="debt-k" data-act="tab" data-id="review"><b>🕯️ Ôn lại</b><span>${p.revToday} đã ôn hôm nay</span><span class="dim">${p.dueRev ? `đến hạn ${p.dueRev} · nợ ${p.dueRev}` : "không có câu đến hạn"}</span></button></div>
     <p class="debt-roast" style="color:${col}">${debtRoast(p)}</p>
   </div>`;
 }
@@ -797,7 +818,7 @@ function viewHome() {
   <div class="grid2">
     <div class="stack">
       ${hero}
-      ${(() => { const ps = upcoming.map((e) => e.code).filter((c, i, a) => a.indexOf(c) === i).map((c) => debtPlan(c, now)).filter(Boolean);
+      ${(() => { const ps = upcoming.map((e) => e.code).filter((c, i, a) => a.indexOf(c) === i).map((c) => (setTimeout(() => backfillCards(c), 0), debtPlan(c, now))).filter(Boolean);
         return ps.length ? `<section class="panel stack"><p class="eyebrow" style="color:var(--alarm)">📒 Sổ đòi nợ</p>${ps.map((p) => debtCard(p)).join("")}</section>` : ""; })()}
       ${list ? `<section class="panel"><p class="eyebrow">Hàng chờ hành quyết</p><div class="exams">${list}</div></section>` : ""}
       ${noExam.length ? `<section class="panel stack"><p class="eyebrow">Môn chưa có lịch thi</p><div class="row">${noExam.map((s) => `<button class="btn small ghost" data-act="open-subject" data-code="${s.code}">${esc(s.name)} <span class="dim">· ${qs(s.code).length}</span></button>`).join("")}</div></section>` : ""}
@@ -858,6 +879,7 @@ function viewSubject() {
     </div>`;
   }).join("");
 
+  setTimeout(() => backfillCards(s.code), 0);
   const dp = debtPlan(s.code);
   return `${dp ? `<section class="panel stack"><p class="eyebrow" style="color:var(--alarm)">📒 Sổ đòi nợ</p>${debtCard(dp, false)}</section>` : ""}<section class="panel">
     <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.filter((q) => !isAnki(q)).length} câu đề cũ · ${list.filter(isAnki).length} thẻ Anki</p></div>
@@ -1089,6 +1111,7 @@ async function answerPractice(choice, self) {
   if (correct) {
     P.right++;
     if (card || rating === "hard") card = schedule(card || newCard(now), rating, now, nextExamAt(it.code));
+    else if (!isAnki(q)) card = firstPassCard(now, rating, nextExamAt(it.code));
     text = rating === "hard" ? "Lờ mờ thì cũng như không. Cho qua lần này, nhưng thẻ này sẽ quay lại tìm bạn." : fill(pick(PRAISE), { patient: P.patient });
   } else {
     penalty = 20;
@@ -1630,7 +1653,7 @@ function erAnswer(k) {
   for (const id of st.qids || []) {
     const q = S.questions[E.case.code]?.[id]; if (!q) continue;
     const u = { ...q, seen: (q.seen || 0) + 1, ...(q.seen ? {} : { firstSeenAt: now }) };
-    if (ok) { if (u.card) u.card = schedule(u.card, ratingFrom(true, ms), now, nextExamAt(E.case.code)); }
+    if (ok) { u.card = u.card ? schedule(u.card, ratingFrom(true, ms), now, nextExamAt(E.case.code)) : firstPassCard(now, ratingFrom(true, ms), nextExamAt(E.case.code)); }
     else { u.wrong = (u.wrong || 0) + 1; u.lastWrongAt = now; const c = schedule(u.card || newCard(now), "again", now, nextExamAt(E.case.code)); u.card = { ...c, due: Math.max(c.due, now + 10 * MIN) }; E.wrongQ.add(id); }
     saveQuestion(E.case.code, u);
   }
