@@ -671,6 +671,8 @@ function subjectCounts(code) {
    hạn chót là hết ngày trước ngày thi. "Làm" = câu được trả lời lần đầu (firstSeenAt). */
 /* ------------------------------------------------------------------ */
 /* Thẻ Anki không tính: học trực tiếp trên app Anki. */
+/* Chừa 4 ngày cuối trước ngày thi để ôn lại câu sai (Thắp nhang), không nhận câu mới. */
+const REVIEW_DAYS = 4;
 const DEBT_KINDS = [["exam", "Đề cũ", "exams"], ["case", "Tình huống", "cases"]];
 const kindOf = (q) => isAnki(q) ? "anki" : isCase(q) ? "case" : "exam";
 function debtPlan(code, now = new Date()) {
@@ -695,7 +697,8 @@ function debtPlan(code, now = new Date()) {
   const left = Object.values(k).reduce((a, c) => a + c.left, 0);
   const doneToday = Object.values(k).reduce((a, c) => a + c.today, 0);
   const total = list.length;
-  const days = Math.max(0, daysLeft);
+  const examIn = Math.max(0, daysLeft);
+  const days = Math.max(0, daysLeft - REVIEW_DAYS);
   // chỉ tiêu hôm nay tính từ số còn lại lúc đầu ngày, để làm xong không bị dời chỉ tiêu
   const per = (n) => days ? Math.ceil(n / days) : n;
   for (const c of Object.values(k)) c.quota = per(c.left + c.today);
@@ -703,12 +706,14 @@ function debtPlan(code, now = new Date()) {
   const quotaYest = Math.ceil((left + doneToday + doneYest) / (days + 1));
   const trackedYest = S.stats.debtStart && S.stats.debtStart <= yest;
   const skippedYest = trackedYest && doneYest < quotaYest ? quotaYest - doneYest : 0;
-  return { code, examAt, days, total, left, doneToday, quota, owe: Math.max(0, quota - doneToday), k, doneYest, skippedYest };
+  return { code, examAt, examIn, days, total, left, doneToday, quota, owe: Math.max(0, quota - doneToday), k, doneYest, skippedYest };
 }
 function debtRoast(p) {
   const name = esc(S.subjects[p.code]?.name || p.code);
   if (!p.left && !p.doneToday) return `Làm hết ${p.total} câu rồi. Giờ thì ôn lại câu sai đi, đừng có ngồi tự hào.`;
-  if (p.days <= 0) return `Hết hạn trả nợ. Còn ${p.left} câu chưa đụng tới và mai thi ${name}. Chúc may mắn — bạn sẽ cần rất nhiều.`;
+  if (p.days <= 0) return p.left
+    ? `Quá hạn trả nợ. Đáng lẽ giờ này chỉ ôn câu sai, vậy mà còn ${p.left} câu chưa đụng tới, ${p.examIn} ngày nữa thi ${name}. Làm cho xong rồi đi Thắp nhang, hôm nay ${p.quota} câu.`
+    : `Hết nợ mới. ${p.examIn} ngày cuối chỉ việc ôn câu sai trong Thắp nhang — đừng có tưởng làm xong là thuộc.`;
   if (!p.owe) return p.doneToday > p.quota * 1.5
     ? `Hôm nay trả dư ${p.doneToday - p.quota} câu. Lạ thật. Có ai cầm súng sau lưng không?`
     : `Đủ chỉ tiêu hôm nay. Không phải giỏi, chỉ là không lười. Mai lại ${p.quota} câu nữa.`;
@@ -734,7 +739,7 @@ function debtCard(p, withName = true) {
   const s = S.subjects[p.code];
   return `<div class="debt">
     <div class="row between" style="align-items:baseline">
-      <div style="min-width:0">${withName ? `<h3>${esc(s?.name || p.code)}</h3>` : ""}<p class="note">Còn ${p.days} ngày để trả (xong trước ngày thi 1 hôm) · chưa làm ${p.left}/${p.total}</p></div>
+      <div style="min-width:0">${withName ? `<h3>${esc(s?.name || p.code)}</h3>` : ""}<p class="note">${p.days ? `Còn ${p.days} ngày để trả (xong trước thi ${REVIEW_DAYS} ngày, ${REVIEW_DAYS} ngày cuối ôn câu sai)` : `Đang trong ${REVIEW_DAYS} ngày ôn câu sai · thi sau ${p.examIn} ngày`} · chưa làm ${p.left}/${p.total}</p></div>
       <div class="debt-n" style="color:${col}">${p.owe}<small>${p.owe ? "câu còn nợ hôm nay" : "nợ hôm nay"}</small></div>
     </div>
     <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
