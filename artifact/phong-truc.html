@@ -208,6 +208,18 @@ details.orig > summary { cursor: pointer; }
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
+.debt { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.debt + .debt { margin-top: 4px; }
+.debt h3 { margin: 0; }
+.debt-n { font: 800 34px/1 var(--font-mono); text-align: right; }
+.debt-n small { display: block; font: 600 11px var(--font-body, inherit); color: var(--muted); }
+.debt .bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.debt .bar i { display: block; height: 100%; }
+.debt-kinds { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; }
+.debt-k { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.debt-k:hover, .debt-k:focus-visible { border-color: var(--alarm); }
+.debt-k:focus-visible { outline: 2px solid var(--alarm); outline-offset: 2px; }
+.debt-roast { margin: 0; font-weight: 600; }
 .casecard { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 6px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
 .casecard:hover, .casecard:focus-visible { border-color: var(--alarm); }
 .casecard:focus-visible { outline: 2px solid var(--alarm); outline-offset: 2px; }
@@ -380,7 +392,7 @@ function write(path, fn) {
 const qPath = (code, id) => `subjects/${code}/questions/${id}`;
 /* Mỗi câu có b = hash(id) % 8: kho chỉ trả tối đa 1000 câu/truy vấn, môn nhiều câu thì chia nhóm theo b. */
 const bucket = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) % 8; };
-const STATE_FIELDS = ["seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "aiNote", "deleted"];
+const STATE_FIELDS = ["firstSeenAt", "seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "aiNote", "deleted"];
 function rebuild(code) {
   const pack = S.pack[code]?.cards || {}, docs = S.docs[code] || {}, m = {};
   for (const id in pack) { const d = docs[id]; if (d?.deleted) continue; m[id] = { ...pack[id], ...(d || {}), id }; }
@@ -654,6 +666,85 @@ function subjectCounts(code) {
   const anki = list.filter(isAnki).length;
   return { n: list.length, anki, exam: list.length - anki, wrong: list.filter((q) => q.wrong > 0).length, due: list.filter((q) => isDue(q)).length };
 }
+/* ------------------------------------------------------------------ */
+/* Sổ đòi nợ: chia phần chưa làm (đề cũ + tình huống + thẻ Anki) đều cho các ngày còn lại,
+   hạn chót là hết ngày trước ngày thi. "Làm" = câu được trả lời lần đầu (firstSeenAt). */
+/* ------------------------------------------------------------------ */
+const DEBT_KINDS = [["exam", "Đề cũ", "exams"], ["case", "Tình huống", "cases"], ["anki", "Thẻ Anki", "anki"]];
+const kindOf = (q) => isAnki(q) ? "anki" : isCase(q) ? "case" : "exam";
+function debtPlan(code, now = new Date()) {
+  const examAt = nextExamAt(code); if (!examAt) return null;
+  const today = ymd(now), t0 = Date.parse(today);
+  const daysLeft = daysUntil(new Date(examAt).toISOString(), now);   // hôm nay → hết ngày trước ngày thi
+  const list = qsAll(code).filter((q) => !q.deleted);
+  if (!list.length) return null;
+  if (!S.stats.debtStart) S.stats.debtStart = today;
+  const dayOf = (q) => q.firstSeenAt ? ymd(new Date(q.firstSeenAt)) : null;
+  const yest = ymd(new Date(t0 - DAY / 2));
+  const k = {};
+  for (const [id] of DEBT_KINDS) k[id] = { total: 0, left: 0, today: 0 };
+  let doneYest = 0;
+  for (const q of list) {
+    const c = k[kindOf(q)]; c.total++;
+    const d = dayOf(q);
+    if (!q.seen) c.left++;
+    else if (d === today) c.today++;
+    if (d === yest) doneYest++;
+  }
+  const left = Object.values(k).reduce((a, c) => a + c.left, 0);
+  const doneToday = Object.values(k).reduce((a, c) => a + c.today, 0);
+  const total = list.length;
+  const days = Math.max(0, daysLeft);
+  // chỉ tiêu hôm nay tính từ số còn lại lúc đầu ngày, để làm xong không bị dời chỉ tiêu
+  const per = (n) => days ? Math.ceil(n / days) : n;
+  for (const c of Object.values(k)) c.quota = per(c.left + c.today);
+  const quota = per(left + doneToday);
+  const quotaYest = Math.ceil((left + doneToday + doneYest) / (days + 1));
+  const trackedYest = S.stats.debtStart && S.stats.debtStart <= yest;
+  const skippedYest = trackedYest && doneYest < quotaYest ? quotaYest - doneYest : 0;
+  return { code, examAt, days, total, left, doneToday, quota, owe: Math.max(0, quota - doneToday), k, doneYest, skippedYest };
+}
+function debtRoast(p) {
+  const name = esc(S.subjects[p.code]?.name || p.code);
+  if (!p.left && !p.doneToday) return `Làm hết ${p.total} câu rồi. Giờ thì ôn lại câu sai đi, đừng có ngồi tự hào.`;
+  if (p.days <= 0) return `Hết hạn trả nợ. Còn ${p.left} câu chưa đụng tới và mai thi ${name}. Chúc may mắn — bạn sẽ cần rất nhiều.`;
+  if (!p.owe) return p.doneToday > p.quota * 1.5
+    ? `Hôm nay trả dư ${p.doneToday - p.quota} câu. Lạ thật. Có ai cầm súng sau lưng không?`
+    : `Đủ chỉ tiêu hôm nay. Không phải giỏi, chỉ là không lười. Mai lại ${p.quota} câu nữa.`;
+  const hard = p.quota >= 120;
+  const lines = !p.doneToday ? [
+    `Hôm nay 0/${p.quota}. Bệnh nhân không chờ bạn "lấy cảm hứng".`,
+    `Chưa làm câu nào. ${p.days} ngày nữa thi mà vẫn bình thản thế này, chắc định thi bằng tâm linh.`,
+    `0 câu. Điện thoại còn pin, sao não thì không?`,
+    `Nợ ${p.quota} câu hôm nay, trả 0. Chủ nợ là ${name}, và nó không biết thương lượng.`,
+  ] : [
+    `Mới ${p.doneToday}/${p.quota}. Làm nửa vời thì thi cũng đậu nửa vời — tức là rớt.`,
+    `Còn nợ ${p.owe} câu hôm nay. Đừng đi ngủ với cái nợ này.`,
+    `${p.doneToday} câu rồi nghỉ? Bệnh nhân mổ được một nửa cũng không gọi là xong.`,
+  ];
+  let t = lines[Math.floor(Date.parse(ymd(new Date())) / DAY + p.doneToday) % lines.length];   // cố định trong ngày, không nhảy mỗi lần vẽ lại
+  if (p.skippedYest) t += ` Hôm qua còn quỵt ${p.skippedYest} câu, đã cộng lãi vào chỉ tiêu hôm nay.`;
+  if (hard) t += ` ${p.quota} câu/ngày — đây là hậu quả của những ngày "mai học".`;
+  return t;
+}
+function debtCard(p, withName = true) {
+  const pct = p.quota ? Math.min(100, Math.round(p.doneToday / p.quota * 100)) : 100;
+  const col = !p.owe ? "var(--ecg)" : p.doneToday ? "var(--warn)" : "var(--alarm)";
+  const s = S.subjects[p.code];
+  return `<div class="debt">
+    <div class="row between" style="align-items:baseline">
+      <div style="min-width:0">${withName ? `<h3>${esc(s?.name || p.code)}</h3>` : ""}<p class="note">Còn ${p.days} ngày để trả (xong trước ngày thi 1 hôm) · chưa làm ${p.left}/${p.total}</p></div>
+      <div class="debt-n" style="color:${col}">${p.owe}<small>${p.owe ? "câu còn nợ hôm nay" : "nợ hôm nay"}</small></div>
+    </div>
+    <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
+    <p class="note">Hôm nay ${p.doneToday}/${p.quota} câu mới</p>
+    <div class="debt-kinds">${DEBT_KINDS.filter(([id]) => p.k[id].total).map(([id, label, tab]) => {
+      const c = p.k[id], owe = Math.max(0, c.quota - c.today);
+      return `<button class="debt-k" data-act="pay-debt" data-code="${p.code}" data-id="${tab}"><b>${label}</b><span>${c.today}/${c.quota} hôm nay</span><span class="dim">còn ${c.left} câu${owe ? ` · nợ ${owe}` : " · xong"}</span></button>`;
+    }).join("")}</div>
+    <p class="debt-roast" style="color:${col}">${debtRoast(p)}</p>
+  </div>`;
+}
 function viewHome() {
   if (!S.loaded.subjects) return `<div class="empty"><p class="eyebrow">Đang tải dữ liệu…</p></div>`;
   if (!subjectList().length) return `<div class="empty"><h2>Chưa có môn nào</h2><p class="muted">Kho dữ liệu đang trống. Nhắn Claude trong khung chat: “nạp lịch thi và danh sách môn” là xong.</p><button class="btn" data-act="add-subject">+ Thêm môn</button></div>`;
@@ -700,6 +791,8 @@ function viewHome() {
   <div class="grid2">
     <div class="stack">
       ${hero}
+      ${(() => { const ps = upcoming.map((e) => e.code).filter((c, i, a) => a.indexOf(c) === i).map((c) => debtPlan(c, now)).filter(Boolean);
+        return ps.length ? `<section class="panel stack"><p class="eyebrow" style="color:var(--alarm)">📒 Sổ đòi nợ</p>${ps.map((p) => debtCard(p)).join("")}</section>` : ""; })()}
       ${list ? `<section class="panel"><p class="eyebrow">Hàng chờ hành quyết</p><div class="exams">${list}</div></section>` : ""}
       ${noExam.length ? `<section class="panel stack"><p class="eyebrow">Môn chưa có lịch thi</p><div class="row">${noExam.map((s) => `<button class="btn small ghost" data-act="open-subject" data-code="${s.code}">${esc(s.name)} <span class="dim">· ${qs(s.code).length}</span></button>`).join("")}</div></section>` : ""}
       ${past.length ? `<p class="note">Đã qua: ${past.map((e) => esc(e.title)).join(", ")}. Không ai nhắc lại điểm của bạn đâu. Trừ trang này.</p>` : ""}
@@ -759,7 +852,8 @@ function viewSubject() {
     </div>`;
   }).join("");
 
-  return `<section class="panel">
+  const dp = debtPlan(s.code);
+  return `${dp ? `<section class="panel stack"><p class="eyebrow" style="color:var(--alarm)">📒 Sổ đòi nợ</p>${debtCard(dp, false)}</section>` : ""}<section class="panel">
     <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.filter((q) => !isAnki(q)).length} câu đề cũ · ${list.filter(isAnki).length} thẻ Anki</p></div>
     ${lessons.length ? `<div class="lessons">${rows}</div>` : `<div class="empty"><p>Môn này chưa có danh sách bài.</p><p class="note">Thêm bài bên dưới, hoặc cứ nạp đề — Claude sẽ đề xuất bài.</p></div>`}
     <form class="row" data-form="add-lesson" style="margin-top:12px"><input type="text" id="new-lesson" placeholder="Tên bài mới, ví dụ: Viêm tai giữa mạn" style="flex:1;min-width:180px" required><button class="btn">+ Thêm bài</button></form>
@@ -978,6 +1072,7 @@ async function answerPractice(choice, self) {
   const correct = self ? self !== "again" : choice === q.answer;
   const ms = Date.now() - P.qStart;
   const now = Date.now();
+  if (!q.seen) q.firstSeenAt = now;
   q.seen = (q.seen || 0) + 1;
   P.answeredCount++;
   S.stats.total++;
@@ -1528,7 +1623,7 @@ function erAnswer(k) {
   const ms = now - E.start;
   for (const id of st.qids || []) {
     const q = S.questions[E.case.code]?.[id]; if (!q) continue;
-    const u = { ...q, seen: (q.seen || 0) + 1 };
+    const u = { ...q, seen: (q.seen || 0) + 1, ...(q.seen ? {} : { firstSeenAt: now }) };
     if (ok) { if (u.card) u.card = schedule(u.card, ratingFrom(true, ms), now, nextExamAt(E.case.code)); }
     else { u.wrong = (u.wrong || 0) + 1; u.lastWrongAt = now; const c = schedule(u.card || newCard(now), "again", now, nextExamAt(E.case.code)); u.card = { ...c, due: Math.max(c.due, now + 10 * MIN) }; E.wrongQ.add(id); }
     saveQuestion(E.case.code, u);
@@ -1570,6 +1665,7 @@ document.addEventListener("click", async (ev) => {
     case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; S.openLimit = 40; render(); break;
     case "practice-subject": S.subject = d.code; go("anki"); break;
     case "sub": go(d.id); break;
+    case "pay-debt": S.subject = d.code; if (d.id === "exams" || d.id === "anki") { S.practice = { code: d.code, kind: d.id === "exams" ? "exam" : "anki" }; } go(d.id); break;
     case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
     case "import-subject": S.subject = d.code; S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
     case "rename-lesson": {
