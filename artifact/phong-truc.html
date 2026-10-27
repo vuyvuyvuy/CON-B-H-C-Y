@@ -206,6 +206,8 @@ details.orig > summary { cursor: pointer; }
 
 /* ---------- tình huống ---------- */
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.chip.rep { border-color: var(--warn); color: var(--warn); }
+.rep-line { margin-top: 6px; }
 .casecard { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 6px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
 .casecard:hover, .casecard:focus-visible { border-color: var(--alarm); }
 .casecard:focus-visible { outline: 2px solid var(--alarm); outline-offset: 2px; }
@@ -316,6 +318,11 @@ const qBack = (q) => !isAnki(q) ? esc(q.answer)
   : rich(q.back);
 const STARS = { 3: "★★★ hay thi", 2: "★★ cần nhớ", 1: "★ ít ra thi" };
 const stars = (q) => q.prio ? `<span class="stars">${STARS[q.prio]}</span>` : "";
+/* Câu đề cũ: năm thi (YYYYMMDD) và danh sách các đề từng ra câu này (hoặc biến thể của nó). */
+const repN = (q) => (Array.isArray(q.rep) ? q.rep.length : 0);
+const repChip = (q) => repN(q) >= 2 ? `<span class="chip rep" title="Đã ra ở: ${esc(q.rep.join(" · "))}">🔁 ra ${repN(q)} đề</span>` : "";
+const repLine = (q) => repN(q) >= 2 ? `<p class="note rep-line">🔁 Câu này (hoặc biến thể) đã ra ở ${repN(q)} đề: ${esc(q.rep.join(" · "))}</p>` : "";
+const byYear = (a, b) => ((b.year || 0) - (a.year || 0)) || (a.source || "").localeCompare(b.source || "") || ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0));
 
 /* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
 async function loadNotes(code, lesson) {
@@ -378,6 +385,9 @@ function rebuild(code) {
   const pack = S.pack[code]?.cards || {}, docs = S.docs[code] || {}, m = {};
   for (const id in pack) { const d = docs[id]; if (d?.deleted) continue; m[id] = { ...pack[id], ...(d || {}), id }; }
   for (const id in docs) if (!pack[id] && !docs[id].deleted) m[id] = { ...docs[id], id };
+  /* qmeta trên doc môn: { labels: [tên đề], m: { id: [năm YYYYMMDD, [chỉ số đề từng ra câu này]] } } */
+  const qm = S.subjects[code]?.qmeta;
+  if (qm?.m) for (const id in m) { const e = qm.m[id]; if (!e) continue; m[id].year ??= e[0]; if (e[1]?.length) m[id].rep = e[1].map((i) => qm.labels[i]); }
   S.questions[code] = m;
 }
 function saveQuestion(code, q) {
@@ -728,7 +738,7 @@ function viewSubject() {
   const exam = (s.exams || []).find((e) => !e.done && Date.parse(e.at) > Date.now());
 
   const rows = lessons.map((l, li) => {
-    const items = (byLesson[l.id] || []).sort((a, b) => (isAnki(a) - isAnki(b)) || ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0)));
+    const items = (byLesson[l.id] || []).sort((a, b) => (isAnki(a) - isAnki(b)) || (isAnki(a) ? ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0)) : byYear(a, b)));
     const nAnki = items.filter(isAnki).length, nExam = items.length - nAnki;
     const wrong = items.filter((q) => q.wrong > 0).length;
     const due = items.filter((q) => isDue(q)).length;
@@ -763,9 +773,9 @@ function viewSubject() {
 function qItem(s, q) {
   const lessonOpts = (s.lessons || []).map((l) => `<option value="${l.id}" ${l.id === q.lesson ? "selected" : ""}>${esc(l.name)}</option>`).join("");
   return `<div class="qitem">
-    <div class="row between" style="gap:6px"><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span></span>
+    <div class="row between" style="gap:6px"><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span>${repChip(q)}</span>
       <div class="row" style="gap:6px">${q.wrong ? `<span class="chip red">sai ${q.wrong}/${q.seen}</span>` : q.seen ? `<span class="chip green">đúng ${q.seen}</span>` : `<span class="chip">chưa làm</span>`}${q.card ? `<span class="chip amber">thẻ ${q.card.state === "review" ? "ôn " + Math.round(q.card.ivl) + "d" : "đang học"}</span>` : ""}</div></div>
-    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${qBack(q)}</div>` : `<p>${esc(q.stem)}</p>${qImg(q)}
+    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${qBack(q)}</div>` : `<p>${esc(q.stem)}</p>${qImg(q)}${repLine(q)}
     ${q.options?.length ? `<ol>${q.options.map((o) => `<li class="${o.k === q.answer ? "ok" : ""}">${esc(o.k)}. ${esc(o.t)}</li>`).join("")}</ol>` : `<p class="note">Đáp án: ${esc(q.answer)}</p>`}`}
     ${q.explanation ? `<p class="note">💡 ${esc(q.explanation)}</p>` : ""}
     <div class="row" style="gap:6px"><select data-act="move-q" data-code="${s.code}" data-id="${q.id}" style="width:auto;flex:1;min-width:150px;padding:5px 8px;font-size:13px">${lessonOpts}<option value="" ${!q.lesson ? "selected" : ""}>Chưa xếp bài</option></select>
@@ -840,7 +850,7 @@ function viewPractice() {
   </section>
   <section class="panel qcard" id="qcard">
     <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : isCase(q) ? "Tình huống" : esc(q.source || "")}</span></span></div>
-    <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>
+    <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>${repLine(q)}
     ${body}
     ${ans ? feedbackBlock(q, ans, it.code) : isMcq ? `<p class="kbd">Phím tắt: A–${q.options[q.options.length - 1].k} để chọn</p>` : ""}
   </section>`;
@@ -894,11 +904,13 @@ function practiceSetup() {
     ? `<div class="empty"><h2>Chưa có đề cũ nào</h2><p class="muted">Dán đề các năm trước vào, Claude tách câu và xếp vào đúng bài.</p><button class="btn red" data-act="sub" data-id="import">Nạp đề cũ</button></div>`
     : `<div class="empty"><h2>Môn này chưa có thẻ Anki</h2><p class="muted">Gửi file .apkg cho Claude trong khung chat.</p></div>`);
   const lessonsWithQ = (s.lessons || []).filter((l) => list.some((q) => q.lesson === l.id));
-  const sources = exam ? Object.entries(list.reduce((m, q) => { const k = q.source || "Không rõ nguồn"; (m[k] ||= []).push(q); return m; }, {})) : [];
+  const sources = exam ? Object.entries(list.reduce((m, q) => { const k = q.source || "Không rõ nguồn"; (m[k] ||= []).push(q); return m; }, {}))
+    .sort((a, b) => Math.max(...b[1].map((q) => q.year || 0)) - Math.max(...a[1].map((q) => q.year || 0))) : [];
+  const nRep = exam ? list.filter((q) => repN(q) >= 2).length : 0;
   return head + `
-  ${sources.length ? `<section class="panel stack"><p class="eyebrow">Làm lại nguyên đề</p><div class="cases">${sources.map(([src, qq]) => {
+  ${sources.length ? `<section class="panel stack"><p class="eyebrow">Làm lại nguyên đề · mới nhất trước</p><div class="cases">${sources.map(([src, qq]) => {
     const wrong = qq.filter((q) => q.wrong).length, done = qq.filter((q) => q.seen).length;
-    return `<button class="casecard" data-act="redo-source" data-code="${code}" data-src="${esc(src)}"><b>${esc(src)}</b><span class="note">${qq.length} câu${done ? ` · đã làm ${done}` : ""}${wrong ? ` · <span style="color:var(--alarm)">sai ${wrong}</span>` : ""}</span></button>`;
+    return `<button class="casecard" data-act="redo-source" data-code="${code}" data-src="${esc(src)}"><b>${esc(src)}</b><span class="note">${qq.length} câu${qq.some((q) => repN(q) >= 2) ? ` · 🔁 ${qq.filter((q) => repN(q) >= 2).length} câu lặp` : ""}${done ? ` · đã làm ${done}` : ""}${wrong ? ` · <span style="color:var(--alarm)">sai ${wrong}</span>` : ""}</span></button>`;
   }).join("")}</div></section>` : ""}
   <form class="panel stack" data-form="start-practice">
     <p class="eyebrow">${exam ? "Hoặc trộn câu theo bài" : "Luyện thẻ"}</p>
@@ -908,7 +920,8 @@ function practiceSetup() {
       ${exam ? `<input type="hidden" id="p-prio" value="0">` : `<label class="field" style="flex:1;min-width:150px">Mức<select id="p-prio">
         <option value="0">Mọi mức</option><option value="3">Chỉ ★★★ hay thi</option><option value="2">Bỏ câu ít ra thi</option></select></label>`}
       <label class="field" style="flex:1;min-width:150px">Lọc<select id="p-mode">
-        <option value="all">Trộn tất cả</option><option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
+        <option value="all">Tất cả</option>${exam ? `<option value="rep">Chỉ câu ra ≥ 2 đề (${nRep})</option>` : ""}<option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
+      ${exam ? `<label class="field" style="flex:1;min-width:150px">Thứ tự<select id="p-order"><option value="year">Năm mới → cũ</option><option value="rep">Ra nhiều lần trước</option><option value="rand">Ngẫu nhiên</option></select></label>` : `<input type="hidden" id="p-order" value="rand">`}
     </div>
     <div class="row" style="align-items:end">
       <label class="field" style="width:120px">Số câu<input type="number" id="p-n" min="1" max="300" value="20"></label>
@@ -940,15 +953,17 @@ function practiceSummary() {
     <div class="row"><button class="btn red" data-act="restart-practice">Phiên mới</button>${P.wrongCount ? `<button class="btn amber" data-act="tab" data-id="review">Thắp nhang ngay</button>` : ""}<button class="btn ghost" data-act="tab" data-id="home">Về bảng tử thần</button></div>
   </section>`;
 }
-function startPractice(code, lesson, mode, n, kind = "all", prio = 0) {
+function startPractice(code, lesson, mode, n, kind = "all", prio = 0, order = "rand") {
   let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
   if (kind === "exam") pool = pool.filter((q) => !isAnki(q));
   if (kind === "anki") pool = pool.filter(isAnki);
   if (prio) pool = pool.filter((q) => !q.prio || q.prio >= prio);
   if (mode === "wrong") pool = pool.filter((q) => q.wrong > 0);
   if (mode === "new") pool = pool.filter((q) => !q.seen);
+  if (mode === "rep") pool = pool.filter((q) => repN(q) >= 2);
   if (!pool.length) { toast(mode === "wrong" ? "Không có câu nào từng sai ở đây. Hiếm có." : "Không còn câu nào khớp bộ lọc."); return; }
-  const items = shuffle(pool).slice(0, n).map((q) => ({ id: q.id, code }));
+  const sorted = order === "year" ? [...pool].sort(byYear) : order === "rep" ? [...pool].sort((a, b) => (repN(b) - repN(a)) || byYear(a, b)) : shuffle(pool);
+  const items = sorted.slice(0, n).map((q) => ({ id: q.id, code }));
   const title = `${S.subjects[code].name}${lesson ? " · " + lessonName(code, lesson) : ""}`;
   S.subject = code;
   S.practice = { code, lesson, mode, kind, prio, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title };
@@ -1171,7 +1186,7 @@ function viewReview() {
   <section class="panel qcard" id="qcard">
     <div class="row between">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" : isCase(q) ? "Tình huống" : esc(q.source || "")}</span></div>
     ${isCase(q) && S.caseById[q.caseId] ? `<details class="setting" open><summary class="eyebrow">Bệnh cảnh · ${esc(S.caseById[q.caseId].title)}</summary><p class="vignette">${esc(S.caseById[q.caseId].setting)}</p></details>` : ""}
-    <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>
+    <div class="stem ${isAnki(q) ? "rich" : ""}">${qFront(q)}</div>${repLine(q)}
     ${q.options?.length ? `<div class="opts">${q.options.map((o) => `<div class="opt ${R.flipped ? (o.k === q.answer ? "right" : "faded") : ""}"><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></div>`).join("")}</div>` : ""}
     ${R.flipped ? `
       ${!q.options?.length ? `<div class="back rich">${qBack(q)}</div>` : ""}
@@ -1639,7 +1654,7 @@ document.addEventListener("submit", async (ev) => {
   const f = ev.target.closest("[data-form]"); if (!f) return;
   ev.preventDefault();
   const k = f.dataset.form;
-  if (k === "start-practice") startPractice($("#p-code").value, $("#p-lesson").value, $("#p-mode").value, Math.max(1, Math.min(300, +$("#p-n").value || 20)), $("#p-kind").value, +$("#p-prio").value);
+  if (k === "start-practice") startPractice($("#p-code").value, $("#p-lesson").value, $("#p-mode").value, Math.max(1, Math.min(300, +$("#p-n").value || 20)), $("#p-kind").value, +$("#p-prio").value, $("#p-order")?.value || "rand");
   if (k === "reader-search") { S.reader.q = $("#r-q").value.trim(); render(); }
   if (k === "import") runImport(f);
   if (k === "er") buildCase($("#e-code").value, $("#e-lesson").value);
@@ -1791,6 +1806,7 @@ async function boot() {
     const m = {};
     for (const d of snap.docs) { m[d.id] = { code: d.id, ...d.data() }; watchQuestions(d.id); }
     S.subjects = m;
+    for (const code in S.docs) if (m[code]) rebuild(code);
     S.loaded.subjects = true;
     onData();
   }, () => { S.loaded.subjects = true; onData(); });
