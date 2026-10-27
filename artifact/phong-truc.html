@@ -667,16 +667,17 @@ function subjectCounts(code) {
   return { n: list.length, anki, exam: list.length - anki, wrong: list.filter((q) => q.wrong > 0).length, due: list.filter((q) => isDue(q)).length };
 }
 /* ------------------------------------------------------------------ */
-/* Sổ đòi nợ: chia phần chưa làm (đề cũ + tình huống + thẻ Anki) đều cho các ngày còn lại,
+/* Sổ đòi nợ: chia phần chưa làm (đề cũ + tình huống) đều cho các ngày còn lại,
    hạn chót là hết ngày trước ngày thi. "Làm" = câu được trả lời lần đầu (firstSeenAt). */
 /* ------------------------------------------------------------------ */
-const DEBT_KINDS = [["exam", "Đề cũ", "exams"], ["case", "Tình huống", "cases"], ["anki", "Thẻ Anki", "anki"]];
+/* Thẻ Anki không tính: học trực tiếp trên app Anki. */
+const DEBT_KINDS = [["exam", "Đề cũ", "exams"], ["case", "Tình huống", "cases"]];
 const kindOf = (q) => isAnki(q) ? "anki" : isCase(q) ? "case" : "exam";
 function debtPlan(code, now = new Date()) {
   const examAt = nextExamAt(code); if (!examAt) return null;
   const today = ymd(now), t0 = Date.parse(today);
   const daysLeft = daysUntil(new Date(examAt).toISOString(), now);   // hôm nay → hết ngày trước ngày thi
-  const list = qsAll(code).filter((q) => !q.deleted);
+  const list = qsAll(code).filter((q) => !q.deleted && !isAnki(q));
   if (!list.length) return null;
   if (!S.stats.debtStart) S.stats.debtStart = today;
   const dayOf = (q) => q.firstSeenAt ? ymd(new Date(q.firstSeenAt)) : null;
