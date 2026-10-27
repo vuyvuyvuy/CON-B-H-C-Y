@@ -270,7 +270,7 @@ const TZ = "Asia/Ho_Chi_Minh";
 const MIN = 60e3, DAY = 864e5;
 
 const S = {
-  db: null, sample: null, canImages: false,
+  db: null, sample: undefined, canImages: false,
   subjects: {},            // code -> subject
   questions: {},           // code -> { id -> question } (gộp gói thẻ tĩnh + dữ liệu trong kho)
   docs: {},                // code -> { id -> document trong kho }
@@ -659,7 +659,7 @@ function onData() {
   requestAnimationFrame(() => {
     pendingRender = false;
     renderNav();
-    const busy = ((S.tab === "practice" || S.tab === "cases") && S.practice?.items && !S.practice.done) || (S.tab === "review" && S.review) || (S.tab === "er" && S.er?.case) || S.tab === "import" || S.tab === "ask";
+    const busy = ((S.tab === "practice" || S.tab === "cases") && S.practice?.items && !S.practice.done) || (S.tab === "review" && S.review) || (S.tab === "er" && S.er?.case) || S.tab === "import" || (S.tab === "ask" && (S.ask?.busy || document.activeElement?.id === "ask-in"));
     if (!busy) render();
   });
 }
@@ -1275,6 +1275,7 @@ Cách làm:
 function viewAsk() {
   const A = askLoad();
   const code = askCode();
+  if (S.sample === undefined) return `<h1>Hỏi bài</h1><div class="empty"><p class="eyebrow">Đang gọi trực…</p></div>`;
   if (!S.sample) return `<h1>Hỏi bài</h1><div class="empty"><p class="muted">Trang chưa được phép dùng Claude nên chưa chat được. Mở bằng app/web Claude và cho phép khi được hỏi.</p></div>`;
   const sugg = ["Còn ít ngày, bài nào nên học trước?", "Có nên bỏ bài K vòm – K thanh quản không?", "Cho mẹo nhớ phân độ khó thở thanh quản", "Phần nào hay ra thi nhất trong VTG?", "Chấm điểm độ lười của tôi tuần này"];
   const bubble = (t, i) => `<div class="msg ${t.role}">${t.role === "assistant" ? `<div class="rich" ${i === A.turns.length - 1 && A.busy ? 'id="ask-live"' : ""}>${askFmt(t.content) || `<span class="dim">${esc(A.status || "Đang nghĩ…")}</span>`}</div>` : esc(t.content).replace(/\n/g, "<br>")}</div>`;
@@ -2034,6 +2035,7 @@ async function boot() {
   render();
   const [db, sample] = await Promise.all([window.claude?.use("db") ?? null, window.claude?.use("sample") ?? null]);
   S.sample = sample;
+  if (S.tab === "ask") render();   // tab Hỏi bài có thể đã vẽ trước khi biết có Claude hay không
   if (sample) {
     try { const lim = await sample.limits(); S.canImages = !!lim.images; S.imgMax = lim.images?.maxCount; } catch {}
   }
