@@ -216,6 +216,7 @@ details.covers { display: grid; gap: 8px; }
 details.covers .qlist { margin: 8px 0; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+.qimg{display:block;max-width:min(100%,420px);height:auto;margin:10px 0;border-radius:6px;background:#fff}
 </style>
 
 <header>
@@ -306,7 +307,8 @@ function rich(html) {
 }
 const isAnki = (q) => q?.kind === "anki";
 const isCase = (q) => q?.kind === "case";
-const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem);
+const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.img) ? `<img class="qimg" src="${q.img}" alt="Hình minh họa">` : "");
+const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem) + qImg(q);
 /* Thẻ Anki có câu "bựa" (fun, **đậm** = keyword) thì hiện câu bựa trước, bản gốc gập lại bên dưới (mở sẵn nếu có hình). */
 const funHTML = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<mark>$1</mark>");
 const qBack = (q) => !isAnki(q) ? esc(q.answer)
@@ -763,7 +765,7 @@ function qItem(s, q) {
   return `<div class="qitem">
     <div class="row between" style="gap:6px"><span class="row" style="gap:8px">${stars(q)}<span class="eyebrow">${isAnki(q) ? "Thẻ Anki" + (q.slide ? " · slide " + esc(q.slide) : "") : esc(q.source || "Đề cũ")}${q.aiAnswer ? " · đáp án do AI giải" : ""}</span></span>
       <div class="row" style="gap:6px">${q.wrong ? `<span class="chip red">sai ${q.wrong}/${q.seen}</span>` : q.seen ? `<span class="chip green">đúng ${q.seen}</span>` : `<span class="chip">chưa làm</span>`}${q.card ? `<span class="chip amber">thẻ ${q.card.state === "review" ? "ôn " + Math.round(q.card.ivl) + "d" : "đang học"}</span>` : ""}</div></div>
-    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${qBack(q)}</div>` : `<p>${esc(q.stem)}</p>
+    ${isAnki(q) ? `<div class="rich"><b>${rich(q.front)}</b></div><div class="rich note">${qBack(q)}</div>` : `<p>${esc(q.stem)}</p>${qImg(q)}
     ${q.options?.length ? `<ol>${q.options.map((o) => `<li class="${o.k === q.answer ? "ok" : ""}">${esc(o.k)}. ${esc(o.t)}</li>`).join("")}</ol>` : `<p class="note">Đáp án: ${esc(q.answer)}</p>`}`}
     ${q.explanation ? `<p class="note">💡 ${esc(q.explanation)}</p>` : ""}
     <div class="row" style="gap:6px"><select data-act="move-q" data-code="${s.code}" data-id="${q.id}" style="width:auto;flex:1;min-width:150px;padding:5px 8px;font-size:13px">${lessonOpts}<option value="" ${!q.lesson ? "selected" : ""}>Chưa xếp bài</option></select>
