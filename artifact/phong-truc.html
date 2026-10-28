@@ -208,6 +208,12 @@ details.orig > summary { cursor: pointer; }
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
+.rv-sub { display: grid; gap: 10px; margin-top: 26px; }
+.rv-head { align-items: baseline; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+.rv-head h2 { font-size: 26px; }
+.rv-lessons { display: grid; gap: 2px; }
+.rv-l { padding: 6px 2px; color: var(--muted); border-bottom: 1px dashed var(--line); }
+.rv-sub > .btn { justify-self: start; }
 .decks { display: grid; gap: 4px; }
 .deck { display: grid; grid-template-columns: 1fr 52px 52px; gap: 8px; align-items: center; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .deck:disabled { opacity: .55; cursor: default; }
@@ -590,7 +596,7 @@ const allQs = () => subjectList().flatMap((s) => qsAll(s.code).map((q) => ({ ...
 /* Thẻ đang học/học lại (hẹn 1–10 phút) tính là đến hạn sớm 20 phút như Anki, để bấm "Quên" xong thoát ra vẫn thấy thẻ trong Thắp nhang. */
 const LEARN_AHEAD = 20 * MIN;
 const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now + (q.card.state === "learning" || q.card.state === "relearning" ? LEARN_AHEAD : 0);
-const dueList = () => allQs().filter((q) => isDue(q)).sort((a, b) => a.card.due - b.card.due);
+const dueList = () => allQs().filter((q) => !isAnki(q) && isDue(q)).sort((a, b) => a.card.due - b.card.due);
 const lessonName = (code, lid) => (S.subjects[code]?.lessons || []).find((l) => l.id === lid)?.name || "Chưa xếp bài";
 const PATIENTS = ["Anh Tuấn, 34t", "Bà Lan, 67t", "Bé Na, 4t", "Ông Ba, 72t", "Chị Hoa, 28t", "Cô Mai, 45t", "Chú Hùng, 58t", "Em Khoa, 17t", "Bà Sáu, 81t", "Anh Dũng, 41t", "Chị Thảo, 32t", "Bé Bin, 2t"];
 
@@ -762,10 +768,10 @@ function debtPlan(code, now = new Date()) {
   const yest = ymd(new Date(t0 - DAY / 2));
   const k = {};
   for (const [id] of DEBT_KINDS) k[id] = { total: 0, left: 0, today: 0, yest: 0 };
-  let doneYest = 0, dueRev = 0, revToday = 0;
+  let doneYest = 0, dueRev = 0, revToday = 0, ankiDue = 0;
   const eod = t0 + DAY - 7 * 3600e3;   // hết ngày hôm nay (giờ VN)
   for (const q of list) {
-    if (q.seen && isDue(q, eod)) dueRev++;
+    if (q.seen && isDue(q, eod)) { if (isAnki(q)) ankiDue++; else dueRev++; }
     if (q.card?.last && ymd(new Date(q.card.last)) === today && dayOf(q) !== today) revToday++;
     const c = k[kindOf(q)]; c.total++;
     const d = dayOf(q);
@@ -788,7 +794,7 @@ function debtPlan(code, now = new Date()) {
   const trackedYest = S.stats.debtStart && S.stats.debtStart <= yest;
   const skippedYest = trackedYest && doneYest < quotaYest ? quotaYest - doneYest : 0;
   const oweNew = Math.max(0, quota - doneToday);
-  return { code, examAt, examIn, days, total, left, doneToday, quota, oweNew, dueRev, revToday, owe: oweNew + dueRev, k, doneYest, skippedYest };
+  return { code, examAt, examIn, days, total, left, doneToday, quota, oweNew, dueRev, revToday, owe: oweNew + dueRev + ankiDue, ankiDue, k, doneYest, skippedYest };
 }
 const backfilled = {};
 function backfillCards(code) {
@@ -802,6 +808,7 @@ function debtRoast(p) {
   const name = esc(S.subjects[p.code]?.name || p.code);
   if (!p.left && !p.doneToday) return `Làm hết ${p.total} câu rồi. Giờ thì ôn lại câu sai đi, đừng có ngồi tự hào.`;
   const rev = p.dueRev ? ` Cộng ${p.dueRev} câu đến hạn ôn lại — câu đúng hôm trước không có nghĩa là hôm nay còn nhớ.` : "";
+  if (!p.oweNew && !p.dueRev && p.ankiDue) return `Thẻ mới đủ chỉ tiêu, nhưng còn ${p.ankiDue} thẻ Anki đến hạn ôn trong bộ thẻ. Vào ôn đi, thẻ không tự thuộc đâu.`;
   if (!p.oweNew && p.dueRev) return `Câu mới đã trả đủ, nhưng còn ${p.dueRev} câu đến hạn ôn trong Thắp nhang. Nhớ được 3 ngày chưa phải là thuộc.`;
   if (p.days <= 0) return (p.left
     ? `Quá hạn trả nợ. Đáng lẽ giờ này chỉ ôn câu sai, vậy mà còn ${p.left} câu chưa đụng tới, ${p.examIn} ngày nữa thi ${name}. Làm cho xong rồi đi Thắp nhang, hôm nay ${p.quota} câu.`
@@ -838,7 +845,7 @@ function debtCard(p, withName = true) {
     <p class="note">Hôm nay ${p.doneToday}/${p.quota} câu mới${p.revToday ? ` · đã ôn lại ${p.revToday} câu` : ""}${p.dueRev ? ` · còn <b>${p.dueRev}</b> câu đến hạn ôn` : ""}</p>
     <div class="debt-kinds">${DEBT_KINDS.filter(([id]) => p.k[id].total).map(([id, label, tab]) => {
       const c = p.k[id], owe = Math.max(0, c.quota - c.today);
-      return `<button class="debt-k" data-act="pay-debt" data-code="${p.code}" data-id="${tab}"><b>${label}</b><span>${c.today}/${c.quota} hôm nay</span><span class="dim">còn ${c.left} ${id === "anki" ? "thẻ" : "câu"}${c.left ? ` · hạn ${c.days} ngày` : ""}${owe ? ` · nợ ${owe}` : " · xong"}</span></button>`;
+      return `<button class="debt-k" data-act="pay-debt" data-code="${p.code}" data-id="${tab}"><b>${label}</b><span>${c.today}/${c.quota} hôm nay</span><span class="dim">${id === "anki" && p.ankiDue ? `<b style="color:var(--ecg)">${p.ankiDue} đến hạn ôn</b> · ` : ""}còn ${c.left} ${id === "anki" ? "thẻ" : "câu"}${c.left ? ` · hạn ${c.days} ngày` : ""}${owe ? ` · nợ ${owe}` : " · xong"}</span></button>`;
     }).join("")}<button class="debt-k" data-act="tab" data-id="review"><b>🕯️ Ôn lại</b><span>${p.revToday} đã ôn hôm nay</span><span class="dim">${p.dueRev ? `đến hạn ${p.dueRev} · nợ ${p.dueRev}` : "không có câu đến hạn"}</span></button></div>
     <p class="debt-roast" style="color:${col}">${debtRoast(p)}</p>
   </div>`;
@@ -1024,6 +1031,11 @@ function viewPractice() {
       if (ans) cls = o.k === q.answer ? "right" : o.k === ans.choice ? "wrong" : "faded";
       return `<button class="opt ${cls}" data-act="answer" data-k="${esc(o.k)}" ${ans ? "disabled" : ""}><span class="k">${esc(o.k)}</span><span>${esc(o.t)}</span></button>`;
     }).join("")}</div>`;
+  } else if (isAnki(q) && P.revealed) {
+    const cur = S.questions[it.code][it.id];
+    body = `<div class="back rich">${qBack(q)}</div>
+      ${S.pack[it.code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><button class="btn small ghost" data-act="show-lecture-p" style="justify-self:start">📖 Xem đoạn bài soạn</button></div>` : ""}
+      <div class="row">${[["again", "Quên", "red", 1], ["hard", "Khó", "", 2], ["good", "Tốt", "green", 3], ["easy", "Dễ", "", 4]].map(([r, l, c, k]) => `<button class="btn ${c}" data-act="self-grade" data-r="${r}">${l} <small class="mono">${ankiLabel(ankiNext(cur, r, it.code))}</small> <span class="kbd">${k}</span></button>`).join("")}</div>`;
   } else if (ans || P.revealed) {
     body = `<div class="back rich">${qBack(q)}</div>${ans ? "" : `<div class="row">
       <button class="btn red" data-act="self-grade" data-r="again">Quên <span class="kbd">1</span></button>
@@ -1034,6 +1046,13 @@ function viewPractice() {
   }
 
   const cs = it.caseId && S.caseById[it.caseId];
+  if (isAnki(q)) return `<div class="row between"><div><p class="eyebrow">${esc(P.title)}</p><h2>Thẻ ${P.i + 1}/${P.items.length}</h2></div><button class="btn small ghost" data-act="end-practice">Kết thúc phiên</button></div>
+  <div class="hp"><i style="width:${Math.round(P.i / P.items.length * 100)}%;background:var(--spo2)"></i></div>
+  <section class="panel qcard" id="qcard">
+    <div class="row between"><span class="eyebrow">${esc(S.subjects[it.code]?.name || "")} · ${esc(lessonName(it.code, q.lesson))}</span><span class="row" style="gap:8px">${stars(q)}${q.slide ? `<span class="eyebrow">slide ${esc(q.slide)}</span>` : ""}</span></div>
+    <div class="stem rich">${qFront(q)}</div>
+    ${body}
+  </section>`;
   return `<div class="row between"><div><p class="eyebrow">${esc(P.title)}</p><h2>${cs ? esc(cs.title) + " · " : ""}Câu ${P.i + 1}/${P.items.length}</h2></div><button class="btn small ghost" data-act="end-practice">${cs ? "Rời ca" : "Kết thúc phiên"}</button></div>
   ${cs ? `<details class="panel setting" open><summary class="eyebrow">Bệnh cảnh</summary><p class="vignette">${esc(cs.setting)}</p></details>` : ""}
   <section class="monitor ${P.hp <= 0 ? "dead" : ""}" id="mon">
@@ -1068,7 +1087,7 @@ function caseExtras(q, code, bad) {
   const queued = cards.filter((c) => c.card && c.card.due <= Date.now() + DAY).length;
   return `${cards.length ? `<details class="covers" ${bad ? "open" : ""}><summary class="eyebrow">🗂 ${cards.length} thẻ Anki của bài liên quan câu này</summary>
       <div class="qlist">${cards.map((c) => `<div class="qitem"><div class="row between">${stars(c)}${c.slide ? `<span class="eyebrow">slide ${esc(c.slide)}</span>` : ""}</div><div class="rich"><b>${rich(c.front)}</b></div><div class="rich note">${qBack(c)}</div></div>`).join("")}</div>
-      ${queued >= cards.length ? `<p class="note mono">Mấy thẻ này đã nằm trong hàng Thắp nhang.</p>` : `<button class="btn small amber" data-act="cover-review" data-code="${code}" data-id="${q.id}">Đẩy ${cards.length} thẻ này vào Thắp nhang</button>`}</details>` : ""}
+      ${queued >= cards.length ? `<p class="note mono">Mấy thẻ này đã nằm trong bộ thẻ Anki hôm nay.</p>` : `<button class="btn small amber" data-act="cover-review" data-code="${code}" data-id="${q.id}">Đẩy ${cards.length} thẻ này vào bộ thẻ hôm nay</button>`}</details>` : ""}
     <div class="explain" id="ainote" ${q.aiNote ? "" : 'style="border-left-color:var(--dim)"'}>${q.aiNote ? esc(q.aiNote) : S.sample ? `<button class="btn small" data-act="explain-deep">Vẫn chưa thông? Nhờ Claude giảng sâu hơn</button>` : ""}</div>`;
 }
 function queueCovers(code, id) {
@@ -1170,6 +1189,7 @@ function redoSource(code, src) {
 function practiceSummary() {
   const P = S.practice;
   if (P.caseRef) return caseSummary(P);
+  if (P.kind === "anki") return `<h1>Xong phiên thẻ</h1><section class="panel stack"><p class="mono" style="font-size:22px">${P.answeredCount} lượt chấm · ${P.wrongCount} lần quên</p><p class="note">Thẻ quên sẽ tự hiện lại trong bộ thẻ khi đến giờ.</p><div class="row"><button class="btn red" data-act="tab" data-id="anki">Về bộ thẻ</button></div></section>`;
   const pct = P.items.length ? Math.round(P.right / P.answeredCount * 100) : 0;
   const alive = P.hp > 0;
   return `<h1>${alive ? "🏥 Xuất viện" : "🪦 Hết ca"}</h1>
@@ -1199,8 +1219,29 @@ function startPractice(code, lesson, mode, n, kind = "all", prio = 0, order = "r
   render();
 }
 /* choice: đáp án trắc nghiệm; self: "again" | "hard" | "good" khi tự chấm thẻ lật. */
+/* Thẻ Anki: không HP, không bia mộ. Chấm Quên/Khó/Tốt/Dễ rồi sang thẻ kế; thẻ quên quay lại sau vài thẻ, đến hạn thì tự hiện trong bộ thẻ. */
+function ankiNext(q, rating, code, now = Date.now()) {
+  const ex = nextExamAt(code);
+  if (!q.card && (rating === "good" || rating === "easy")) return firstPassCard(now, rating, ex, true);
+  return schedule(q.card || newCard(now), rating, now, ex);
+}
+const ankiLabel = (card, now = Date.now()) => { const m = Math.max(1, Math.round((card.due - now) / MIN)); return m < 60 ? m + " ph" : m < 1440 ? Math.round(m / 60) + " giờ" : Math.round(m / 1440) + " ngày"; };
+function answerAnki(rating) {
+  const P = S.practice; const it = P?.items[P.i]; if (!it) return;
+  const q = { ...S.questions[it.code][it.id] }; const now = Date.now();
+  if (!q.seen) q.firstSeenAt = now;
+  q.seen = (q.seen || 0) + 1;
+  q.card = ankiNext(q, rating, it.code, now);
+  if (rating === "again") { q.wrong = (q.wrong || 0) + 1; P.wrongCount++; if (!P.items.slice(P.i + 1).some((x) => x.id === it.id)) P.items.splice(Math.min(P.items.length, P.i + 3), 0, { id: it.id, code: it.code }); } else P.right++;
+  P.answeredCount++; S.stats.total++; bumpStreak();
+  saveQuestion(it.code, q); saveStats();
+  P.revealed = false;
+  if (P.i + 1 >= P.items.length) P.done = true; else { P.i++; P.qStart = Date.now(); }
+  render(); window.scrollTo({ top: 0 });
+}
 async function answerPractice(choice, self) {
   const P = S.practice; if (!P || P.answered) return;
+  if (isAnki(S.questions[P.items[P.i].code]?.[P.items[P.i].id])) return answerAnki(self === "hard" ? "hard" : self || "good");
   const it = P.items[P.i];
   const q = { ...S.questions[it.code][it.id] };
   const correct = self ? self !== "again" : choice === q.answer;
@@ -1508,14 +1549,18 @@ function viewReview() {
   const R = S.review;
   if (!R) {
     const due = dueList();
-    const upcoming = allQs().filter((q) => q.card && !isDue(q)).sort((a, b) => a.card.due - b.card.due)[0];
+    const upcoming = allQs().filter((q) => !isAnki(q) && q.card && !isDue(q)).sort((a, b) => a.card.due - b.card.due)[0];
     const bySub = {};
-    for (const q of due) bySub[q.code] = (bySub[q.code] || 0) + 1;
+    for (const q of due) ((bySub[q.code] ||= {})[q.lesson] ||= []).push(q);
+    const subs = subjectList().filter((x) => bySub[x.code]);
     return `<h1>Thắp nhang</h1>
-    <p class="muted">Mỗi câu từng làm sai là một nén nhang chưa thắp. Lật thẻ, tự chấm. Nhớ thì nhang cháy, quên thì thẻ quay lại cuối hàng.</p>
-    ${due.length ? `<section class="panel stack"><p class="mono" style="font-size:22px">${due.length} thẻ đến hạn</p>
-      <div class="row">${Object.entries(bySub).map(([c, n]) => `<span class="chip amber">${esc(S.subjects[c]?.name)} · ${n}</span>`).join("")}</div>
-      <div class="row"><button class="btn amber big" data-act="start-review">Bắt đầu thắp</button>${Object.keys(bySub).length > 1 ? Object.keys(bySub).map((c) => `<button class="btn small" data-act="start-review" data-code="${c}">Chỉ ${esc(S.subjects[c]?.name)}</button>`).join("") : ""}</div></section>`
+    <p class="muted">Câu đề cũ và tình huống làm sai thì thành nén nhang chưa thắp. Lật thẻ, tự chấm. Nhớ thì nhang cháy, quên thì thẻ quay lại cuối hàng. Thẻ Anki không nằm ở đây: đến hạn là tự hiện trong bộ thẻ của môn.</p>
+    ${due.length ? `<section class="panel stack"><div class="row between"><p class="mono" style="font-size:22px">${due.length} thẻ đến hạn · ${subs.length} môn</p><button class="btn amber big" data-act="start-review">Thắp tất cả</button></div></section>
+    ${subs.map((x) => { const L = bySub[x.code], n = Object.values(L).reduce((t, a) => t + a.length, 0);
+      const lessons = (x.lessons || []).filter((l) => L[l.id]).concat(L[undefined] || L[""] ? [{ id: L[undefined] ? "undefined" : "", name: "Chưa xếp bài" }] : []);
+      return `<section class="rv-sub"><div class="row between rv-head"><h2>${esc(x.name)}</h2><span class="chip amber">${n} thẻ</span></div>
+        <div class="rv-lessons">${lessons.map((l) => `<div class="row between rv-l"><span>${esc(l.name)}</span><span class="mono">${(L[l.id] || []).length}</span></div>`).join("")}</div>
+        <button class="btn amber" data-act="start-review" data-code="${x.code}">Thắp ${esc(x.name)}</button></section>`; }).join("")}`
       : `<div class="empty"><p style="font-size:30px">🕊️</p><h2>Không còn nén nào cần thắp</h2><p class="muted">${upcoming ? `Thẻ kế tiếp đến hạn lúc ${fmtShort(upcoming.card.due)}.` : "Chưa có thẻ nào. Làm sai vài câu ở Luyện đề là có ngay."}</p></div>`}`;
   }
   const it = R.queue[0];
@@ -1965,6 +2010,7 @@ document.addEventListener("click", async (ev) => {
     case "redo-source": redoSource(d.code, d.src); break;
     case "start-review": startReview(d.code); break;
     case "flip": S.review.flipped = true; render(); break;
+    case "show-lecture-p": { const it = S.practice.items[S.practice.i]; fillLecture(it.code, S.questions[it.code][it.id]); break; }
     case "show-lecture": { const it = S.review.queue[0]; fillLecture(it.code, S.questions[it.code][it.id]); break; }
     case "rate": rateCard(d.r); break;
     case "end-review": S.review = null; render(); break;
@@ -2037,7 +2083,7 @@ document.addEventListener("keydown", (ev) => {
       const q = S.questions[P.items[P.i].code]?.[P.items[P.i].id];
       if (q?.options?.length) { if (q.options.some((o) => o.k === key.toUpperCase())) { ev.preventDefault(); answerPractice(key.toUpperCase()); } }
       else if (!P.revealed && (key === " " || key === "Enter")) { ev.preventDefault(); P.revealed = true; render(); }
-      else if (P.revealed && "123".includes(key) && key.length === 1) { ev.preventDefault(); answerPractice(null, ["again", "hard", "good"][+key - 1]); }
+      else if (P.revealed && "1234".includes(key) && key.length === 1) { ev.preventDefault(); if (isAnki(q)) answerAnki(["again", "hard", "good", "easy"][+key - 1]); else if (key !== "4") answerPractice(null, ["again", "hard", "good"][+key - 1]); }
     } else if (key === "Enter") { ev.preventDefault(); nextQuestion(); }
   }
   if (S.tab === "review" && S.review?.queue.length) {
