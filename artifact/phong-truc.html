@@ -447,8 +447,8 @@ const SRS = { learn: [1, 10], relearn: [10], grad: 1, easyIvl: 4, ease: 2.5, min
 const newCard = (now = Date.now()) => ({ state: "new", due: now, ivl: 0, ease: SRS.ease, reps: 0, lapses: 0, step: 0, last: null });
 /* Câu đề cũ / tình huống làm đúng lần đầu vẫn được hẹn ôn lại (2–3 ngày sau), để không "đúng hôm nay, quên tuần sau".
    Mọi lịch ôn bị kẹp trước ngày thi 1 hôm (trong schedule) nên câu nào cũng quay lại ít nhất 1 lần trước khi thi. */
-function firstPassCard(now, rating, examAt) {
-  const ivl = rating === "easy" ? 3 : 2;
+function firstPassCard(now, rating, examAt, anki = false) {
+  const ivl = rating === "easy" ? 3 : anki ? 1 : 2;   // thẻ Anki: 1 → 3 → 8 ngày, 4 ngày là lên mức cách 1 tuần
   const lim = examAt ? examAt - DAY : Infinity;
   return { ...newCard(now), state: "review", ivl, reps: 1, last: now, due: lim > now ? Math.min(now + ivl * DAY, lim) : now + ivl * DAY };
 }
@@ -684,22 +684,25 @@ function subjectCounts(code) {
 /* Sổ đòi nợ: chia phần chưa làm (đề cũ + tình huống) đều cho các ngày còn lại,
    hạn chót là hết ngày trước ngày thi. "Làm" = câu được trả lời lần đầu (firstSeenAt). */
 /* ------------------------------------------------------------------ */
-/* Thẻ Anki không tính: học trực tiếp trên app Anki. */
-/* Chừa 4 ngày cuối trước ngày thi để ôn lại câu sai (Thắp nhang), không nhận câu mới. */
-const REVIEW_DAYS = 4;
-const DEBT_KINDS = [["exam", "Đề cũ", "exams"], ["case", "Tình huống", "cases"]];
+/* Đề cũ, tình huống: chừa 4 ngày cuối để ôn câu sai (Thắp nhang), không nhận câu mới.
+   Thẻ Anki: chừa 7 ngày cuối; thẻ mới phải học xong trước đó thêm 4 ngày (1 → 3 → 8 ngày)
+   để vào tuần cuối thẻ nào cũng đã giãn tới mức cách 1 tuần. Môn trong ANKI_SELF học trên app Anki nên không tính. */
+const REVIEW_DAYS = 4, ANKI_FINAL = 7, ANKI_RAMP = 4;
+const ANKI_SELF = new Set(["TMH0054"]);
+const ankiTracked = (code) => !ANKI_SELF.has(code);
+const DEBT_KINDS = [["exam", "Đề cũ", "exams", REVIEW_DAYS], ["case", "Tình huống", "cases", REVIEW_DAYS], ["anki", "Thẻ Anki", "anki", ANKI_FINAL + ANKI_RAMP]];
 const kindOf = (q) => isAnki(q) ? "anki" : isCase(q) ? "case" : "exam";
 function debtPlan(code, now = new Date()) {
   const examAt = nextExamAt(code); if (!examAt) return null;
   const today = ymd(now), t0 = Date.parse(today);
   const daysLeft = daysUntil(new Date(examAt).toISOString(), now);   // hôm nay → hết ngày trước ngày thi
-  const list = qsAll(code).filter((q) => !q.deleted && !isAnki(q));
+  const list = qsAll(code).filter((q) => !q.deleted && (!isAnki(q) || ankiTracked(code)));
   if (!list.length) return null;
   if (!S.stats.debtStart) S.stats.debtStart = today;
   const dayOf = (q) => q.firstSeenAt ? ymd(new Date(q.firstSeenAt)) : null;
   const yest = ymd(new Date(t0 - DAY / 2));
   const k = {};
-  for (const [id] of DEBT_KINDS) k[id] = { total: 0, left: 0, today: 0 };
+  for (const [id] of DEBT_KINDS) k[id] = { total: 0, left: 0, today: 0, yest: 0 };
   let doneYest = 0, dueRev = 0, revToday = 0;
   const eod = t0 + DAY - 7 * 3600e3;   // hết ngày hôm nay (giờ VN)
   for (const q of list) {
@@ -709,18 +712,20 @@ function debtPlan(code, now = new Date()) {
     const d = dayOf(q);
     if (!q.seen) c.left++;
     else if (d === today) c.today++;
-    if (d === yest) doneYest++;
+    if (d === yest) { doneYest++; c.yest++; }
   }
   const left = Object.values(k).reduce((a, c) => a + c.left, 0);
   const doneToday = Object.values(k).reduce((a, c) => a + c.today, 0);
   const total = list.length;
   const examIn = Math.max(0, daysLeft);
-  const days = Math.max(0, daysLeft - REVIEW_DAYS);
   // chỉ tiêu hôm nay tính từ số còn lại lúc đầu ngày, để làm xong không bị dời chỉ tiêu
-  const per = (n) => days ? Math.ceil(n / days) : n;
-  for (const c of Object.values(k)) c.quota = per(c.left + c.today);
-  const quota = per(left + doneToday);
-  const quotaYest = Math.ceil((left + doneToday + doneYest) / (days + 1));
+  let quota = 0, quotaYest = 0, days = 0;
+  for (const [id, , , reserve] of DEBT_KINDS) {
+    const c = k[id]; c.days = Math.max(0, daysLeft - reserve);
+    c.quota = c.days ? Math.ceil((c.left + c.today) / c.days) : c.left + c.today;
+    quota += c.quota; quotaYest += Math.ceil((c.left + c.today + c.yest) / (c.days + 1));
+    if (c.total) days = Math.max(days, c.days);
+  }
   const trackedYest = S.stats.debtStart && S.stats.debtStart <= yest;
   const skippedYest = trackedYest && doneYest < quotaYest ? quotaYest - doneYest : 0;
   const oweNew = Math.max(0, quota - doneToday);
@@ -767,14 +772,14 @@ function debtCard(p, withName = true) {
   const s = S.subjects[p.code];
   return `<div class="debt">
     <div class="row between" style="align-items:baseline">
-      <div style="min-width:0">${withName ? `<h3>${esc(s?.name || p.code)}</h3>` : ""}<p class="note">${p.days ? `Còn ${p.days} ngày để trả (xong trước thi ${REVIEW_DAYS} ngày, ${REVIEW_DAYS} ngày cuối ôn câu sai)` : `Đang trong ${REVIEW_DAYS} ngày ôn câu sai · thi sau ${p.examIn} ngày`} · chưa làm ${p.left}/${p.total}</p></div>
+      <div style="min-width:0">${withName ? `<h3>${esc(s?.name || p.code)}</h3>` : ""}<p class="note">${p.days ? `Thi sau ${p.examIn} ngày · đề cũ/tình huống xong trước thi ${REVIEW_DAYS} ngày${p.k.anki.total ? `, thẻ Anki học mới xong trước thi ${ANKI_FINAL + ANKI_RAMP} ngày (${ANKI_RAMP} ngày ôn giãn lên 1 tuần + ${ANKI_FINAL} ngày cuối chỉ ôn)` : ""}` : `Hết hạn học mới · thi sau ${p.examIn} ngày, giờ chỉ ôn`} · chưa làm ${p.left}/${p.total}</p></div>
       <div class="debt-n" style="color:${col}">${p.owe}<small>${p.owe ? (p.dueRev ? "câu nợ (mới + ôn)" : "câu còn nợ hôm nay") : "nợ hôm nay"}</small></div>
     </div>
     <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
     <p class="note">Hôm nay ${p.doneToday}/${p.quota} câu mới${p.revToday ? ` · đã ôn lại ${p.revToday} câu` : ""}${p.dueRev ? ` · còn <b>${p.dueRev}</b> câu đến hạn ôn` : ""}</p>
     <div class="debt-kinds">${DEBT_KINDS.filter(([id]) => p.k[id].total).map(([id, label, tab]) => {
       const c = p.k[id], owe = Math.max(0, c.quota - c.today);
-      return `<button class="debt-k" data-act="pay-debt" data-code="${p.code}" data-id="${tab}"><b>${label}</b><span>${c.today}/${c.quota} hôm nay</span><span class="dim">còn ${c.left} câu${owe ? ` · nợ ${owe}` : " · xong"}</span></button>`;
+      return `<button class="debt-k" data-act="pay-debt" data-code="${p.code}" data-id="${tab}"><b>${label}</b><span>${c.today}/${c.quota} hôm nay</span><span class="dim">còn ${c.left} ${id === "anki" ? "thẻ" : "câu"}${c.left ? ` · hạn ${c.days} ngày` : ""}${owe ? ` · nợ ${owe}` : " · xong"}</span></button>`;
     }).join("")}<button class="debt-k" data-act="tab" data-id="review"><b>🕯️ Ôn lại</b><span>${p.revToday} đã ôn hôm nay</span><span class="dim">${p.dueRev ? `đến hạn ${p.dueRev} · nợ ${p.dueRev}` : "không có câu đến hạn"}</span></button></div>
     <p class="debt-roast" style="color:${col}">${debtRoast(p)}</p>
   </div>`;
@@ -1118,7 +1123,7 @@ async function answerPractice(choice, self) {
   if (correct) {
     P.right++;
     if (card || rating === "hard") card = schedule(card || newCard(now), rating, now, nextExamAt(it.code));
-    else if (!isAnki(q)) card = firstPassCard(now, rating, nextExamAt(it.code));
+    else if (!isAnki(q) || ankiTracked(it.code)) card = firstPassCard(now, rating, nextExamAt(it.code), isAnki(q));
     text = rating === "hard" ? "Lờ mờ thì cũng như không. Cho qua lần này, nhưng thẻ này sẽ quay lại tìm bạn." : fill(pick(PRAISE), { patient: P.patient });
   } else {
     penalty = 20;
@@ -1233,7 +1238,7 @@ function askTools(code) {
             da_lam: xs.filter((q) => q.seen).length, tung_sai: xs.filter((q) => q.wrong > 0).length, den_han_on: xs.filter((q) => isDue(q)).length };
         });
         return { mon: S.subjects[code]?.name, thi_luc: nextExamAt(code) ? new Date(nextExamAt(code)).toISOString() : null,
-          so_doi_no: p && { con_ngay_hoc_moi: p.days, ngay_on_cuoi: REVIEW_DAYS, chi_tieu_cau_moi_hom_nay: p.quota, da_lam_hom_nay: p.doneToday, chua_lam: p.left, den_han_on: p.dueRev }, theo_bai: per };
+          so_doi_no: p && { con_ngay_hoc_moi: p.days, ngay_on_cuoi: REVIEW_DAYS, theo_loai: Object.fromEntries(Object.entries(p.k).filter(([, c]) => c.total).map(([id, c]) => [id, { con_ngay: c.days, chi_tieu: c.quota, hom_nay: c.today, chua_lam: c.left }])), chi_tieu_cau_moi_hom_nay: p.quota, da_lam_hom_nay: p.doneToday, chua_lam: p.left, den_han_on: p.dueRev }, theo_bai: per };
       } },
     { name: "tim_bai_soan", description: "Tìm một từ khoá trong bài soạn (giảng giải slide, có mẹo nhớ) của môn. Trả về tối đa 5 đoạn trích kèm bài và số trang. Dùng trước khi giải thích kiến thức hay đưa mẹo nhớ, để bám sát bài của bộ môn.",
       inputSchema: { type: "object", properties: { tu_khoa: { type: "string" }, bai: { type: "string", description: "id bài, vd tmh1; bỏ trống = mọi bài" } }, required: ["tu_khoa"] },
