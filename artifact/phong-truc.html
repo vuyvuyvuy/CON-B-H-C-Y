@@ -328,7 +328,7 @@ function rich(html) {
 }
 const isAnki = (q) => q?.kind === "anki";
 const isCase = (q) => q?.kind === "case";
-const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.img) ? `<img class="qimg" src="${q.img}" alt="Hình minh họa">` : "");
+const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.img) ? `<img class="qimg" src="${S.media?.[q.img] || q.img}" alt="Hình minh họa">` : "");
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem) + qImg(q);
 /* Thẻ Anki có câu "bựa" (fun, **đậm** = keyword) thì hiện câu bựa trước, bản gốc gập lại bên dưới (mở sẵn nếu có hình). */
 const funHTML = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<mark>$1</mark>");
