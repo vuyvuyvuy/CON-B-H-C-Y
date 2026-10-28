@@ -208,9 +208,13 @@ details.orig > summary { cursor: pointer; }
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
-.rv-sub { display: grid; gap: 10px; margin-top: 26px; }
-.rv-head { align-items: baseline; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
-.rv-head h2 { font-size: 26px; }
+.rv-sub { margin-top: 18px; }
+.rv-sub[open] { display: grid; gap: 10px; }
+.rv-head { display: flex; gap: 10px; align-items: baseline; padding-bottom: 8px; border-bottom: 2px solid var(--line); cursor: pointer; list-style: none; }
+.rv-head::-webkit-details-marker { display: none; }
+.rv-head::before { content: "›"; font-size: 26px; line-height: 1; color: var(--muted); transition: transform .15s; }
+.rv-sub[open] > .rv-head::before { transform: rotate(90deg); }
+.rv-head h2 { font-size: 26px; flex: 1; }
 .rv-lessons { display: grid; gap: 2px; }
 .rv-l { padding: 6px 2px; color: var(--muted); border-bottom: 1px dashed var(--line); }
 .rv-sub > .btn { justify-self: start; }
@@ -1554,13 +1558,12 @@ function viewReview() {
     for (const q of due) ((bySub[q.code] ||= {})[q.lesson] ||= []).push(q);
     const subs = subjectList().filter((x) => bySub[x.code]);
     return `<h1>Thắp nhang</h1>
-    <p class="muted">Câu đề cũ và tình huống làm sai thì thành nén nhang chưa thắp. Lật thẻ, tự chấm. Nhớ thì nhang cháy, quên thì thẻ quay lại cuối hàng. Thẻ Anki không nằm ở đây: đến hạn là tự hiện trong bộ thẻ của môn.</p>
     ${due.length ? `<section class="panel stack"><div class="row between"><p class="mono" style="font-size:22px">${due.length} thẻ đến hạn · ${subs.length} môn</p><button class="btn amber big" data-act="start-review">Thắp tất cả</button></div></section>
     ${subs.map((x) => { const L = bySub[x.code], n = Object.values(L).reduce((t, a) => t + a.length, 0);
       const lessons = (x.lessons || []).filter((l) => L[l.id]).concat(L[undefined] || L[""] ? [{ id: L[undefined] ? "undefined" : "", name: "Chưa xếp bài" }] : []);
-      return `<section class="rv-sub"><div class="row between rv-head"><h2>${esc(x.name)}</h2><span class="chip amber">${n} thẻ</span></div>
+      return `<details class="rv-sub"><summary class="rv-head"><h2>${esc(x.name)}</h2><span class="chip amber">${n} thẻ</span></summary>
         <div class="rv-lessons">${lessons.map((l) => `<div class="row between rv-l"><span>${esc(l.name)}</span><span class="mono">${(L[l.id] || []).length}</span></div>`).join("")}</div>
-        <button class="btn amber" data-act="start-review" data-code="${x.code}">Thắp ${esc(x.name)}</button></section>`; }).join("")}`
+        <button class="btn amber" data-act="start-review" data-code="${x.code}">Thắp ${esc(x.name)}</button></details>`; }).join("")}`
       : `<div class="empty"><p style="font-size:30px">🕊️</p><h2>Không còn nén nào cần thắp</h2><p class="muted">${upcoming ? `Thẻ kế tiếp đến hạn lúc ${fmtShort(upcoming.card.due)}.` : "Chưa có thẻ nào. Làm sai vài câu ở Luyện đề là có ngay."}</p></div>`}`;
   }
   const it = R.queue[0];
@@ -1621,15 +1624,17 @@ function viewGraves() {
   const list = Object.entries(S.graves).map(([id, g]) => ({ id, ...g })).sort((a, b) => b.diedAt - a.diedAt);
   if (!list.length) return `<h1>Nghĩa trang</h1><div class="empty"><p style="font-size:30px">🌱</p><h2>Nghĩa trang còn trống</h2><p class="muted">Chưa ai chết dưới tay bạn. Chắc tại bạn chưa làm câu nào.</p></div>`;
   const open = list.filter((g) => !graveLit(g).every(Boolean));
-  return `<h1>Nghĩa trang</h1>
-  <p class="muted">Một nén nhang cháy khi câu sai đó được ôn tới mức nhớ hẳn (thẻ lên trạng thái ôn dài hạn). Cháy hết nhang thì hồn siêu thoát.</p>
-  <p class="note">${open.length} hồn còn oán · ${list.length - open.length} đã siêu thoát</p>
-  <div class="graves">${list.map((g) => {
+  const card = (g) => {
     const lit = graveLit(g); const n = lit.filter(Boolean).length; const saved = n === lit.length;
-    return `<div class="grave ${saved ? "saved" : ""}"><div class="stone">${saved ? "🕊️" : "🪦"}</div><b>${esc(g.patient)}</b><span class="note">${esc(g.subject)}</span>
+    return `<div class="grave ${saved ? "saved" : ""}"><div class="stone">${saved ? "🕊️" : "🪦"}</div><b>${esc(g.patient)}</b>
       <i class="note">“${esc(g.epitaph)}”</i><div class="incense">${lit.map((x) => `<span class="${x ? "" : "off"}">🕯️</span>`).join("")}</div>
       ${saved ? "" : `<button class="btn small amber" data-act="pray" data-id="${g.id}">Thắp nhang (${lit.length - n})</button>`}</div>`;
-  }).join("")}</div>`;
+  };
+  const codes = [...new Set(list.map((g) => g.code))].sort((x, y) => (S.subjects[x]?.order ?? 99) - (S.subjects[y]?.order ?? 99));
+  return `<h1>Nghĩa trang</h1>
+  <p class="note">${open.length} hồn còn oán · ${list.length - open.length} đã siêu thoát</p>
+  ${codes.map((c) => { const gs = list.filter((g) => g.code === c), o = gs.filter((g) => !graveLit(g).every(Boolean)).length;
+    return `<details class="rv-sub" ${o ? "open" : ""}><summary class="rv-head"><h2>${esc(S.subjects[c]?.name || gs[0].subject)}</h2><span class="chip ${o ? "amber" : "green"}">${o ? o + " còn oán" : "siêu thoát hết"}</span></summary><div class="graves">${gs.map(card).join("")}</div></details>`; }).join("")}`;
 }
 
 /* ------------------------------------------------------------------ */
