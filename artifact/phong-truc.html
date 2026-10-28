@@ -208,6 +208,12 @@ details.orig > summary { cursor: pointer; }
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
+.decks { display: grid; gap: 4px; }
+.deck { display: grid; grid-template-columns: 1fr 52px 52px; gap: 8px; align-items: center; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.deck:disabled { opacity: .55; cursor: default; }
+.deck-name { display: grid; gap: 2px; min-width: 0; }
+.deck-due, .deck-new { text-align: right; font-family: var(--mono, monospace); font-size: 18px; font-weight: 600; }
+.deck-due { color: var(--ecg); } .deck-new { color: var(--spo2); } .zero { color: var(--muted, #6b7a80); font-weight: 400; }
 .resume { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 10px; }
 .debt { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
 .debt + .debt { margin-top: 4px; }
@@ -1099,8 +1105,9 @@ function practiceSetup() {
     const wrong = qq.filter((q) => q.wrong).length, done = qq.filter((q) => q.seen).length;
     return `<button class="casecard" data-act="redo-source" data-code="${code}" data-src="${esc(src)}"><b>${esc(src)}</b><span class="note">${qq.length} câu${qq.some((q) => repN(q) >= 2) ? ` · 🔁 ${qq.filter((q) => repN(q) >= 2).length} câu lặp` : ""}${done ? ` · đã làm ${done}` : ""}${wrong ? ` · <span style="color:var(--alarm)">sai ${wrong}</span>` : ""}</span></button>`;
   }).join("")}</div></section>` : ""}
+  ${exam ? "" : deckPanel(code, list, lessonsWithQ)}
   <form class="panel stack" data-form="start-practice">
-    <p class="eyebrow">${exam ? "Hoặc trộn câu theo bài" : "Luyện thẻ"}</p>
+    <p class="eyebrow">${exam ? "Hoặc trộn câu theo bài" : "Hoặc luyện tự chọn"}</p>
     <input type="hidden" id="p-code" value="${code}"><input type="hidden" id="p-kind" value="${exam ? "exam" : "anki"}">
     <div class="row" style="align-items:end">
       <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn (${list.length})</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${list.filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
@@ -1115,6 +1122,38 @@ function practiceSetup() {
       <button class="btn red big" style="flex:1;min-width:160px">Nhận bệnh nhân</button>
     </div>
   </form>`;
+}
+/* Bảng bộ thẻ kiểu Anki: mỗi bài bao nhiêu thẻ đến hạn ôn, bao nhiêu thẻ mới. Bấm một bài = ôn thẻ đến hạn trước, rồi thẻ mới theo chỉ tiêu hôm nay. */
+function newLeftToday(code) {
+  const k = ankiTracked(code) ? debtPlan(code)?.k.anki : null;
+  return k?.days ? Math.max(0, k.quota - k.today) : 20;
+}
+function deckPanel(code, list, lessons) {
+  const cnt = (qq) => ({ due: qq.filter((q) => q.seen && isDue(q)).length, nw: qq.filter((q) => !q.seen).length, n: qq.length });
+  const all = cnt(list), quota = newLeftToday(code);
+  const k = ankiTracked(code) ? debtPlan(code)?.k.anki : null;
+  const row = (id, name, c) => `<button class="deck" data-act="deck" data-code="${code}" data-id="${id}" ${c.due || c.nw ? "" : "disabled"}>
+      <span class="deck-name">${esc(name)}<small class="note">${c.n} thẻ${c.n - c.nw ? ` · đã học ${c.n - c.nw}` : ""}</small></span>
+      <span class="deck-due ${c.due ? "" : "zero"}">${c.due}</span><span class="deck-new ${c.nw ? "" : "zero"}">${c.nw}</span></button>`;
+  return `<section class="panel stack">
+    <div class="row between" style="align-items:baseline"><p class="eyebrow">Bộ thẻ hôm nay</p><span class="note"><b style="color:var(--ecg)">Đến hạn</b> · <b style="color:var(--spo2)">Mới</b></span></div>
+    ${k ? `<p class="note">Chỉ tiêu thẻ mới hôm nay: <b>${k.today}/${k.quota}</b>${k.days ? ` · hạn học mới còn ${k.days} ngày` : " · đã hết hạn học mới, chỉ ôn"}. Bấm một bài: ôn hết thẻ đến hạn trước, rồi tới tối đa ${quota} thẻ mới.</p>` : `<p class="note">Bấm một bài: ôn hết thẻ đến hạn trước, rồi tới tối đa ${quota} thẻ mới.</p>`}
+    <div class="decks">${row("", "Cả môn", all)}${lessons.map((l) => row(l.id, l.name, cnt(list.filter((q) => q.lesson === l.id)))).join("")}</div>
+  </section>`;
+}
+function startDeck(code, lesson) {
+  const pool = qs(code).filter((q) => isAnki(q) && (!lesson || q.lesson === lesson));
+  const due = pool.filter((q) => q.seen && isDue(q)).sort((a, b) => a.card.due - b.card.due);
+  const order = (S.subjects[code]?.lessons || []).map((l) => l.id);
+  const nw = pool.filter((q) => !q.seen).sort((a, b) => (order.indexOf(a.lesson) - order.indexOf(b.lesson)) || ((a.n || 0) - (b.n || 0))).slice(0, newLeftToday(code));
+  const items = [...due, ...nw].map((q) => ({ id: q.id, code }));
+  if (!items.length) { toast(due.length || pool.some((q) => !q.seen) ? "Hôm nay hết chỉ tiêu thẻ mới rồi. Muốn học thêm thì dùng luyện tự chọn bên dưới." : "Bài này không còn thẻ đến hạn hay thẻ mới."); return; }
+  S.subject = code;
+  stashRun();
+  S.practice = { code, lesson, mode: "deck", kind: "anki", prio: 0, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title: `${S.subjects[code].name}${lesson ? " · " + lessonName(code, lesson) : ""} · ${due.length} ôn + ${nw.length} mới` };
+  S.tab = "practice";
+  render();
+  window.scrollTo({ top: 0 });
 }
 /* Làm lại nguyên một đề cũ, giữ thứ tự câu như trong đề. */
 function redoSource(code, src) {
@@ -1930,6 +1969,7 @@ document.addEventListener("click", async (ev) => {
     case "rate": rateCard(d.r); break;
     case "end-review": S.review = null; render(); break;
     case "resume-run": resumeRun(); break;
+    case "deck": startDeck(d.code, d.id); break;
     case "drop-run": if (S.paused) S.paused = null; else if (liveRun(S.practice)) S.practice = { code: S.practice.code }; render(); break;
     case "pray": {
       const g = S.graves[d.id];
