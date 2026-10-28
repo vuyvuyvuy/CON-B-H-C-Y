@@ -1195,7 +1195,8 @@ Viết phần "nêu lại kiến thức" bằng tiếng Việt, tối đa ${deep
 - Câu 1: kiến thức cốt lõi mà câu hỏi kiểm tra.
 - Vì sao đáp án đúng là đúng${choice ? ", và vì sao lựa chọn của sinh viên sai" : ""}.
 - Kết bằng một dòng bắt đầu "Mẹo nhớ:"${ctx ? " (ưu tiên mẹo có sẵn trong bài soạn)" : ""}.
-Giọng chuyên môn, chính xác, không đùa. Nếu đáp án được cho có vẻ sai về mặt y khoa, nói rõ ở dòng đầu: "Lưu ý: đáp án đề có thể chưa đúng vì…".`;
+Giọng chuyên môn, chính xác, không đùa.
+ĐÁP ÁN TRÊN LÀ ĐÁP ÁN BỘ MÔN${repN(q) >= 2 ? ` (câu này đã ra ở ${repN(q)} đề: ${q.rep.join(", ")})` : ""}. Giải thích THEO đáp án này, tìm lý lẽ/cách hiểu của bộ môn (ví dụ phân giai đoạn sớm–muộn, chữ "thường gặp nhất", "câu SAI"…). Không tự đổi đáp án, không bảo sinh viên "hỏi giảng viên". Chỉ khi đáp án sai rõ ràng, không có cách hiểu nào bênh được, mới thêm MỘT dòng cuối: "Ghi chú: sách khác có thể viết …, đi thi vẫn chọn theo đáp án bộ môn."`;
   try {
     const { text } = await S.sample(prompt, { onText: ({ text }) => { if (box()) box().textContent = text; }, cache: { gcTime: 864e5 } });
     const cur = S.questions[code][id];
