@@ -208,6 +208,7 @@ details.orig > summary { cursor: pointer; }
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
+.resume { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--warn); border-radius: 10px; }
 .debt { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
 .debt + .debt { margin-top: 4px; }
 .debt h3 { margin: 0; }
@@ -580,7 +581,9 @@ const subjectList = () => Object.values(S.subjects).sort((a, b) => (a.order ?? 9
 const qsAll = (code) => Object.values(S.questions[code] || {});
 const qs = (code) => qsAll(code).filter((q) => !isCase(q));
 const allQs = () => subjectList().flatMap((s) => qsAll(s.code).map((q) => ({ ...q, code: s.code })));
-const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now;
+/* Thẻ đang học/học lại (hẹn 1–10 phút) tính là đến hạn sớm 20 phút như Anki, để bấm "Quên" xong thoát ra vẫn thấy thẻ trong Thắp nhang. */
+const LEARN_AHEAD = 20 * MIN;
+const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now + (q.card.state === "learning" || q.card.state === "relearning" ? LEARN_AHEAD : 0);
 const dueList = () => allQs().filter((q) => isDue(q)).sort((a, b) => a.card.due - b.card.due);
 const lessonName = (code, lid) => (S.subjects[code]?.lessons || []).find((l) => l.id === lid)?.name || "Chưa xếp bài";
 const PATIENTS = ["Anh Tuấn, 34t", "Bà Lan, 67t", "Bé Na, 4t", "Ông Ba, 72t", "Chị Hoa, 28t", "Cô Mai, 45t", "Chú Hùng, 58t", "Em Khoa, 17t", "Bà Sáu, 81t", "Anh Dũng, 41t", "Chị Thảo, 32t", "Bé Bin, 2t"];
@@ -631,6 +634,7 @@ function renderNav() {
     `<button data-act="tab" data-id="${id}" aria-current="${S.tab === id || (id === "home" && inSubject())}">${label}${id === "review" && due ? `<span class="badge">${due}</span>` : ""}</button>`).join("");
 }
 function go(tab) {
+  if (tab !== (S.practice?.caseRef ? "cases" : "practice")) stashRun();   // về đúng màn hình của phiên thì giữ nguyên
   if (tab === "exams" || tab === "anki") { S.practice = { code: S.subject, kind: tab === "exams" ? "exam" : "anki" }; tab = "practice"; }
   if (tab === "practice" && (S.practice?.caseRef || (S.subject && S.practice?.code !== S.subject))) S.practice = { code: S.subject || S.practice.code, kind: S.practice?.kind === "exam" ? "exam" : "anki" };
   if (S.subject) {          // mục trong môn: trỏ mọi phiên về môn đang mở
@@ -648,8 +652,57 @@ function render() {
   renderNav();
   const app = $("#app");
   const view = { home: viewHome, cases: viewCases, subject: viewSubject, practice: viewPractice, review: viewReview, ask: viewAsk, er: viewER, import: viewImport, graves: viewGraves, reader: viewReader }[S.tab] || viewHome;
-  app.innerHTML = (inSubject() ? subjectBar() : "") + view();
+  app.innerHTML = resumeBar() + (inSubject() ? subjectBar() : "") + view();
   afterRender();
+  saveRun();
+}
+/* ------------------------------------------------------------------ */
+/* Phiên dở dang: đổi tab, mở phiên khác hay tắt app đều giữ lại để làm tiếp. */
+/* ------------------------------------------------------------------ */
+const RUN_KEY = "pt.run";
+const liveRun = (P) => !!(P?.items?.length && !P.done);
+const viewingRun = () => S.tab === (S.practice?.caseRef ? "cases" : "practice");
+/* Gọi trước khi S.practice bị thay: phiên đang dở được cất sang S.paused. */
+function stashRun() { if (liveRun(S.practice)) { S.paused = S.practice; S.practice = { code: S.practice.code }; } }
+function resumable() { return liveRun(S.practice) && !viewingRun() ? S.practice : S.paused; }
+function runSnapshot(P) {
+  const i = P.answered ? P.i + 1 : P.i;   // câu đã trả lời thì đã lưu kết quả, mở lại bắt đầu từ câu sau
+  if (i >= P.items.length) return null;
+  return { ...P, i, answered: null, revealed: false, savedAt: Date.now() };
+}
+function saveRun() {
+  try {
+    const P = liveRun(S.practice) ? S.practice : S.paused;
+    const run = { practice: P ? runSnapshot(P) : null, review: S.review?.queue?.length ? { queue: S.review.queue, done: S.review.done } : null };
+    if (run.practice || run.review) localStorage.setItem(RUN_KEY, JSON.stringify(run)); else localStorage.removeItem(RUN_KEY);
+  } catch {}
+}
+function loadRun() {
+  try {
+    const run = JSON.parse(localStorage.getItem(RUN_KEY) || "null"); if (!run) return;
+    if (run.practice?.items?.length) S.paused = run.practice;
+    if (run.review?.queue?.length) S.review = { queue: run.review.queue, flipped: false, done: run.review.done || 0, msg: null };
+  } catch {}
+}
+function resumeBar() {
+  if (!S.loaded.subjects || !S.packsLoaded) return "";
+  const P = resumable(), out = [];
+  if (P) {
+    const left = P.items.filter((it, j) => j >= P.i && S.questions[it.code]?.[it.id]).length;
+    if (left) out.push(`<div class="resume"><span>⏸ Phiên dở: <b>${esc(P.title || "")}</b> · câu ${P.i + 1}/${P.items.length} · ${Math.max(0, P.hp)} HP</span><span class="row"><button class="btn small red" data-act="resume-run">Làm tiếp</button><button class="btn small ghost" data-act="drop-run">Bỏ phiên</button></span></div>`);
+  }
+  const R = S.review;
+  if (R?.queue?.length && S.tab !== "review") out.push(`<div class="resume"><span>🕯️ Thắp nhang đang dở: còn <b>${R.queue.length}</b> thẻ</span><span class="row"><button class="btn small amber" data-act="tab" data-id="review">Ôn tiếp</button><button class="btn small ghost" data-act="end-review">Bỏ</button></span></div>`);
+  return out.join("");
+}
+function resumeRun() {
+  const P = resumable(); if (!P) return;
+  if (P === S.paused) { if (liveRun(S.practice)) { const cur = S.practice; S.practice = P; S.paused = cur; } else { S.practice = P; S.paused = null; } }
+  P.items = P.items.filter((it, j) => j < P.i || S.questions[it.code]?.[it.id]);
+  P.answered = null; P.revealed = false; P.qStart = Date.now();
+  if (P.i >= P.items.length) P.done = true;
+  S.subject = P.code; S.tab = P.caseRef ? "cases" : "practice";
+  render(); window.scrollTo({ top: 0 });
 }
 /* Dữ liệu đổi từ máy khác: chỉ vẽ lại các màn hình "đọc", không phá phiên đang làm hay ô đang gõ. */
 let pendingRender = false;
@@ -995,7 +1048,7 @@ function feedbackBlock(q, ans, code) {
   const bad = !ans.correct;
   return `<div class="feedback ${bad ? "bad" : "good"}">
     <p class="roast">${bad ? `−${ans.penalty} HP · ` : ""}${esc(ans.roast)}</p>
-    ${bad || ans.rating === "hard" ? `<p class="note mono">Đã thêm vào Thắp nhang: gặp lại sau ${ans.card ? Math.max(1, Math.round((ans.card.due - Date.now()) / MIN)) : 1} phút.</p>` : ""}
+    ${bad || ans.rating === "hard" ? `<p class="note mono">${ans.requeued ? "Câu này sẽ quay lại sau vài câu nữa trong phiên này, và nằm" : "Đã thêm"} vào Thắp nhang: gặp lại sau ${ans.card ? Math.max(1, Math.round((ans.card.due - Date.now()) / MIN)) : 1} phút.</p>` : ""}
     ${bad && S.pack[code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><div class="lecture"><span class="eyebrow">📖 Bài soạn</span>Đang tìm đoạn liên quan…</div></div>` : ""}
     ${isCase(q) ? `<div class="explain">${esc(q.why)}</div>` : bad || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
     ${isCase(q) ? caseExtras(q, code, bad) : ""}
@@ -1069,6 +1122,7 @@ function redoSource(code, src) {
     .sort((a, b) => ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0))).map((q) => ({ id: q.id, code }));
   if (!items.length) return;
   S.subject = code;
+  stashRun();
   S.practice = { code, lesson: "", mode: "all", kind: "exam", prio: 0, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title: `${S.subjects[code].name} · ${src}` };
   S.tab = "practice";
   render();
@@ -1100,6 +1154,7 @@ function startPractice(code, lesson, mode, n, kind = "all", prio = 0, order = "r
   const items = sorted.slice(0, n).map((q) => ({ id: q.id, code }));
   const title = `${S.subjects[code].name}${lesson ? " · " + lessonName(code, lesson) : ""}`;
   S.subject = code;
+  stashRun();
   S.practice = { code, lesson, mode, kind, prio, items, i: 0, hp: 100, patient: pick(PATIENTS), patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title };
   S.tab = "practice";
   render();
@@ -1118,7 +1173,7 @@ async function answerPractice(choice, self) {
   S.stats.total++;
   bumpStreak();
   let card = q.card;
-  let text, penalty = 0;
+  let text, penalty = 0, requeued = false;
   const rating = self || ratingFrom(correct, ms);
   if (correct) {
     P.right++;
@@ -1135,13 +1190,17 @@ async function answerPractice(choice, self) {
     card = { ...card, due: Math.max(card.due, now + 10 * MIN) };   // sai: 10 phút sau gặp lại
     P.hp -= penalty;
     P.sessionWrong.push(it.id);
+    // như Anki: thẻ quên quay lại ngay trong phiên, sau vài câu (ca soạn sẵn thì giữ thứ tự ca, câu sai vào Thắp nhang)
+    if (!P.caseRef && !P.items.slice(P.i + 1).some((x) => x.id === it.id && x.code === it.code)) {
+      P.items.splice(Math.min(P.items.length, P.i + 4), 0, { id: it.id, code: it.code, again: true }); requeued = true;
+    }
     const sev = severity(P.hp, 100);
     text = q.wrong >= 3 && sev !== "dead"
       ? roast("repeat", { times: q.wrong })
       : roast(isCase(q) && (sev === "scratch" || sev === "bleeding") ? "ward" : sev, { patient: P.patient, hp: Math.max(0, P.hp), penalty, source: isAnki(q) ? "thẻ Anki của chính bạn" : q.source || "cũ" });
   }
   q.card = card || null;
-  P.answered = { choice, correct, roast: text, penalty, card, rating };
+  P.answered = { choice, correct, roast: text, penalty, card, rating, requeued };
   if (!correct && P.hp <= 0) {
     P.killed++;
     S.stats.killed++;
@@ -1369,6 +1428,7 @@ function viewCases() {
 const casePatient = (c) => c.setting.match(/^((?:Bé|Anh|Chị|Ông|Bà|Em|Cô|Chú) [^,.]+, [^,.]+)/)?.[1] || pick(PATIENTS);
 function playItems(code, lesson, items, extra) {
   S.subject = code;
+  stashRun();
   S.practice = { code, lesson, mode: "case", kind: "case", prio: 0, items, i: 0, hp: 100, patientNo: 1, right: 0, wrongCount: 0, answeredCount: 0, killed: 0, sessionWrong: [], startedAt: Date.now(), qStart: Date.now(), title: `${S.subjects[code].name} · ${lessonName(code, lesson)}`, ...extra };
   S.tab = "cases";
   render();
@@ -1816,7 +1876,7 @@ document.addEventListener("click", async (ev) => {
     case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; S.openLimit = 40; render(); break;
     case "practice-subject": S.subject = d.code; go("anki"); break;
     case "sub": go(d.id); break;
-    case "pay-debt": S.subject = d.code; if (d.id === "exams" || d.id === "anki") { S.practice = { code: d.code, kind: d.id === "exams" ? "exam" : "anki" }; } go(d.id); break;
+    case "pay-debt": stashRun(); S.subject = d.code; if (d.id === "exams" || d.id === "anki") { S.practice = { code: d.code, kind: d.id === "exams" ? "exam" : "anki" }; } go(d.id); break;
     case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
     case "import-subject": S.subject = d.code; S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
     case "rename-lesson": {
@@ -1853,9 +1913,9 @@ document.addEventListener("click", async (ev) => {
     case "play-case": playCase(d.id); break;
     case "case-wrong": playWrong(d.code, d.lesson); break;
     case "case-subject": S.cs = { code: d.code }; render(); break;
-    case "case-list": S.practice = { code: S.practice?.code }; render(); break;
+    case "case-list": stashRun(); S.practice = { code: S.practice?.code }; render(); break;
     case "open-cases": {
-      S.subject = d.code; S.cs = { code: d.code }; if (S.practice?.caseRef) S.practice = { code: d.code };
+      S.subject = d.code; S.cs = { code: d.code }; if (S.practice?.caseRef) { stashRun(); S.practice = { code: d.code }; }
       go("cases");
       requestAnimationFrame(() => $("#cl-" + d.lesson)?.scrollIntoView({ block: "start" }));
       break;
@@ -1869,6 +1929,8 @@ document.addEventListener("click", async (ev) => {
     case "show-lecture": { const it = S.review.queue[0]; fillLecture(it.code, S.questions[it.code][it.id]); break; }
     case "rate": rateCard(d.r); break;
     case "end-review": S.review = null; render(); break;
+    case "resume-run": resumeRun(); break;
+    case "drop-run": if (S.paused) S.paused = null; else if (liveRun(S.practice)) S.practice = { code: S.practice.code }; render(); break;
     case "pray": {
       const g = S.graves[d.id];
       const queue = g.qids.filter((id) => S.questions[g.code]?.[id]).map((id) => ({ id, code: g.code }));
@@ -1890,7 +1952,7 @@ document.addEventListener("change", async (ev) => {
   const el = ev.target; const d = el.dataset;
   if (d.act === "move-q") { const q = S.questions[d.code][d.id]; saveQuestion(d.code, { ...q, lesson: el.value }); render(); }
   if (d.act === "exam-done") { const s = { ...S.subjects[d.code], exams: S.subjects[d.code].exams.map((e, i) => (i === +d.idx ? { ...e, done: el.checked } : e)) }; await saveSubject(s); render(); }
-  if (d.act === "p-code") { S.practice = { code: el.value }; render(); }
+  if (d.act === "p-code") { stashRun(); S.practice = { code: el.value }; render(); }
   if (d.act === "reader-lesson") { S.reader = { ...S.reader, lesson: el.value, page: 1 }; render(); }
   if (d.act === "e-code") { S.er = { code: el.value }; loadSavedCase(el.value); render(); }
   if (d.act === "imp-keep") { S.imp.items[+d.i].keep = el.checked; render(); }
@@ -2038,6 +2100,7 @@ async function loadPacks() {
 }
 async function boot() {
   try { const t = localStorage.getItem("pt.tab"); if (t && TABS.some(([id]) => id === t)) S.tab = t; } catch {}
+  loadRun();
   render();
   const [db, sample] = await Promise.all([window.claude?.use("db") ?? null, window.claude?.use("sample") ?? null]);
   S.sample = sample;
