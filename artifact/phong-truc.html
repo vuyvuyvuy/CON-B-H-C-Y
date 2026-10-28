@@ -208,6 +208,13 @@ details.orig > summary { cursor: pointer; }
 .cases { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
+.grid2 > *, .stack > * { min-width: 0; }
+.tchart { overflow: hidden; padding: 0 14px; display: flex; align-items: stretch; gap: 3px; height: 150px; }
+.tcol { flex: 1; min-width: 0; display: grid; grid-template-rows: 14px 1fr 14px; align-items: end; justify-items: center; }
+.tcol i { width: 100%; max-width: 22px; background: var(--spo2); opacity: .55; border-radius: 3px 3px 0 0; align-self: end; }
+.tcol i.now { background: var(--ecg); opacity: 1; }
+.tv, .tl { font: 10px var(--font-mono); color: var(--muted); white-space: nowrap; overflow: visible; width: 0; display: flex; justify-content: center; }
+.tl { align-self: end; }
 .rv-sub { margin-top: 18px; }
 .rv-sub[open] { display: grid; gap: 10px; }
 .rv-head { display: flex; gap: 10px; align-items: baseline; padding-bottom: 8px; border-bottom: 2px solid var(--line); cursor: pointer; list-style: none; }
@@ -609,7 +616,19 @@ function allExams() {
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
+/* Thời gian học: mỗi lần chấm một câu/thẻ cộng khoảng cách từ lần chấm trước (tối đa 3 phút, nghỉ lâu hơn thì chỉ tính 30 giây cho chính câu đó). */
+let lastStudyAt = 0;
+function trackStudy(now = Date.now()) {
+  const gap = lastStudyAt ? now - lastStudyAt : 0;
+  lastStudyAt = now;
+  const add = gap > 0 && gap <= 3 * MIN ? gap : 30e3;
+  const m = { ...(S.stats.studyMs || {}) }, k = ymd(new Date(now));
+  m[k] = (m[k] || 0) + add;
+  const keys = Object.keys(m).sort(); for (const old of keys.slice(0, Math.max(0, keys.length - 120))) delete m[old];
+  S.stats.studyMs = m;
+}
 function bumpStreak() {
+  trackStudy();
   const today = ymd(new Date());
   const st = S.stats;
   if (st.lastDay === today) return;
@@ -854,6 +873,16 @@ function debtCard(p, withName = true) {
     <p class="debt-roast" style="color:${col}">${debtRoast(p)}</p>
   </div>`;
 }
+function studyChart(days = 14) {
+  const m = S.stats.studyMs || {}, now = Date.now();
+  const rows = Array.from({ length: days }, (_, i) => { const t = now - (days - 1 - i) * DAY; const k = ymd(new Date(t)); return { k, min: Math.round((m[k] || 0) / 60e3), d: k.slice(8) + "/" + k.slice(5, 7) }; });
+  const max = Math.max(60, ...rows.map((r) => r.min)), tot = rows.reduce((a, r) => a + r.min, 0), act = rows.filter((r) => r.min).length;
+  const fmt = (n) => n >= 60 ? `${Math.floor(n / 60)}h${String(n % 60).padStart(2, "0")}` : `${n}p`;
+  const today = rows[rows.length - 1].min;
+  return `<section class="panel stack"><div class="row between" style="align-items:baseline"><p class="eyebrow">Thời gian học · ${days} ngày</p><span class="mono">${fmt(today)} hôm nay</span></div>
+    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày">${rows.map((r, i) => `<div class="tcol" title="${r.k}: ${r.min} phút"><span class="tv">${i === days - 1 || r.min === Math.max(...rows.map((x) => x.min)) && r.min ? fmt(r.min) : ""}</span><i style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / max * 100))}%" class="${i === days - 1 ? "now" : ""}"></i><span class="tl">${(days - 1 - i) % 2 === 0 ? r.d : ""}</span></div>`).join("")}</div>
+    <p class="note">${act ? `Trung bình ${fmt(Math.round(tot / act))}/ngày có học · tổng ${fmt(tot)}` : "Chưa có dữ liệu. Thời gian tính từ lúc bạn chấm câu/thẻ đầu tiên, nghỉ quá 3 phút thì không cộng."}</p></section>`;
+}
 function viewHome() {
   if (!S.loaded.subjects) return `<div class="empty"><p class="eyebrow">Đang tải dữ liệu…</p></div>`;
   if (!subjectList().length) return `<div class="empty"><h2>Chưa có môn nào</h2><p class="muted">Kho dữ liệu đang trống. Nhắn Claude trong khung chat: “nạp lịch thi và danh sách môn” là xong.</p><button class="btn" data-act="add-subject">+ Thêm môn</button></div>`;
@@ -907,6 +936,7 @@ function viewHome() {
       ${past.length ? `<p class="note">Đã qua: ${past.map((e) => esc(e.title)).join(", ")}. Không ai nhắc lại điểm của bạn đâu. Trừ trang này.</p>` : ""}
     </div>
     <aside class="stack">
+      ${studyChart()}
       <section class="panel rank"><p class="eyebrow">Danh hiệu hiện tại</p><b style="color:${r.color}">${r.title}</b><p class="note">${r.sub}</p>
         <p class="eyebrow" style="margin-top:8px">Tỷ lệ sai ${st.total ? Math.round(st.wrong / st.total * 100) : 0}% · ${st.wrong}/${st.total} câu</p></section>
       <div class="stats">
