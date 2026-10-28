@@ -1,8 +1,11 @@
 // Gói Anki + bài soạn -> pack tĩnh cho Artifact Phòng Trực
 const fs = require('fs'); const path = require('path'); const { execFileSync } = require('child_process');
-const [notesJson, pdfDir, outDir] = process.argv.slice(2);
-const CODE = 'TMH0054';
-const LESSONS = [
+const [notesJson, pdfDir, outDir, cfgF] = process.argv.slice(2);
+// Cấu hình môn (tuỳ chọn): { code, source, lessons: [[id, tên, file pdf, deck id]], prio3: "regex tag", prio1: "regex tag" }
+const CFG = cfgF ? JSON.parse(fs.readFileSync(cfgF, 'utf8')) : null;
+const CODE = CFG?.code || 'TMH0054';
+const SOURCE = CFG?.source || 'Anki · NĂM 4 › 1. TMH';
+const LESSONS = CFG?.lessons || [
   ['tmh1', 'Viêm mũi xoang cấp và mạn', 'ed38e6ab-1._VMX_cap_man_giang_tung_slide.pdf', 1792290905111],
   ['tmh2', 'Giải phẫu – sinh lý nghe và thăng bằng', '46039ef8-Bai2_GiaiPhau_SinhLy_Nghe_ThangBang.pdf', 1793016649274],
   ['tmh3', 'Ung thư vòm – ung thư thanh quản', 'b7850577-3._UngThuVom_UngThuThanhQuan_BaiSoan.pdf', 1792345669659],
@@ -83,6 +86,9 @@ function convert(html, meta) {
 const plain = (h) => decode(h.replace(/<br>|<\/div>|<\/li>|<\/blockquote>/g, '\n').replace(/<img[^>]*>/g, '[hình]').replace(/<[^>]+>/g, '')).replace(/\n{2,}/g, '\n').trim();
 
 function prioFromTags(tags) {
+  if (CFG?.prio3 && new RegExp(CFG.prio3).test(tags)) return 3;
+  if (CFG?.prio1 && new RegExp(CFG.prio1).test(tags)) return 1;
+  if (CFG) return 2;
   if (/(^| )(hay_thi|HighYield|TMH::UuTien::3sao|TMH::DiVat::HighYield)( |$)/.test(tags)) return 3;
   if (/(^| )(it_ra_thi|LowYield|TMH::UuTien::1sao)( |$)/.test(tags)) return 1;
   return 2;
@@ -101,7 +107,7 @@ for (const n of notes) {
     id: 'a' + n.id, kind: 'anki', lesson, front, back,
     stem: plain(front), answer: plain(back) || '(xem hình)',
     prio: meta.badge || prioFromTags(n.tags), slide: meta.slide || null, topic: meta.topic || null,
-    source: 'Anki · NĂM 4 › 1. TMH', n: order[lesson],
+    source: SOURCE, n: order[lesson],
   });
 }
 // ---------- bài soạn: chữ theo từng trang ----------
@@ -117,7 +123,12 @@ for (const [id, name, file] of LESSONS) {
   noteFiles[id] = f;
 }
 fs.writeFileSync(path.join(outDir, `packs/${CODE}.json`), JSON.stringify({ code: CODE, version: 1, cards }));
-fs.writeFileSync(path.join(outDir, 'packs/index.json'), JSON.stringify({ packs: [{ code: CODE, file: `packs/${CODE}.json`, count: cards.length, notes: noteFiles }] }, null, 1));
+// index.json có thể chứa nhiều môn: giữ các môn khác, thay mục của môn này (giữ trường cases nếu đã có).
+const idxF = path.join(outDir, 'packs/index.json');
+const idx = fs.existsSync(idxF) ? JSON.parse(fs.readFileSync(idxF, 'utf8')) : { packs: [] };
+const prev = idx.packs.find((p) => p.code === CODE);
+idx.packs = idx.packs.filter((p) => p.code !== CODE).concat([{ ...(prev || {}), code: CODE, file: `packs/${CODE}.json`, count: cards.length, notes: noteFiles }]);
+fs.writeFileSync(idxF, JSON.stringify(idx, null, 1));
 const by = {}; for (const c of cards) by[c.lesson] = (by[c.lesson] || [0, 0, 0, 0]), by[c.lesson][c.prio]++;
 console.log('cards', cards.length, JSON.stringify(by), 'slides', cards.filter((c) => c.slide).length, 'imgs', cards.filter((c) => /<img/.test(c.front + c.back)).length);
 console.log(JSON.stringify(LESSONS.map(([id, name]) => ({ id, name }))));
