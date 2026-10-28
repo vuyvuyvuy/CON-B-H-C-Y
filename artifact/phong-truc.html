@@ -210,7 +210,7 @@ details.orig > summary { cursor: pointer; }
 .rep-line { margin-top: 6px; }
 .grid2 > *, .stack > * { min-width: 0; }
 .tchart { overflow: hidden; padding: 0 14px; display: flex; align-items: stretch; gap: 3px; height: 150px; }
-.tcol { flex: 1; min-width: 0; display: grid; grid-template-rows: 14px 1fr 14px; align-items: end; justify-items: center; }
+.tcol { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; flex: 1; min-width: 0; display: grid; grid-template-rows: 14px 1fr 14px; align-items: end; justify-items: center; }
 .tcol i { width: 100%; max-width: 22px; background: var(--spo2); opacity: .55; border-radius: 3px 3px 0 0; align-self: end; }
 .tcol i.now { background: var(--ecg); opacity: 1; }
 .tv, .tl { font: 10px var(--font-mono); color: var(--muted); white-space: nowrap; overflow: visible; width: 0; display: flex; justify-content: center; }
@@ -873,6 +873,23 @@ function debtCard(p, withName = true) {
     <p class="debt-roast" style="color:${col}">${debtRoast(p)}</p>
   </div>`;
 }
+/* Bấm vào cột/biểu đồ thời gian học: khịa theo số phút của ngày đó. {m} = số phút, {t} = giờ phút, {d} = ngày. */
+const STUDY_ROAST = {
+  zero: ["{d}: 0 phút. Sách còn sạch hơn lương tâm của bạn.", "{d} không học một chữ. Bệnh nhân thì không nghỉ lễ đâu nha.", "Cột {d} phẳng lì như đường ECG của người đã mất.", "0 phút. Bạn đi du lịch hay đi trốn?", "{d}: trống trơn. Chắc hôm đó bận 'nạp năng lượng' cả ngày.", "Không có dữ liệu ngày {d}. Hoặc bạn không học, hoặc bạn học bằng thần giao cách cảm.", "{d} nghỉ. Kỳ thi thì không nghỉ cùng bạn.", "Ngày {d} đã bị bạn xóa khỏi lịch sử học tập. Đáng buồn là không xóa được khỏi lịch thi.", "0 phút học. Ngủ thì ngon đó, thi thì sẽ khóc.", "{d}: bạn nợ môn thi một ngày công. Có lãi đó nha."],
+  low: ["{t} thôi à? Đọc xong cái bìa sách còn chưa hết.", "{t} ngày {d}. Pha ly cà phê còn lâu hơn.", "{t} học, còn lại lướt điện thoại. Chắc là cân đối rồi.", "Có {t}. Đủ để biết tên bài, chưa đủ để biết nội dung.", "{t} thôi mà đòi thành bác sĩ. Ước mơ đẹp quá.", "{t}: học như đi khám bệnh, vào 5 phút ra đơn thuốc.", "{t}. Bệnh nhân sống được tới lúc bạn đọc xong chẩn đoán phân biệt là may.", "Chỉ {t}. Anki còn chưa kịp làm nóng thẻ.", "{t} ngày {d}. Mỗi lần mở app là một lần tự an ủi.", "{t} – như hít một hơi rồi thôi. Học đi, lặn xuống nữa."],
+  mid: ["{t}. Không tệ, nhưng đừng vội ăn mừng, đề thi không chấm theo tinh thần.", "{t} ngày {d}. Mức 'không bị đuổi học'.", "{t}: vừa đủ để lương tâm ngủ yên, chưa đủ để điểm cao.", "{t}. Có học, có điểm sống, chưa có điểm giỏi.", "{t}. Đây là mức của người học để không phải xấu hổ trước nhóm.", "{t} – nhìn tạm ổn. Tạm thôi.", "{t}. Hợp lý. Mai tăng thêm chút nữa thì có thể xin tha tội.", "{t}: học như người trung bình. Mà đề thi thì không thi trung bình.", "{t} ngày {d}. Có tiến bộ, nhưng chưa đủ để khoe với ai."],
+  good: ["{t}! Hôm nay chắc có người thúc phía sau.", "{t} ngày {d}. Lạ thật, không ai ép bạn mà.", "{t}. Hôm đó bạn là sinh viên Y đúng nghĩa. Giữ lại nhé.", "{t}. Có ngày như vậy thì ba ngày lười cũng đỡ ngượng.", "{t}. Thầy cô mà thấy chắc rơi nước mắt.", "{t}: não bạn bốc khói rồi đấy, nhớ cho nó uống nước.", "{t}. Cột này cao tới mức mấy cột kia thấy tủi.", "{t} ngày {d}. Có ai đổi phải mật khẩu tài khoản của bạn không?", "{t}. Đỉnh. Đừng để đây là cột duy nhất cao trong tháng."],
+  great: ["{t}!! Bạn có còn ngủ không đó?", "{t} ngày {d}. Đi ăn cơm chưa? Đi tắm chưa? Có sống không?", "{t}. Khoa phải cấp bằng 'liệt sĩ ôn thi' cho bạn.", "{t}. Ngày này bạn xứng đáng nhận một cái ôm, hoặc một giấc ngủ.", "{t}: tới mức bệnh nhân còn thương bạn.", "{t}. Học như vậy mà rớt thì phải trách đề, không trách bạn.", "{t}. Nhớ đứng dậy đi lại, kẻo chưa thi đã bị huyết khối tĩnh mạch.", "{t} ngày {d}. Cột này là bằng chứng bạn có thể, vấn đề chỉ là có muốn không.", "{t}. Đừng ép quá, nghỉ một chút nhé. Rồi mai lại học."],
+};
+let lastRoast = "";
+function studyRoast(k, min) {
+  const t = min >= 60 ? `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}` : `${min} phút`;
+  const tier = !min ? "zero" : min < 30 ? "low" : min < 90 ? "mid" : min < 240 ? "good" : "great";
+  const pool = STUDY_ROAST[tier].filter((x) => x !== lastRoast);
+  lastRoast = pick(pool);
+  const d = k === ymd(new Date()) ? "hôm nay" : k.slice(8) + "/" + k.slice(5, 7);
+  return lastRoast.replaceAll("{t}", t).replaceAll("{m}", min).replaceAll("{d}", d);
+}
 function studyChart(days = 14) {
   const m = S.stats.studyMs || {}, now = Date.now();
   const rows = Array.from({ length: days }, (_, i) => { const t = now - (days - 1 - i) * DAY; const k = ymd(new Date(t)); return { k, min: Math.round((m[k] || 0) / 60e3), d: k.slice(8) + "/" + k.slice(5, 7) }; });
@@ -880,7 +897,8 @@ function studyChart(days = 14) {
   const fmt = (n) => n >= 60 ? `${Math.floor(n / 60)}h${String(n % 60).padStart(2, "0")}` : `${n}p`;
   const today = rows[rows.length - 1].min;
   return `<section class="panel stack"><div class="row between" style="align-items:baseline"><p class="eyebrow">Thời gian học · ${days} ngày</p><span class="mono">${fmt(today)} hôm nay</span></div>
-    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày">${rows.map((r, i) => `<div class="tcol" title="${r.k}: ${r.min} phút"><span class="tv">${i === days - 1 || r.min === Math.max(...rows.map((x) => x.min)) && r.min ? fmt(r.min) : ""}</span><i style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / max * 100))}%" class="${i === days - 1 ? "now" : ""}"></i><span class="tl">${(days - 1 - i) % 2 === 0 ? r.d : ""}</span></div>`).join("")}</div>
+    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày">${rows.map((r, i) => `<button class="tcol" data-act="study-roast" data-k="${r.k}" data-m="${r.min}" title="${r.k}: ${r.min} phút"><span class="tv">${i === days - 1 || r.min === Math.max(...rows.map((x) => x.min)) && r.min ? fmt(r.min) : ""}</span><i style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / max * 100))}%" class="${i === days - 1 ? "now" : ""}"></i><span class="tl">${(days - 1 - i) % 2 === 0 ? r.d : ""}</span></button>`).join("")}</div>
+    <p class="debt-roast" id="troast" style="color:var(--muted)">Bấm vào một cột để nghe khịa.</p>
     <p class="note">${act ? `Trung bình ${fmt(Math.round(tot / act))}/ngày có học · tổng ${fmt(tot)}` : "Chưa có dữ liệu. Thời gian tính từ lúc bạn chấm câu/thẻ đầu tiên, nghỉ quá 3 phút thì không cộng."}</p></section>`;
 }
 function viewHome() {
@@ -2051,6 +2069,7 @@ document.addEventListener("click", async (ev) => {
     case "end-review": S.review = null; render(); break;
     case "resume-run": resumeRun(); break;
     case "deck": startDeck(d.code, d.id); break;
+    case "study-roast": { const el = $("#troast"); if (el) { el.textContent = studyRoast(d.k, +d.m); el.style.color = +d.m < 30 ? "var(--alarm)" : +d.m < 90 ? "var(--warn)" : "var(--ecg)"; } break; }
     case "drop-run": if (S.paused) S.paused = null; else if (liveRun(S.practice)) S.practice = { code: S.practice.code }; render(); break;
     case "pray": {
       const g = S.graves[d.id];
