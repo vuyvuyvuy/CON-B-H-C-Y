@@ -705,26 +705,57 @@ function runSnapshot(P) {
   if (i >= P.items.length) return null;
   return { ...P, i, answered: null, revealed: false, savedAt: Date.now() };
 }
+/* Phiên dở lưu 2 nơi: localStorage (nhanh) và kho meta/run (bền). App trên iPad/điện thoại hay xoá bộ nhớ trang
+   khi thoát lâu, nên lúc mở lại lấy bản nào mới hơn. Chưa đọc xong bản trong kho thì không ghi đè lên nó. */
+let runSig = null, runTimer = null;
+function currentRun() {
+  const P = liveRun(S.practice) ? S.practice : S.paused;
+  const p = P ? runSnapshot(P) : null; if (p) delete p.savedAt;
+  return { practice: p, review: S.review?.queue?.length ? { queue: S.review.queue, done: S.review.done } : null };
+}
 function saveRun() {
-  try {
-    const P = liveRun(S.practice) ? S.practice : S.paused;
-    const run = { practice: P ? runSnapshot(P) : null, review: S.review?.queue?.length ? { queue: S.review.queue, done: S.review.done } : null };
-    if (run.practice || run.review) localStorage.setItem(RUN_KEY, JSON.stringify(run)); else localStorage.removeItem(RUN_KEY);
-  } catch {}
+  const run = currentRun(), sig = JSON.stringify(run), empty = !run.practice && !run.review;
+  if (sig === runSig) return;
+  runSig = sig;
+  const at = Date.now();
+  try { if (empty) localStorage.removeItem(RUN_KEY); else localStorage.setItem(RUN_KEY, JSON.stringify({ ...run, at })); } catch {}
+  if (!S.runLoaded) return;
+  clearTimeout(runTimer);
+  runTimer = setTimeout(flushRun, 800, empty ? null : sig, at);
+}
+function flushRun(sig = runSig, at = Date.now()) {
+  clearTimeout(runTimer); runTimer = null;
+  if (!S.db || !S.runLoaded) return;
+  const run = sig && sig !== "null" && JSON.parse(sig);
+  const json = run && (run.practice || run.review) ? sig : null;
+  write("meta/run", () => S.db.doc("meta/run").set({ run: json, at })).catch(() => {});
+}
+function applyRun(run) {
+  if (run?.practice?.items?.length && !liveRun(S.practice) && !S.paused) S.paused = run.practice;
+  if (run?.review?.queue?.length && !S.review?.queue?.length) S.review = { queue: run.review.queue, flipped: false, done: run.review.done || 0, msg: null };
 }
 function loadRun() {
-  try {
-    const run = JSON.parse(localStorage.getItem(RUN_KEY) || "null"); if (!run) return;
-    if (run.practice?.items?.length) S.paused = run.practice;
-    if (run.review?.queue?.length) S.review = { queue: run.review.queue, flipped: false, done: run.review.done || 0, msg: null };
-  } catch {}
+  try { applyRun(JSON.parse(localStorage.getItem(RUN_KEY) || "null")); } catch {}
+  runSig = JSON.stringify(currentRun());
 }
+async function loadRunRemote() {
+  let localAt = 0; try { localAt = JSON.parse(localStorage.getItem(RUN_KEY) || "null")?.at || 0; } catch {}
+  try {
+    const snap = await S.db.doc("meta/run").get();
+    const d = snap.exists ? snap.data() : null;
+    if (d?.run && (d.at || 0) > localAt) { S.paused = null; applyRun(JSON.parse(d.run)); }
+  } catch (e) { console.warn("meta/run", e); }
+  S.runLoaded = true;
+  runSig = null; saveRun();   // đẩy bản đang có lên kho (nếu local mới hơn)
+  onData();
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && runTimer) flushRun(); });
 function resumeBar() {
   if (!S.loaded.subjects || !S.packsLoaded) return "";
   const P = resumable(), out = [];
   if (P) {
     const left = P.items.filter((it, j) => j >= P.i && S.questions[it.code]?.[it.id]).length;
-    if (left) out.push(`<div class="resume"><span>⏸ Phiên dở: <b>${esc(P.title || "")}</b> · câu ${P.i + 1}/${P.items.length} · ${Math.max(0, P.hp)} HP</span><span class="row"><button class="btn small red" data-act="resume-run">Làm tiếp</button><button class="btn small ghost" data-act="drop-run">Bỏ phiên</button></span></div>`);
+    if (left) out.push(`<div class="resume"><span>⏸ Phiên dở: <b>${esc(P.title || "")}</b> · ${P.kind === "anki" ? "thẻ" : "câu"} ${P.i + 1}/${P.items.length}${P.kind === "anki" ? "" : ` · ${Math.max(0, P.hp)} HP`}</span><span class="row"><button class="btn small red" data-act="resume-run">Làm tiếp</button><button class="btn small ghost" data-act="drop-run">Bỏ phiên</button></span></div>`);
   }
   const R = S.review;
   if (R?.queue?.length && S.tab !== "review") out.push(`<div class="resume"><span>🕯️ Thắp nhang đang dở: còn <b>${R.queue.length}</b> thẻ</span><span class="row"><button class="btn small amber" data-act="tab" data-id="review">Ôn tiếp</button><button class="btn small ghost" data-act="end-review">Bỏ</button></span></div>`);
@@ -2255,6 +2286,7 @@ async function boot() {
   }
   S.db = db;
   loadPacks();
+  loadRunRemote();
   db.collection("subjects").onSnapshot((snap) => {
     const m = {};
     for (const d of snap.docs) { m[d.id] = { code: d.id, ...d.data() }; watchQuestions(d.id); }
