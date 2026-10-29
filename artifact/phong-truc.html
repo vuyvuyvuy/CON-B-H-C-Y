@@ -1316,10 +1316,25 @@ function startPractice(code, lesson, mode, n, kind = "all", prio = 0, order = "r
 }
 /* choice: đáp án trắc nghiệm; self: "again" | "hard" | "good" khi tự chấm thẻ lật. */
 /* Thẻ Anki: không HP, không bia mộ. Chấm Quên/Khó/Tốt/Dễ rồi sang thẻ kế; thẻ quên quay lại sau vài thẻ, đến hạn thì tự hiện trong bộ thẻ. */
+/* Bước học thẻ Anki: thẻ mới Quên 1ph / Khó 5ph. Đã Quên/Khó thì lần sau Quên 1ph / Khó 3ph / Tốt 5ph;
+   bấm Tốt lần nữa (sau bước 5ph) hoặc Dễ thì ra ôn dài ngày. Thẻ ôn dài ngày mà quên thì quay lại thang 1/3/5ph. */
+const ANKI_NEW = { again: 1, hard: 5 }, ANKI_LEARN = { again: 1, hard: 3, good: 5 };
 function ankiNext(q, rating, code, now = Date.now()) {
-  const ex = nextExamAt(code);
-  if (!q.card && (rating === "good" || rating === "easy")) return firstPassCard(now, rating, ex, true);
-  return schedule(q.card || newCard(now), rating, now, ex);
+  const ex = nextExamAt(code), c = q.card;
+  const lim = ex ? ex - DAY : Infinity, clamp = (t) => lim > now ? Math.min(t, lim) : t;
+  // step = vị trí trên thang: 0 sau Quên/Khó, 1 sau Tốt ở bước 5ph; Tốt khi đang ở 1 thì ra ôn dài ngày
+  const step = (st, min, extra = {}) => ({ ...(c || newCard(now)), ...extra, state: st, step: rating === "good" ? 1 : 0, reps: (c?.reps || 0) + 1, last: now, due: now + min * MIN });
+  if (!c || c.state === "new") {
+    if (rating === "good" || rating === "easy") return firstPassCard(now, rating, ex, true);
+    return step("learning", ANKI_NEW[rating]);
+  }
+  if (c.state === "learning" || c.state === "relearning") {
+    if (rating === "again" || rating === "hard" || (rating === "good" && !(c.step >= 1))) return step(c.state, ANKI_LEARN[rating]);
+    const ivl = c.state === "relearning" ? Math.max(1, c.ivl || 1) : rating === "easy" ? 3 : 1;
+    return { ...c, state: "review", step: 0, ivl, reps: c.reps + 1, last: now, due: clamp(now + ivl * DAY) };
+  }
+  if (rating === "again") return step("relearning", ANKI_LEARN.again, { lapses: (c.lapses || 0) + 1, ease: Math.max(SRS.minEase, c.ease - 0.2), ivl: Math.max(1, Math.round(c.ivl * SRS.lapse)) });
+  return schedule(c, rating, now, ex);
 }
 const ankiLabel = (card, now = Date.now()) => { const m = Math.max(1, Math.round((card.due - now) / MIN)); return m < 60 ? m + " ph" : m < 1440 ? Math.round(m / 60) + " giờ" : Math.round(m / 1440) + " ngày"; };
 function answerAnki(rating) {
@@ -1328,7 +1343,10 @@ function answerAnki(rating) {
   if (!q.seen) q.firstSeenAt = now;
   q.seen = (q.seen || 0) + 1;
   q.card = ankiNext(q, rating, it.code, now);
-  if (rating === "again") { q.wrong = (q.wrong || 0) + 1; P.wrongCount++; if (!P.items.slice(P.i + 1).some((x) => x.id === it.id)) P.items.splice(Math.min(P.items.length, P.i + 3), 0, { id: it.id, code: it.code }); } else P.right++;
+  if (rating === "again") { q.wrong = (q.wrong || 0) + 1; P.wrongCount++; } else P.right++;
+  // thẻ còn ở bước phút (1/3/5ph) thì quay lại trong phiên: càng hẹn lâu càng chen xa
+  const mins = (q.card.due - now) / MIN;
+  if (mins < 20 && !P.items.slice(P.i + 1).some((x) => x.id === it.id)) P.items.splice(Math.min(P.items.length, P.i + 1 + Math.max(2, Math.round(mins * 1.5))), 0, { id: it.id, code: it.code });
   P.answeredCount++; S.stats.total++; bumpStreak();
   saveQuestion(it.code, q); saveStats();
   P.revealed = false;
