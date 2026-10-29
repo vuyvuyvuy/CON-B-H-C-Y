@@ -262,6 +262,25 @@ details.covers .qlist { margin: 8px 0; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 .qimg{display:block;max-width:min(100%,420px);height:auto;margin:10px 0;border-radius:6px;background:#fff}
+
+/* Pomodoro nổi ở góc, có Mèo Trực mỏ hỗn */
+#app { padding-bottom: 84px; }
+#pomo { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); z-index: 25; font-size: 14px; }
+.pm-pill { display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; box-shadow: 0 6px 20px rgb(0 0 0 / .35); font: 600 15px var(--font-mono); }
+.pm-pill.focus { border-color: var(--alarm); } .pm-pill.break { border-color: var(--ecg); }
+.pm-cat { width: 40px; height: 40px; flex: none; }
+.pm-cat.big { width: 74px; height: 74px; cursor: pointer; }
+.pm-box { width: min(320px, calc(100vw - 24px)); display: grid; gap: 10px; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 10px 30px rgb(0 0 0 / .45); }
+.pm-head { display: flex; gap: 10px; align-items: flex-start; }
+.pm-say { position: relative; flex: 1; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); font-size: 13px; line-height: 1.4; }
+.pm-say::before { content: ""; position: absolute; left: -6px; top: 16px; border: 6px solid transparent; border-left: 0; border-right-color: var(--panel-2); }
+.pm-time { font: 700 44px var(--font-mono); text-align: center; letter-spacing: 1px; }
+.pm-time.focus { color: var(--alarm); } .pm-time.break { color: var(--ecg); }
+.pm-bar { height: 4px; border-radius: 4px; background: var(--panel-2); overflow: hidden; } .pm-bar i { display: block; height: 100%; background: currentColor; }
+.pm-set { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pm-set label { display: grid; gap: 2px; font-size: 11px; color: var(--muted); }
+.pm-set input { width: 100%; padding: 6px; font: 600 14px var(--font-mono); }
+.pm-x { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
 </style>
 
 <header>
@@ -274,6 +293,7 @@ details.covers .qlist { margin: 8px 0; }
   <div class="empty"><p class="eyebrow">Đang bật monitor…</p></div>
 </main>
 <div class="toast" id="toast" hidden></div>
+<aside id="pomo" aria-label="Đồng hồ Pomodoro"></aside>
 
 <script>
 "use strict";
@@ -2300,6 +2320,128 @@ async function loadPacks() {
   S.packsLoaded = true;
   onData();
 }
+
+/* ------------------------------------------------------------------ */
+/* Pomodoro + Mèo Trực: nổi ở góc dưới phải, chạy theo mốc giờ kết thúc nên đổi tab, tải lại trang vẫn đúng. */
+/* ------------------------------------------------------------------ */
+const POMO_KEY = "pt.pomo";
+const PM = Object.assign({ phase: "idle", endAt: 0, left: 0, focus: 25, short: 5, long: 15, every: 4, round: 0, open: false, auto: true, doneDay: "", done: 0, say: "" },
+  (() => { try { return JSON.parse(localStorage.getItem(POMO_KEY) || "{}"); } catch { return {}; } })());
+const pmSave = () => { try { localStorage.setItem(POMO_KEY, JSON.stringify(PM)); } catch {} };
+const CAT_LINES = {
+  idle: ["Bấm bắt đầu đi chứ, ngồi nhìn tôi hoài.", "Định học hay định ngắm mèo?", "Đồng hồ không tự chạy đâu cưng.", "Tôi chờ bạn lâu hơn bệnh nhân chờ kết quả xét nghiệm.", "Mở app rồi thì học luôn đi, đừng có lướt.", "Meo. Dịch: học đi đồ lười."],
+  focus: ["Học đi. Tôi canh rồi đó.", "Điện thoại úp xuống. Ngay.", "Còn {t} nữa thôi, đừng có ngó Facebook.", "Bạn mà đứng dậy là tôi cào sofa.", "Tập trung coi, não cá vàng.", "Một thẻ nữa. Rồi một thẻ nữa. Rồi một thẻ nữa.", "Tôi là mèo mà còn ngồi yên lâu hơn bạn.", "Nhìn gì? Nhìn bài kìa.", "Học xong mới được vuốt ve tôi.", "Đừng tưởng tôi ngủ, tôi đang đếm từng giây của bạn.", "Bệnh nhân không chờ bạn 'lấy lại cảm hứng'.", "Gãi đầu cũng không làm bài tự thuộc đâu.", "{t} nữa. Chịu khó, rồi tôi cho nghỉ.", "Thấy câu khó là muốn đi pha trà hả? Ngồi xuống."],
+  short: ["Nghỉ {t}. Không phải nghỉ luôn đâu nha.", "Uống nước, đứng dậy, vươn vai. Cấm mở TikTok.", "Ra phơi nắng như tôi đi.", "Nghỉ ngắn thôi, kỳ thi không nghỉ cùng bạn.", "Duỗi lưng đi, lưng bạn cong như dấu hỏi rồi.", "Ăn vặt được. Ăn hết nguyên gói thì không.", "Nhắm mắt 1 phút. Không phải ngủ 1 tiếng."],
+  long: ["Nghỉ dài {t}. Xứng đáng đấy, lần này thôi.", "Đi ăn gì đi, tôi cũng đói rồi.", "Nghỉ dài nhưng đừng nghỉ tới tối nha.", "Ra ngoài đi bộ chút. Đừng nằm."],
+  paused: ["Tạm dừng? Ai cho?", "Đi đâu đó? Quay lại học.", "Dừng lâu là tôi ngủ luôn đó.", "Bấm tiếp đi, tôi chưa tha bạn đâu."],
+  focusDone: ["Xong một hiệp. Tạm chấp nhận được.", "Hôm nay {n} hiệp rồi. Ai đó khen bạn đi, tôi thì không.", "Hết giờ học. Đứng dậy trước khi thành tượng.", "Một hiệp nữa xong. Đừng tự hào quá sớm."],
+  breakDone: ["Hết giờ chơi. Vào học!", "Nghỉ đủ rồi, đừng giả vờ không nghe chuông.", "Quay lại bàn học. Ngay. Meo.", "Giờ nghỉ là của tôi, giờ học là của bạn."],
+};
+const pmLeft = () => PM.phase === "idle" ? PM.focus * 60e3 : PM.endAt ? Math.max(0, PM.endAt - Date.now()) : PM.left;
+const pmFmt = (ms) => { const t = Math.ceil(ms / 1000); return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+const pmTotal = () => (PM.phase === "short" ? PM.short : PM.phase === "long" ? PM.long : PM.focus) * 60e3;
+const pmKind = () => PM.phase === "focus" ? "focus" : PM.phase === "short" || PM.phase === "long" ? "break" : "";
+function pmSay(group) {
+  const pool = CAT_LINES[group].filter((x) => x !== PM.say);
+  PM.say = pick(pool); pmSave();
+}
+const pmLine = () => PM.say.replaceAll("{t}", Math.max(1, Math.round(pmLeft() / 60e3)) + " phút").replaceAll("{n}", PM.done);
+function pmStart(phase) {
+  PM.phase = phase; PM.endAt = Date.now() + pmTotal(); PM.left = 0;
+  pmSay(phase === "focus" ? "focus" : phase); pmRender();
+}
+function pmBeep() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.25, 0.5].forEach((t) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.15, ac.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + t + 0.2); o.connect(g).connect(ac.destination); o.start(ac.currentTime + t); o.stop(ac.currentTime + t + 0.2); });
+  } catch {}
+  navigator.vibrate?.([200, 100, 200]);
+}
+function pmFinish() {
+  const today = ymd(new Date());
+  if (PM.phase === "focus") {
+    if (PM.doneDay !== today) { PM.doneDay = today; PM.done = 0; }
+    PM.done++; PM.round++;
+    const next = PM.round % PM.every === 0 ? "long" : "short";
+    pmBeep(); pmSay("focusDone"); toast("🐱 " + pmLine());
+    if (PM.auto) pmStart(next); else { PM.phase = next; PM.endAt = 0; PM.left = pmTotal(); }
+  } else {
+    pmBeep(); pmSay("breakDone"); toast("🐱 " + pmLine());
+    if (PM.auto) pmStart("focus"); else { PM.phase = "focus"; PM.endAt = 0; PM.left = pmTotal(); }
+  }
+  PM.open = true; pmRender();
+}
+const CAT_SVG = (cls = "pm-cat") => `<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+  <path d="M10 26 L14 6 L26 18 Z M54 26 L50 6 L38 18 Z" fill="#f2a65a"/><path d="M14 22 L16 12 L22 18 Z M50 22 L48 12 L42 18 Z" fill="#ffd3b0"/>
+  <ellipse cx="32" cy="36" rx="24" ry="21" fill="#f2a65a"/>
+  <path d="M22 9 h20 l-3 7 h-14 z" fill="#fff"/><path d="M30.5 10.5 h3 v2 h2 v2.5 h-2 v2 h-3 v-2 h-2 v-2.5 h2 z" fill="#ff4b3e" transform="translate(0,-0.5) scale(1)"/>
+  <ellipse cx="32" cy="44" rx="11" ry="8" fill="#ffe3cc"/>
+  <path d="M17 27 l9 3 M47 27 l-9 3" stroke="#3a2416" stroke-width="2.4" stroke-linecap="round"/>
+  <ellipse cx="23" cy="34" rx="3.2" ry="3.6" fill="#2a1a10"/><ellipse cx="41" cy="34" rx="3.2" ry="3.6" fill="#2a1a10"/>
+  <circle cx="24" cy="33" r="1" fill="#fff"/><circle cx="42" cy="33" r="1" fill="#fff"/>
+  <ellipse cx="15" cy="41" rx="4" ry="2.4" fill="#ff8a8a" opacity=".55"/><ellipse cx="49" cy="41" rx="4" ry="2.4" fill="#ff8a8a" opacity=".55"/>
+  <path d="M30 40 l2 2 l2 -2 z" fill="#d9534f"/><path d="M27 46 q5 -3 10 0" stroke="#3a2416" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M8 40 h8 M8 44 h8 M48 40 h8 M48 44 h8" stroke="#3a2416" stroke-width="1" opacity=".5"/></svg>`;
+function pmRender() {
+  const el = $("#pomo"); if (!el) return;
+  const k = pmKind(), left = pmLeft(), running = !!PM.endAt;
+  const label = PM.phase === "focus" ? `Học · hiệp ${PM.round % PM.every + 1}/${PM.every}` : PM.phase === "short" ? "Nghỉ ngắn" : PM.phase === "long" ? "Nghỉ dài" : "Chưa bắt đầu";
+  if (!PM.open) {
+    el.innerHTML = `<button class="pm-pill ${k}" data-pomo="open" title="Pomodoro">${CAT_SVG()}<span>${PM.phase === "idle" ? "Pomodoro" : pmFmt(left)}${PM.phase !== "idle" && !running ? " ⏸" : ""}</span></button>`;
+    return;
+  }
+  if (!PM.say) pmSay(PM.phase === "idle" ? "idle" : !running ? "paused" : PM.phase === "focus" ? "focus" : PM.phase);
+  const pct = PM.phase === "idle" ? 0 : Math.round((1 - left / pmTotal()) * 100);
+  el.innerHTML = `<div class="pm-box">
+    <div class="pm-head">${CAT_SVG("pm-cat big")}<div class="pm-say" data-pomo="poke"><b style="color:#f2a65a">Mèo Trực</b><br>${esc(pmLine())}</div><button class="pm-x" data-pomo="close" aria-label="Thu nhỏ">▾</button></div>
+    <p class="eyebrow" style="text-align:center">${label}${PM.done && PM.doneDay === ymd(new Date()) ? ` · hôm nay ${PM.done} hiệp` : ""}</p>
+    <div class="pm-time ${k}" id="pm-time">${pmFmt(left)}</div>
+    <div class="pm-bar" style="color:${k === "focus" ? "var(--alarm)" : "var(--ecg)"}"><i id="pm-bar" style="width:${pct}%"></i></div>
+    <div class="row" style="justify-content:center">
+      ${PM.phase === "idle" ? `<button class="btn red" data-pomo="start">▶ Bắt đầu học</button>` : running ? `<button class="btn" data-pomo="pause">⏸ Tạm dừng</button>` : `<button class="btn red" data-pomo="resume">▶ Chạy tiếp</button>`}
+      ${PM.phase !== "idle" ? `<button class="btn ghost" data-pomo="skip">⏭ Bỏ qua</button><button class="btn ghost" data-pomo="reset">↺</button>` : ""}
+    </div>
+    <details><summary class="note" style="cursor:pointer">Cài đặt thời gian</summary>
+      <div class="pm-set" style="margin-top:8px">
+        <label>Học (ph)<input type="number" min="1" max="180" data-pomo-set="focus" value="${PM.focus}"></label>
+        <label>Nghỉ (ph)<input type="number" min="1" max="60" data-pomo-set="short" value="${PM.short}"></label>
+        <label>Nghỉ dài<input type="number" min="1" max="90" data-pomo-set="long" value="${PM.long}"></label>
+        <label>Sau mấy hiệp<input type="number" min="1" max="12" data-pomo-set="every" value="${PM.every}"></label>
+      </div>
+      <label class="note" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" data-pomo-set="auto" ${PM.auto ? "checked" : ""}> Hết giờ tự chạy hiệp kế tiếp</label>
+    </details>
+  </div>`;
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-pomo]"); if (!b) return;
+  const a = b.dataset.pomo;
+  if (a === "open") { PM.open = true; if (PM.phase === "idle") pmSay("idle"); }
+  else if (a === "close") PM.open = false;
+  else if (a === "start") { PM.round = 0; pmStart("focus"); }
+  else if (a === "pause") { PM.left = pmLeft(); PM.endAt = 0; pmSay("paused"); }
+  else if (a === "resume") { PM.endAt = Date.now() + (PM.left || pmTotal()); PM.left = 0; pmSay(PM.phase === "focus" ? "focus" : PM.phase); }
+  else if (a === "skip") { PM.endAt = Date.now(); pmFinish(); return; }
+  else if (a === "reset") { PM.phase = "idle"; PM.endAt = 0; PM.left = 0; PM.round = 0; pmSay("idle"); }
+  else if (a === "poke") pmSay(PM.phase === "idle" ? "idle" : !PM.endAt ? "paused" : PM.phase === "focus" ? "focus" : PM.phase);
+  pmSave(); pmRender();
+});
+document.addEventListener("change", (ev) => {
+  const el = ev.target.closest("[data-pomo-set]"); if (!el) return;
+  const k = el.dataset.pomoSet;
+  if (k === "auto") PM.auto = el.checked;
+  else { const v = Math.max(1, Math.min(+el.max || 180, Math.round(+el.value || 1))); PM[k] = v; if (PM.phase !== "idle" && !PM.endAt && ((k === "focus" && PM.phase === "focus") || (k === "short" && PM.phase === "short") || (k === "long" && PM.phase === "long"))) PM.left = v * 60e3; }
+  pmSave();
+  const t = $("#pm-time"); if (t) t.textContent = pmFmt(pmLeft());   // không vẽ lại cả khung: ô đang nhập mất focus sẽ làm lỗi
+});
+setInterval(() => {
+  if (PM.endAt && Date.now() >= PM.endAt) return pmFinish();
+  if (!PM.endAt) return;
+  const t = $("#pm-time"), bar = $("#pm-bar");
+  if (t) { t.textContent = pmFmt(pmLeft()); if (bar) bar.style.width = Math.round((1 - pmLeft() / pmTotal()) * 100) + "%"; }
+  else { const s = $("#pomo .pm-pill span"); if (s) s.textContent = pmFmt(pmLeft()); }
+}, 1000);
+setInterval(() => { if (PM.open && PM.endAt) { pmSay(PM.phase === "focus" ? "focus" : PM.phase); pmRender(); } }, 60e3);
+pmRender();
 async function boot() {
   try { const t = localStorage.getItem("pt.tab"); if (t && TABS.some(([id]) => id === t)) S.tab = t; } catch {}
   loadRun();
