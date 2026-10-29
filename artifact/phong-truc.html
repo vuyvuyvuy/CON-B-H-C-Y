@@ -697,9 +697,18 @@ function render() {
 const RUN_KEY = "pt.run";
 const liveRun = (P) => !!(P?.items?.length && !P.done);
 const viewingRun = () => S.tab === (S.practice?.caseRef ? "cases" : "practice");
-/* Gọi trước khi S.practice bị thay: phiên đang dở được cất sang S.paused. */
-function stashRun() { if (liveRun(S.practice)) { S.paused = S.practice; S.practice = { code: S.practice.code }; } }
-function resumable() { return liveRun(S.practice) && !viewingRun() ? S.practice : S.paused; }
+/* Mỗi loại giữ riêng một phiên dở: đề cũ, tình huống, thẻ Anki. Mở phiên loại khác không đè lên nhau. */
+const SLOTS = [["exam", "Đề cũ"], ["case", "Tình huống"], ["anki", "Thẻ Anki"]];
+const slotOf = (P) => P.kind === "anki" ? "anki" : P.caseRef ? "case" : "exam";
+S.paused = {};
+/* Gọi trước khi S.practice bị thay: phiên đang dở được cất vào ngăn của loại đó. */
+function stashRun() { if (liveRun(S.practice)) { S.paused[slotOf(S.practice)] = S.practice; S.practice = { code: S.practice.code }; } }
+/* Các phiên có thể làm tiếp, mỗi loại một phiên; phiên đang mở nhưng không ở màn hình làm bài cũng tính. */
+function resumables() {
+  const m = { ...S.paused };
+  if (liveRun(S.practice)) { if (viewingRun()) delete m[slotOf(S.practice)]; else m[slotOf(S.practice)] = S.practice; }
+  return SLOTS.filter(([k]) => m[k]).map(([k, label]) => ({ slot: k, label, P: m[k] }));
+}
 function runSnapshot(P) {
   const i = P.answered ? P.i + 1 : P.i;   // câu đã trả lời thì đã lưu kết quả, mở lại bắt đầu từ câu sau
   if (i >= P.items.length) return null;
@@ -709,12 +718,12 @@ function runSnapshot(P) {
    khi thoát lâu, nên lúc mở lại lấy bản nào mới hơn. Chưa đọc xong bản trong kho thì không ghi đè lên nó. */
 let runSig = null, runTimer = null;
 function currentRun() {
-  const P = liveRun(S.practice) ? S.practice : S.paused;
-  const p = P ? runSnapshot(P) : null; if (p) delete p.savedAt;
-  return { practice: p, review: S.review?.queue?.length ? { queue: S.review.queue, done: S.review.done } : null };
+  const m = { ...S.paused }; if (liveRun(S.practice)) m[slotOf(S.practice)] = S.practice;
+  const practices = SLOTS.map(([k]) => m[k] && runSnapshot(m[k])).filter(Boolean); practices.forEach((p) => delete p.savedAt);
+  return { practices, review: S.review?.queue?.length ? { queue: S.review.queue, done: S.review.done } : null };
 }
 function saveRun() {
-  const run = currentRun(), sig = JSON.stringify(run), empty = !run.practice && !run.review;
+  const run = currentRun(), sig = JSON.stringify(run), empty = !run.practices.length && !run.review;
   if (sig === runSig) return;
   runSig = sig;
   const at = Date.now();
@@ -727,11 +736,14 @@ function flushRun(sig = runSig, at = Date.now()) {
   clearTimeout(runTimer); runTimer = null;
   if (!S.db || !S.runLoaded) return;
   const run = sig && sig !== "null" && JSON.parse(sig);
-  const json = run && (run.practice || run.review) ? sig : null;
+  const json = run && (run.practices?.length || run.review) ? sig : null;
   write("meta/run", () => S.db.doc("meta/run").set({ run: json, at })).catch(() => {});
 }
 function applyRun(run) {
-  if (run?.practice?.items?.length && !liveRun(S.practice) && !S.paused) S.paused = run.practice;
+  for (const p of run?.practices || (run?.practice ? [run.practice] : [])) {
+    const k = slotOf(p);
+    if (p.items?.length && !S.paused[k] && !(liveRun(S.practice) && slotOf(S.practice) === k)) S.paused[k] = p;
+  }
   if (run?.review?.queue?.length && !S.review?.queue?.length) S.review = { queue: run.review.queue, flipped: false, done: run.review.done || 0, msg: null };
 }
 function loadRun() {
@@ -743,7 +755,7 @@ async function loadRunRemote() {
   try {
     const snap = await S.db.doc("meta/run").get();
     const d = snap.exists ? snap.data() : null;
-    if (d?.run && (d.at || 0) > localAt) { S.paused = null; applyRun(JSON.parse(d.run)); }
+    if (d?.run && (d.at || 0) > localAt) { S.paused = {}; applyRun(JSON.parse(d.run)); }
   } catch (e) { console.warn("meta/run", e); }
   S.runLoaded = true;
   runSig = null; saveRun();   // đẩy bản đang có lên kho (nếu local mới hơn)
@@ -752,18 +764,19 @@ async function loadRunRemote() {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && runTimer) flushRun(); });
 function resumeBar() {
   if (!S.loaded.subjects || !S.packsLoaded) return "";
-  const P = resumable(), out = [];
-  if (P) {
+  const out = [];
+  for (const { slot, label, P } of resumables()) {
     const left = P.items.filter((it, j) => j >= P.i && S.questions[it.code]?.[it.id]).length;
-    if (left) out.push(`<div class="resume"><span>⏸ Phiên dở: <b>${esc(P.title || "")}</b> · ${P.kind === "anki" ? "thẻ" : "câu"} ${P.i + 1}/${P.items.length}${P.kind === "anki" ? "" : ` · ${Math.max(0, P.hp)} HP`}</span><span class="row"><button class="btn small red" data-act="resume-run">Làm tiếp</button><button class="btn small ghost" data-act="drop-run">Bỏ phiên</button></span></div>`);
+    if (left) out.push(`<div class="resume"><span>⏸ ${label} dở: <b>${esc(P.title || "")}</b> · ${P.kind === "anki" ? "thẻ" : "câu"} ${P.i + 1}/${P.items.length}${P.kind === "anki" ? "" : ` · ${Math.max(0, P.hp)} HP`}</span><span class="row"><button class="btn small red" data-act="resume-run" data-id="${slot}">Làm tiếp</button><button class="btn small ghost" data-act="drop-run" data-id="${slot}">Bỏ phiên</button></span></div>`);
   }
   const R = S.review;
   if (R?.queue?.length && S.tab !== "review") out.push(`<div class="resume"><span>🕯️ Thắp nhang đang dở: còn <b>${R.queue.length}</b> thẻ</span><span class="row"><button class="btn small amber" data-act="tab" data-id="review">Ôn tiếp</button><button class="btn small ghost" data-act="end-review">Bỏ</button></span></div>`);
   return out.join("");
 }
-function resumeRun() {
-  const P = resumable(); if (!P) return;
-  if (P === S.paused) { if (liveRun(S.practice)) { const cur = S.practice; S.practice = P; S.paused = cur; } else { S.practice = P; S.paused = null; } }
+function resumeRun(slot) {
+  const r = resumables().find((x) => x.slot === slot); if (!r) return;
+  const P = r.P;
+  if (P !== S.practice) { stashRun(); delete S.paused[slot]; S.practice = P; }
   P.items = P.items.filter((it, j) => j < P.i || S.questions[it.code]?.[it.id]);
   P.answered = null; P.revealed = false; P.qStart = Date.now();
   if (P.i >= P.items.length) P.done = true;
@@ -2098,10 +2111,10 @@ document.addEventListener("click", async (ev) => {
     case "show-lecture": { const it = S.review.queue[0]; fillLecture(it.code, S.questions[it.code][it.id]); break; }
     case "rate": rateCard(d.r); break;
     case "end-review": S.review = null; render(); break;
-    case "resume-run": resumeRun(); break;
+    case "resume-run": resumeRun(d.id); break;
     case "deck": startDeck(d.code, d.id); break;
     case "study-roast": { const el = $("#troast"); if (el) { el.textContent = studyRoast(d.k, +d.m); el.style.color = +d.m < 30 ? "var(--alarm)" : +d.m < 90 ? "var(--warn)" : "var(--ecg)"; } break; }
-    case "drop-run": if (S.paused) S.paused = null; else if (liveRun(S.practice)) S.practice = { code: S.practice.code }; render(); break;
+    case "drop-run": if (liveRun(S.practice) && slotOf(S.practice) === d.id) S.practice = { code: S.practice.code }; delete S.paused[d.id]; render(); break;
     case "pray": {
       const g = S.graves[d.id];
       const queue = g.qids.filter((id) => S.questions[g.code]?.[id]).map((id) => ({ id, code: g.code }));
