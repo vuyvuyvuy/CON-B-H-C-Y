@@ -211,8 +211,11 @@ details.orig > summary { cursor: pointer; }
 .grid2 > *, .stack > * { min-width: 0; }
 .tchart { overflow: hidden; padding: 0 14px; display: flex; align-items: stretch; gap: 3px; height: 150px; }
 .tcol { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; flex: 1; min-width: 0; display: grid; grid-template-rows: 14px 1fr 14px; align-items: end; justify-items: center; }
-.tcol i { width: 100%; max-width: 22px; background: var(--spo2); opacity: .55; border-radius: 3px 3px 0 0; align-self: end; }
-.tcol i.now { background: var(--ecg); opacity: 1; }
+.tstack { width: 100%; max-width: 22px; align-self: end; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; background: var(--line); opacity: .8; }
+.tstack.now { opacity: 1; outline: 1px solid var(--fg); outline-offset: 1px; }
+.tstack i { display: block; min-height: 2px; }
+.tlegend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); }
+.tlegend span { display: inline-flex; align-items: center; gap: 5px; } .tlegend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 .tv, .tl { font: 10px var(--font-mono); color: var(--muted); white-space: nowrap; overflow: visible; width: 0; display: flex; justify-content: center; }
 .tl { align-self: end; }
 .rv-sub { margin-top: 18px; }
@@ -638,17 +641,19 @@ function allExams() {
 
 /* Thời gian học: mỗi lần chấm một câu/thẻ cộng khoảng cách từ lần chấm trước (tối đa 3 phút, nghỉ lâu hơn thì chỉ tính 30 giây cho chính câu đó). */
 let lastStudyAt = 0;
-function trackStudy(now = Date.now()) {
+/* studyMs[ngày] = { mã môn: ms } (bản cũ là một con số tổng, đọc vào thành môn "?"). */
+const dayStudy = (v) => typeof v === "number" ? (v ? { "?": v } : {}) : v || {};
+function trackStudy(code = "?", now = Date.now()) {
   const gap = lastStudyAt ? now - lastStudyAt : 0;
   lastStudyAt = now;
   const add = gap > 0 && gap <= 3 * MIN ? gap : 30e3;
   const m = { ...(S.stats.studyMs || {}) }, k = ymd(new Date(now));
-  m[k] = (m[k] || 0) + add;
+  const d = { ...dayStudy(m[k]) }; d[code] = (d[code] || 0) + add; m[k] = d;
   const keys = Object.keys(m).sort(); for (const old of keys.slice(0, Math.max(0, keys.length - 120))) delete m[old];
   S.stats.studyMs = m;
 }
-function bumpStreak() {
-  trackStudy();
+function bumpStreak(code) {
+  trackStudy(code);
   const today = ymd(new Date());
   const st = S.stats;
   if (st.lastDay === today) return;
@@ -964,14 +969,25 @@ function studyRoast(k, min) {
   const d = k === ymd(new Date()) ? "hôm nay" : k.slice(8) + "/" + k.slice(5, 7);
   return lastRoast.replaceAll("{t}", t).replaceAll("{m}", min).replaceAll("{d}", d);
 }
+/* Mỗi môn một màu cố định theo thứ tự môn; bảng màu tách bạch được trên nền tối. */
+const SUBJ_COLORS = ["#5cc8ff", "#ff8a5c", "#3ddc97", "#c58cff", "#ffd166", "#ff5c8a", "#4fd1c5", "#a3e635", "#f472b6", "#94a3b8"];
+const subjColor = (code) => { if (code === "?") return "#6b7a80"; const i = subjectList().findIndex((x) => x.code === code); return SUBJ_COLORS[(i < 0 ? 9 : i) % SUBJ_COLORS.length]; };
 function studyChart(days = 14) {
   const m = S.stats.studyMs || {}, now = Date.now();
-  const rows = Array.from({ length: days }, (_, i) => { const t = now - (days - 1 - i) * DAY; const k = ymd(new Date(t)); return { k, min: Math.round((m[k] || 0) / 60e3), d: k.slice(8) + "/" + k.slice(5, 7) }; });
+  const rows = Array.from({ length: days }, (_, i) => {
+    const t = now - (days - 1 - i) * DAY; const k = ymd(new Date(t)); const parts = dayStudy(m[k]);
+    const by = Object.entries(parts).map(([c, ms]) => [c, ms / 60e3]).sort((a, b) => subjectList().findIndex((x) => x.code === a[0]) - subjectList().findIndex((x) => x.code === b[0]));
+    return { k, by, min: Math.round(by.reduce((a, [, v]) => a + v, 0)), d: k.slice(8) + "/" + k.slice(5, 7) };
+  });
   const max = Math.max(60, ...rows.map((r) => r.min)), tot = rows.reduce((a, r) => a + r.min, 0), act = rows.filter((r) => r.min).length;
   const fmt = (n) => n >= 60 ? `${Math.floor(n / 60)}h${String(n % 60).padStart(2, "0")}` : `${n}p`;
-  const today = rows[rows.length - 1].min;
+  const name = (c) => c === "?" ? "Chưa rõ môn" : S.subjects[c]?.name || c;
+  const today = rows[rows.length - 1].min, top = Math.max(...rows.map((x) => x.min));
+  const sum = {}; for (const r of rows) for (const [c, v] of r.by) sum[c] = (sum[c] || 0) + v;
+  const legend = Object.entries(sum).sort((a, b) => b[1] - a[1]);
   return `<section class="panel stack"><div class="row between" style="align-items:baseline"><p class="eyebrow">Thời gian học · ${days} ngày</p><span class="mono">${fmt(today)} hôm nay</span></div>
-    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày">${rows.map((r, i) => `<button class="tcol" data-act="study-roast" data-k="${r.k}" data-m="${r.min}" title="${r.k}: ${r.min} phút"><span class="tv">${i === days - 1 || r.min === Math.max(...rows.map((x) => x.min)) && r.min ? fmt(r.min) : ""}</span><i style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / max * 100))}%" class="${i === days - 1 ? "now" : ""}"></i><span class="tl">${(days - 1 - i) % 2 === 0 ? r.d : ""}</span></button>`).join("")}</div>
+    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày, chia màu theo môn">${rows.map((r, i) => `<button class="tcol" data-act="study-roast" data-k="${r.k}" data-m="${r.min}" title="${r.d}: ${fmt(r.min)}${r.by.length ? " — " + r.by.map(([c, v]) => `${name(c)} ${fmt(Math.round(v))}`).join(", ") : ""}"><span class="tv">${i === days - 1 || r.min === top && r.min ? fmt(r.min) : ""}</span><span class="tstack ${i === days - 1 ? "now" : ""}" style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / max * 100))}%">${r.by.map(([c, v]) => `<i style="flex:${v};background:${subjColor(c)}"></i>`).join("")}</span><span class="tl">${(days - 1 - i) % 2 === 0 ? r.d : ""}</span></button>`).join("")}</div>
+    ${legend.length ? `<div class="tlegend">${legend.map(([c, v]) => `<span><i style="background:${subjColor(c)}"></i>${esc(name(c))} <b class="mono">${fmt(Math.round(v))}</b></span>`).join("")}</div>` : ""}
     <p class="debt-roast" id="troast" style="color:var(--muted)">Bấm vào một cột để nghe khịa.</p>
     <p class="note">${act ? `Trung bình ${fmt(Math.round(tot / act))}/ngày có học · tổng ${fmt(tot)}` : "Chưa có dữ liệu. Thời gian tính từ lúc bạn chấm câu/thẻ đầu tiên, nghỉ quá 3 phút thì không cộng."}</p></section>`;
 }
@@ -1381,7 +1397,7 @@ function answerAnki(rating) {
   // thẻ còn ở bước phút (1/3/5ph) thì quay lại trong phiên: càng hẹn lâu càng chen xa
   const mins = (q.card.due - now) / MIN;
   if (mins < 20 && !P.items.slice(P.i + 1).some((x) => x.id === it.id)) P.items.splice(Math.min(P.items.length, P.i + 1 + Math.max(2, Math.round(mins * 1.5))), 0, { id: it.id, code: it.code });
-  P.answeredCount++; S.stats.total++; bumpStreak();
+  P.answeredCount++; S.stats.total++; bumpStreak(it.code);
   saveQuestion(it.code, q); saveStats();
   P.revealed = false;
   if (P.i + 1 >= P.items.length) P.done = true; else { P.i++; P.qStart = Date.now(); }
@@ -1399,7 +1415,7 @@ async function answerPractice(choice, self) {
   q.seen = (q.seen || 0) + 1;
   P.answeredCount++;
   S.stats.total++;
-  bumpStreak();
+  bumpStreak(it.code);
   let card = q.card;
   let text, penalty = 0, requeued = false;
   const rating = self || ratingFrom(correct, ms);
@@ -1744,7 +1760,7 @@ function rateCard(r) {
   const q = { ...S.questions[it.code][it.id] };
   const now = Date.now();
   q.card = schedule(q.card || newCard(now), r, now, nextExamAt(it.code));
-  bumpStreak();
+  bumpStreak(it.code);
   saveQuestion(it.code, q);
   saveStats();
   R.queue.shift();
@@ -2070,7 +2086,7 @@ function erAnswer(k) {
     saveQuestion(E.case.code, u);
   }
   S.stats.total++; if (!ok) S.stats.wrong++;
-  bumpStreak();
+  bumpStreak(E.case.code);
   let text;
   if (ok) text = fill(pick(PRAISE), { patient: E.case.patient?.name || "Bệnh nhân" });
   else {
