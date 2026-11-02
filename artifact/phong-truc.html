@@ -1282,7 +1282,7 @@ function deckPanel(code, list, lessons) {
       <span class="deck-due ${c.due ? "" : "zero"}">${c.due}</span><span class="deck-new ${c.nw ? "" : "zero"}">${c.nw}</span></button>`;
   return `<section class="panel stack">
     <div class="row between" style="align-items:baseline"><p class="eyebrow">Bộ thẻ hôm nay</p><span class="note"><b style="color:var(--ecg)">Đến hạn</b> · <b style="color:var(--spo2)">Mới</b></span></div>
-    ${k ? `<p class="note">Chỉ tiêu thẻ mới hôm nay: <b>${k.today}/${k.quota}</b>${k.days ? ` · hạn học mới còn ${k.days} ngày` : " · đã hết hạn học mới, chỉ ôn"}. Bấm một bài: ôn hết thẻ đến hạn trước, rồi tới tối đa ${quota} thẻ mới.</p>` : `<p class="note">Bấm một bài: ôn hết thẻ đến hạn trước, rồi tới tối đa ${quota} thẻ mới.</p>`}
+    ${k ? `<p class="note">Chỉ tiêu thẻ mới hôm nay: <b>${k.today}/${k.quota}</b>${k.days ? ` · hạn học mới còn ${k.days} ngày` : " · đã hết hạn học mới, chỉ ôn"}. Bấm một bài: trộn thẻ đến hạn (ra dày hơn) với tối đa ${quota} thẻ mới.</p>` : `<p class="note">Bấm một bài: trộn thẻ đến hạn (ra dày hơn) với tối đa ${quota} thẻ mới.</p>`}
     <div class="decks">${row("", "Cả môn", all)}${lessons.map((l) => row(l.id, l.name, cnt(list.filter((q) => q.lesson === l.id)))).join("")}</div>
   </section>`;
 }
@@ -1291,7 +1291,11 @@ function startDeck(code, lesson) {
   const due = pool.filter((q) => q.seen && isDue(q)).sort((a, b) => a.card.due - b.card.due);
   const order = (S.subjects[code]?.lessons || []).map((l) => l.id);
   const nw = pool.filter((q) => !q.seen).sort((a, b) => (order.indexOf(a.lesson) - order.indexOf(b.lesson)) || ((a.n || 0) - (b.n || 0))).slice(0, newLeftToday(code));
-  const items = [...due, ...nw].map((q) => ({ id: q.id, code }));
+  // trộn đến hạn với mới cho đỡ chán: mỗi lượt bốc thẻ đến hạn với trọng số gấp đôi, nên thẻ đến hạn ra dày hơn ở đầu phiên
+  // (thẻ đến hạn xáo ngẫu nhiên, thẻ mới giữ thứ tự trong bài để học theo mạch)
+  const dq = shuffle(due), nq = [...nw], mixed = [];
+  while (dq.length || nq.length) mixed.push(Math.random() * (2 * dq.length + nq.length) < 2 * dq.length ? dq.shift() : nq.shift());
+  const items = mixed.map((q) => ({ id: q.id, code }));
   if (!items.length) { toast(due.length || pool.some((q) => !q.seen) ? "Hôm nay hết chỉ tiêu thẻ mới rồi. Muốn học thêm thì dùng luyện tự chọn bên dưới." : "Bài này không còn thẻ đến hạn hay thẻ mới."); return; }
   S.subject = code;
   stashRun();
