@@ -883,7 +883,14 @@ function debtPlan(code, now = new Date()) {
     const c = k[id];
     c.wait = Math.max(0, daysLeft - start);           // còn bao nhiêu ngày nữa mới bắt đầu đòi loại này
     c.startAt = c.wait ? ymd(new Date(t0 + c.wait * DAY + DAY / 2)) : null;
-    c.days = Math.max(0, Math.min(daysLeft, start) - reserve);
+    // trễ hạn hoặc thi gấp (vd thi lâm sàng báo trước vài ngày): bỏ bớt phần chừa — thẻ Anki bỏ 4 ngày giãn lịch, giữ 7 ngày ôn;
+    // vẫn không đủ thì dồn vào các ngày còn lại, chỉ chừa hôm cuối
+    let d = Math.min(daysLeft, start) - reserve;
+    if (d < 2 && daysLeft <= start) {
+      d = daysLeft - (id === "anki" ? ANKI_FINAL : REVIEW_DAYS);
+      if (d < 2) d = daysLeft >= 2 ? daysLeft - 1 : daysLeft;
+    }
+    c.days = Math.max(0, d);
     c.quota = c.wait ? 0 : c.days ? Math.ceil((c.left + c.today) / c.days) : c.left + c.today;
     quota += c.quota; oweNew += Math.max(0, c.quota - c.today);
     if (daysLeft + 1 <= start) { quotaYest += Math.ceil((c.left + c.today + c.yest) / (c.days + 1)); doneYestA += c.yest; }
