@@ -179,6 +179,11 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .rich small { color: var(--muted); font-size: 13px; }
 .rich blockquote { margin: 8px 0 0; padding: 6px 10px; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 9%, transparent); color: #f1dfb6; font-size: 13.5px; border-radius: 0 6px 6px 0; }
 .rich img { display: block; max-width: 100%; height: auto; margin-top: 8px; border-radius: 8px; background: #fff; }
+.rich div:has(> img + img) { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; margin: 6px 0; }
+.rich div:has(> img + img) img { margin: 0; width: 100%; height: 104px; object-fit: cover; }
+.rich img { cursor: zoom-in; }
+.zoom { position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,.88); display: flex; align-items: center; justify-content: center; padding: 12px; cursor: zoom-out; }
+.zoom img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 .rich ul, .rich ol { margin: 4px 0; padding-left: 20px; }
 .rich table { border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
 .rich td, .rich th { border: 1px solid var(--line); padding: 3px 6px; }
@@ -366,7 +371,7 @@ function rich(html) {
       if (c.nodeType !== 1 || !RICH_OK.has(c.tagName)) { c.replaceWith(document.createTextNode(c.textContent || "")); continue; }
       const src = c.tagName === "IMG" ? c.getAttribute("src") : null;
       for (const a of [...c.attributes]) c.removeAttribute(a.name);
-      if (c.tagName === "IMG") { if (src && /^media\/[\w.\-]+$/.test(src)) { c.setAttribute("src", S.media[src.slice(6)] || src); c.setAttribute("alt", ""); c.setAttribute("loading", "lazy"); } else { c.remove(); continue; } }
+      if (c.tagName === "IMG") { if (src && /^media\/[\w.\-]+$/.test(src)) { let u = S.media[src.slice(6)]; if (typeof u === "string" && u.startsWith("/_blob/")) u = S.media[u] || u; c.setAttribute("src", u || src); c.setAttribute("alt", ""); c.setAttribute("loading", "lazy"); } else { c.remove(); continue; } }
       clean(c);
     }
   };
@@ -2120,6 +2125,13 @@ function erNext() {
 /* ------------------------------------------------------------------ */
 /* Sự kiện                                                             */
 /* ------------------------------------------------------------------ */
+/* Chạm hình trong thẻ → phóng to; chạm lần nữa để đóng. */
+document.addEventListener("click", (ev) => {
+  const z = ev.target.closest?.(".zoom"); if (z) { ev.stopPropagation(); z.remove(); return; }
+  const im = ev.target.closest?.(".rich img"); if (!im) return;
+  ev.stopPropagation(); ev.preventDefault();
+  const o = document.createElement("div"); o.className = "zoom"; const b = document.createElement("img"); b.src = im.src; b.alt = ""; o.append(b); document.body.append(o);
+}, true);
 document.addEventListener("click", async (ev) => {
   const el = ev.target.closest("[data-act]"); if (!el || el.tagName === "SELECT" || el.type === "checkbox") return;
   const a = el.dataset.act, d = el.dataset;
