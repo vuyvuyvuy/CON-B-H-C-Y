@@ -1053,7 +1053,7 @@ function viewHome() {
         return ps.length ? `<section class="panel stack"><p class="eyebrow" style="color:var(--alarm)">📒 Sổ đòi nợ</p>${ps.map((p) => debtCard(p)).join("")}</section>` : ""; })()}
       ${list ? `<section class="panel"><p class="eyebrow">Hàng chờ hành quyết</p><div class="exams">${list}</div></section>` : ""}
       ${noExam.length ? `<section class="panel stack"><p class="eyebrow">Môn chưa có lịch thi</p><div class="row">${noExam.map((s) => `<button class="btn small ghost" data-act="open-subject" data-code="${s.code}">${esc(s.name)} <span class="dim">· ${qs(s.code).length}</span></button>`).join("")}</div></section>` : ""}
-      ${past.length ? `<p class="note">Đã qua: ${past.map((e) => esc(e.title)).join(", ")}. Không ai nhắc lại điểm của bạn đâu. Trừ trang này.</p>` : ""}
+      ${past.length ? `<section class="panel stack"><p class="eyebrow">🪦 Đã thi · bấm để mở lại đề, Anki, bài soạn</p><div class="row">${past.slice().sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).map((e) => `<button class="btn small ghost" data-act="open-subject" data-code="${e.code}">${esc(e.title)} <span class="dim">· ${new Intl.DateTimeFormat("vi-VN", { timeZone: TZ, day: "numeric", month: "numeric" }).format(new Date(e.at))}</span></button>`).join("")}</div><p class="note">Không ai nhắc lại điểm của bạn đâu. Trừ trang này.</p></section>` : ""}
     </div>
     <aside class="stack">
       ${studyChart()}
