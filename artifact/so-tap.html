@@ -241,6 +241,38 @@ p{margin:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px)}
 textarea.dump{width:100%;min-height:160px;font-family:ui-monospace,Menlo,monospace;font-size:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:8px}
 @media (max-width:380px){.badges{grid-template-columns:repeat(2,1fr)}.srow{grid-template-columns:48px 28px 1fr 1fr}.tick{width:48px}}
+
+/* ---- tối giản ---- */
+h1{font-size:26px}
+.card{border:0;border-radius:16px}
+.tsec,.fitem,.move,.wday{border:0}
+.wday{min-height:56px}
+.wday.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.nhon{grid-template-columns:34px 1fr;gap:10px;padding:2px 0;background:none;align-items:center}
+.nhon .ava{width:34px;height:34px}
+.nn{font-size:13px;font-family:var(--f-body);font-weight:700}
+.nb p{margin-top:1px;font-size:14px;line-height:1.45}
+.tag{text-transform:none;letter-spacing:0;font-weight:600;border-radius:999px;padding:3px 9px}
+.t-poom,.t-ghost{padding:2px 8px}
+.tog{min-height:44px;border-radius:999px;border-width:1px;font-size:14px;padding:6px 14px}
+.tog .box{width:18px;height:18px;border-radius:50%;font-size:11px}
+.prev{background:none;padding:0;font-size:12.5px}
+.hint{font-size:12.5px}
+.banner{font-size:13px}
+.ex{border-top-color:color-mix(in srgb,var(--line) 60%,transparent)}
+.sec h4{font-size:11px;color:var(--muted)}
+.eyebrow{font-size:11px}
+.btn{border-radius:999px}
+.btn.sm{min-height:36px}
+.seg button{border-radius:999px;border-width:1px;min-height:40px}
+.seg.seg2{grid-template-columns:1fr 1fr}
+.seg.seg4{grid-template-columns:1fr 1fr}
+.chart-empty{background:none;border:1px dashed var(--line)}
+.drow{grid-template-columns:52px 1fr auto}
+.dname{min-width:0}
+.tbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;font-size:12px;font-weight:700;padding:2px 8px;color:var(--accent);margin-right:4px}
+.steps li{margin-bottom:4px}
+.empty{font-style:italic}
 </style>
 
 <div class="wrap">
@@ -317,10 +349,10 @@ const SCHED=[
 const STATUS={learning:"Đang học",known:"Thuộc",polish:"Cần trau chuốt"};
 
 /* ===== trạng thái ===== */
-const S={tac:{notes:{},prog:{}},phase:1,days:{},metrics:{},forms:{},loaded:{days:false,metrics:false,forms:false},conn:"loading",readonly:false};
+const S={tac:{notes:{},prog:{}},phase:1,days:{},metrics:{},forms:{},drills:{},loaded:{days:false,metrics:false,forms:false,drills:false},conn:"loading",readonly:false};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
-const UI={tab:lsGet("sotap.tab")||"day",date:today(),week:null,form:null,edit:false,openMoves:new Set(),scoreForm:lsGet("sotap.sf")||"",confirm:null,dump:null,importData:null,uploading:null};
+const UI={drill:null,dedit:false,poomMode:"forms",tab:lsGet("sotap.tab")||"day",date:today(),week:null,form:null,edit:false,openMoves:new Set(),scoreForm:lsGet("sotap.sf")||"",confirm:null,dump:null,importData:null,uploading:null};
 let db=null,assets=null,downloads=null;
 
 const wkey=d=>"w"+mondayOf(d);
@@ -346,6 +378,8 @@ async function flush(path){
 const dirty=p=>!!(Q[p]&&(Q[p].dirty||Q[p].busy));
 const saveDay=d=>save("days/"+d,()=>{const o=S.days[d];return o&&Object.keys(o).length?o:null});
 const saveForm=id=>save("forms/"+id,()=>S.forms[id]??null);
+const saveDrill=id=>save("drills/"+id,()=>S.drills[id]??null);
+const saveCtx=ctx=>ctx.startsWith("d:")?saveDrill(ctx.slice(2)):saveForm(UI.form);
 function writeErr(e){
   const c=e&&e.code;
   if(c==="invalid_argument"){S.readonly=true;toast("Hổng lưu được. Tài khoản này chỉ xem thôi, hổng phải lỗi của Nhơn nha.")}
@@ -376,12 +410,12 @@ async function init(){
   c.use("assets").then(a=>{assets=a;render()}).catch(()=>{});
   c.use("downloads").then(d=>{downloads=d}).catch(()=>{});
   const slow=setTimeout(()=>{if(S.conn==="loading"){S.conn="slow";setSync();render()}},10000);
-  let pending=5;
+  let pending=6;
   const done=()=>{if(--pending===0){clearTimeout(slow);syncAch();if(S.conn==="loading"||S.conn==="slow")S.conn="ok";setSync();render()}};
   const marks={};
   const once=k=>{if(!marks[k]){marks[k]=1;done()}};
   const onErr=k=>e=>{once(k);if(e&&e.code!=="revoked")toast("Mất kết nối kho ("+e.code+"). Mở lại trang thử xem.");S.conn="bad";setSync()};
-  for(const [coll,key] of [["days","days"],["metrics","metrics"],["forms","forms"]]){
+  for(const [coll,key] of [["days","days"],["metrics","metrics"],["forms","forms"],["drills","drills"]]){
     db.collection(coll).onSnapshot(snap=>{
       let ch=false;
       for(const x of snap.docChanges()){
@@ -603,12 +637,12 @@ function vDay(){
   if(d===today())h+=reminder();
   h+=`${nhonSay(quip(d))}`;
   h+=`<div class="toggles">
-    <button class="tog ${dd.tired?"on":""}" data-act="tired" aria-pressed="${!!dd.tired}"><span class="box">${dd.tired?"✓":""}</span>Hôm nay mệt / ngủ ít</button>
+    <button class="tog ${dd.tired?"on":""}" data-act="tired" aria-pressed="${!!dd.tired}"><span class="box">${dd.tired?"✓":""}</span>Mệt / ngủ ít</button>
     <button class="tog ${dd.hip?"on":""}" data-act="hip" aria-pressed="${!!dd.hip}"><span class="box">${dd.hip?"✓":""}</span>Đau hông</button></div>`;
   if(dd.tired)h+=`<div class="banner"><b>Nay mỗi bài chỉ 2 set thôi.</b>Tick đủ 2 set là tính đã tập rồi. Tập xong thì nghỉ, ăn đủ, ngủ đủ nghen chị.</div>`;
-  h+=`<section class="card"><div class="shead"><h3>Cân buổi sáng</h3><span class="meta">tuỳ chọn</span></div>
+  h+=`<section class="card"><div class="shead"><h3>Cân buổi sáng</h3><span class="meta">ngủ dậy, cùng giờ · tuỳ chọn</span></div>
     <div class="wrow"><label class="fld"><input id="w-${d}" inputmode="decimal" data-in="w" value="${dd.w!=null?esc(fmtN(dd.w)):""}" placeholder="–" aria-label="Cân nặng buổi sáng (kg)"><span>kg</span></label></div>
-    <p class="hint">Sau khi ngủ dậy, cùng giờ mỗi ngày. Bỏ trống cũng được, Nhơn hổng ép.<br>Cân nặng dao động 1-2kg trong ngày là bình thường.</p></section>`;
+    <p class="hint">Cân nặng dao động 1-2kg trong ngày là bình thường.</p></section>`;
   for(const it of SCHED[di])h+=sessHtml(d,it,ph);
   h+=poomCard(d);
   return h;
@@ -623,10 +657,10 @@ function sessHtml(d,it,ph){
   const [k,t]=sessProgress(d,it),done=sessDone(d,it);
   const kindTag=s.kind==="gym"?`<span class="tag t-gym ${done?"t-done":""}">${s.label}</span>`:`<span class="tag t-home ${done?"t-done":""}">${s.label}${it.light?" · nhẹ":""}${it.opt?" · tùy chọn":""}</span>`;
   let body=`<div class="shead">${kindTag}<span class="meta num">${k}/${t} set${s.kind==="home"?" · 10–12 phút":""}</span></div>`;
-  if(s.kind==="gym"&&ph)body+=`<p class="hint"><b>${PH[ph].name}:</b> ${esc(PH[ph].tip)}</p>`;
   if(it.light)body+=`<p class="hint">Chủ nhật: mỗi bài 2 set, nhẹ nhàng thôi.</p>`;
   for(const id of s.ex)body+=exHtml(d,id,it,ph);
-  body+=`<div class="btnrow"><button class="btn sm" data-act="tickall" data-s="${it.s}" data-light="${it.light?1:""}">Tick hết các set</button></div>`;
+  body+=drillRows(d,it.s);
+  body+=`<div class="btnrow"><button class="link" data-act="tickall" data-s="${it.s}" data-light="${it.light?1:""}">Tick hết các set</button></div>`;
   if(it.opt){
     const has=s.ex.some(id=>(dd.ex?.[id]||[]).some(r=>r&&(r.d||r.v||r.r)));
     return `<details class="card sess home" ${has?"open":""}><summary class="shead" style="cursor:pointer;list-style:none"><span class="tag t-home">Bài tập nhà · tùy chọn</span><span class="meta">Chạm để mở</span></summary>${body}</details>`;
@@ -641,7 +675,7 @@ function exHtml(d,id,it,ph){
   const prev=prevFor(id,d);
   let h=`<div class="ex"><div><div class="exn">${esc(e.n)}${e.opt?` <span class="opt">tùy chọn</span>`:""}</div>
     <div class="exp">${sets} set × ${esc(rep)}${e.leg?" · T = trái, P = phải":""}${e.note?" · "+esc(e.note):""}</div></div>
-    <div class="prev">${prev?`Lần trước <b>${prev.label}</b>: ${esc(prev.text)}`:"Chưa có buổi trước. Lần đầu thì cứ nhẹ tay."}</div>`;
+    ${prev?`<div class="prev">Lần trước <b>${prev.label}</b>: ${esc(prev.text)}</div>`:""}`;
   const cls=e.u&&e.r?"":(e.u||e.r)?"one":"zero";
   for(let i=0;i<n;i++){
     const r=a[i]||{},lbl=rowLabel(e,i),base=`${d}-${id}-${i}`;
@@ -741,11 +775,13 @@ function vProg(){
 }
 
 /* ===== poomsae ===== */
+function poomSeg(){return `<div class="seg seg2" role="group" aria-label="Mục">${[["forms","Bài quyền"],["video","Video bổ trợ"]].map(([k,l])=>`<button class="${UI.poomMode===k?"on":""}" data-act="poommode" data-v="${k}">${l}</button>`).join("")}</div>`}
 function vPoom(){
+  if(UI.poomMode==="video")return `<section class="shead"><h1>Quyền</h1></section>`+poomSeg()+vDrillList("quyen");
   if(UI.form&&S.forms[UI.form])return vForm(UI.form);
   UI.form=null;
   const forms=formsSorted(),pd2=pmDays();
-  let h=`<section class="shead"><h1>Poomsae</h1><button class="btn pri" data-act="addform">+ Thêm bài</button></section>`;
+  let h=`<section class="shead"><h1>Quyền</h1><button class="btn pri sm" data-act="addform">+ Thêm bài</button></section>`+poomSeg();
   if(!forms.length)h+=`<div class="chart-empty">${S.loaded.forms?"Thư viện trống. Bấm “Thêm bài” để tạo Taegeuk, Koryo… tuỳ chị.":"Đang lấy thư viện… đợi chút, đừng hối."}</div>`;
   h+=`<div class="flist">`;
   for(const [id,f] of forms){
@@ -794,8 +830,8 @@ function mediaHtml(list,ctx,edit){
 }
 function addMediaHtml(ctx){
   const up=UI.uploading===ctx;
-  return `<div class="addmedia">${assets?`<button class="btn sm" data-act="upload" data-ctx="${esc(ctx)}" ${up?"disabled":""}>${up?"Đang tải lên…":"Tải video / ảnh lên (MP4, MOV, ảnh · tối đa 20MB)"}</button>`:`<p class="hint">Trang này không tải file lên được ở chế độ xem hiện tại, dán link thay thế.</p>`}
-    <div class="linkrow"><input id="lk-${esc(ctx)}" placeholder="Hoặc dán link video (YouTube, Drive…)" inputmode="url" aria-label="Link video"><button class="btn sm" data-act="addlink" data-ctx="${esc(ctx)}">Thêm link</button></div></div>`;
+  return `<div class="addmedia">${assets?`<button class="btn sm" data-act="upload" data-ctx="${esc(ctx)}" ${up?"disabled":""}>${up?"Đang tải lên…":"+ Tải video hoặc ảnh"}</button>`:`<p class="hint">Trang này không tải file lên được ở chế độ xem hiện tại, dán link thay thế.</p>`}
+    <p class="hint">MP4, MOV hoặc ảnh, tối đa 20MB.</p><div class="linkrow"><input id="lk-${esc(ctx)}" placeholder="Hoặc dán link video (YouTube, Drive…)" inputmode="url" aria-label="Link video"><button class="btn sm" data-act="addlink" data-ctx="${esc(ctx)}">Thêm link</button></div></div>`;
 }
 function reviewHtml(f,E){
   const rv=f.review||{};
@@ -1059,10 +1095,11 @@ function typeBody(t){
 }
 function vTac(){
   const cards=tacCards(),known=cards.filter(cd=>S.tac.prog[cd.id]&&S.tac.prog[cd.id].ok).length;
-  let h=`<section class="shead"><h1>Đối kháng</h1><span class="meta small muted">chị đứng bộ trái</span></section>`;
-  h+=nhonSay(UI.tacMode==="read"?"Học như học bài nha chị. Lên sân khỏi đoán, thấy dấu hiệu nào thì ra combo đó. Mấy chỗ Nhơn hổng chắc, Nhơn ghi ở cuối, chị đem hỏi bạn tập.":`Thuộc ${known}/${cards.length} thẻ rồi đó. Hứ, còn nhiêu đó nữa thôi.`);
-  h+=`<div class="seg two-seg" role="group" aria-label="Chế độ"><button class="${UI.tacMode==="read"?"on":""}" data-act="tacmode" data-v="read">Đọc bảng</button><button class="${UI.tacMode==="learn"?"on":""}" data-act="tacmode" data-v="learn">Học thuộc · ${known}/${cards.length}</button></div>`;
+  let h=`<section class="shead"><h1>Đối kháng</h1><span class="meta small muted">bộ trái</span></section>`;
+  if(UI.tacMode!=="video")h+=nhonSay(UI.tacMode==="read"?"Học như học bài nha chị. Lên sân khỏi đoán, thấy dấu hiệu nào thì ra combo đó. Mấy chỗ Nhơn hổng chắc, Nhơn ghi ở cuối, chị đem hỏi bạn tập.":`Thuộc ${known}/${cards.length} thẻ rồi đó. Hứ, còn nhiêu đó nữa thôi.`);
+  h+=`<div class="seg" role="group" aria-label="Chế độ">${[["read","Chiến thuật"],["learn","Học thuộc"],["video","Video"]].map(([k,l])=>`<button class="${UI.tacMode===k?"on":""}" data-act="tacmode" data-v="${k}">${l}</button>`).join("")}</div>`;
   if(UI.tacMode==="learn")return h+vLearn(cards);
+  if(UI.tacMode==="video")return h+vDrillList("dau");
   h+=`<p class="eyebrow">Thuộc trước tiên</p>`;
   h+=tblock("defaults","4 đòn mặc định","<ol class=\"dl\">"+TAC.defaults.map(d=>`<li><b>${esc(d.k)}</b><span>Khi: ${esc(d.t)}</span><span class="muted">${esc(d.d)}</span></li>`).join("")+"</ol>","ít phải suy nghĩ nhất");
   h+=tblock("opening","Kịch bản mở đầu mỗi hiệp",TAC.opening.map(o=>`<div class="sec"><h4>${esc(o.h)}</h4><ol class="tl">${o.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>`).join(""),"đòn dò đầu tiên, cách đọc");
@@ -1096,6 +1133,53 @@ function vLearn(cards){
     <div class="btnrow"><button class="btn sm" data-act="reshuffle">Xáo lại, thẻ chưa thuộc lên trước</button></div>`;
 }
 
+/* ===== video bài tập ===== */
+const ATTACH={"":"Không gắn",gymA:"Gym A",gymB:"Gym B",home:"Bài tập nhà"};
+const drillsOf=tab=>Object.entries(S.drills).filter(([,d])=>(d.tab||"dau")===tab).sort((a,b)=>(a[1].order||0)-(b[1].order||0));
+function vDrillList(tab){
+  if(UI.drill&&S.drills[UI.drill])return vDrill(UI.drill);
+  UI.drill=null;
+  const L=drillsOf(tab);
+  let h=`<div class="shead"><p class="hint" style="flex:1;min-width:0">Video hướng dẫn từng bước. Gắn vào Gym hoặc Bài tập nhà để nó hiện trong ngày tập.</p><button class="btn pri sm" data-act="adddrill" data-tab="${tab}">+ Thêm</button></div>`;
+  if(!L.length)h+=`<div class="chart-empty">${S.loaded.drills?"Chưa có video nào. Bấm “Thêm”, hoặc gửi video cho Claude kèm lời nhắn, Nhơn lưu vô đây.":"Đang tải…"}</div>`;
+  h+=`<div class="flist">${L.map(([id,d])=>{const hasV=(d.media||[]).some(m=>m.kind==="video");return `<button class="fitem" data-act="opendrill" data-id="${esc(id)}"><span class="fn">${esc(d.title||"Bài chưa đặt tên")}</span>${d.attach?`<span class="tag t-gym">${ATTACH[d.attach]}</span>`:"<span></span>"}<span class="fm">${[d.goal,d.dose,hasV?"có video":"chưa có video"].filter(Boolean).map(esc).join(" · ")}</span></button>`}).join("")}</div>`;
+  return h;
+}
+const tsec=x=>{const m=String(x).match(/^(\d{1,2}):(\d{2})$/);return m?+m[1]*60+ +m[2]:null};
+function stepsHtml(t,hasV){
+  const L=String(t||"").split("\n").map(x=>x.trim()).filter(Boolean);
+  if(!L.length)return `<p class="empty hint">Chưa có bước nào.</p>`;
+  return `<ol class="tl steps">${L.map((ln,i)=>{
+    const m=ln.match(/^(\d{1,2}:\d{2})(?:\s*[-–]\s*(\d{1,2}:\d{2}))?\s+(.*)$/);
+    if(m&&hasV){const a=tsec(m[1]);let b=m[2]?tsec(m[2]):null;if(b==null){const nx=L[i+1]&&L[i+1].match(/^(\d{1,2}:\d{2})/);b=nx?tsec(nx[1]):a+8}
+      return `<li><button class="tbtn" data-act="seek" data-a="${a}" data-b="${b}">▶ ${m[1]}</button> ${esc(m[3])}</li>`}
+    return `<li>${esc(ln.replace(/^\s*([-•*]|\d+[.)])\s*/,""))}</li>`}).join("")}</ol>`;
+}
+function vDrill(id){
+  const d=S.drills[id],E=UI.dedit,hasV=(d.media||[]).some(m=>m.kind==="video");
+  let h=`<section class="shead"><button class="btn sm" data-act="dback">‹ Danh sách</button><button class="btn sm ${E?"pri":""}" data-act="dedit">${E?"Xong":"Sửa"}</button></section>`;
+  if(E){
+    const tf=(k,l,v,ta,ph)=>`<div class="tf"><label for="${k}-${id}">${l}</label>${ta?`<textarea id="${k}-${id}" data-in="${k}" placeholder="${ph||""}">${esc(v||"")}</textarea>`:`<input id="${k}-${id}" data-in="${k}" value="${esc(v||"")}" placeholder="${ph||""}">`}</div>`;
+    h+=`<section class="card">${tf("dtitle","Tên bài",d.title)}${tf("dgoal","Để làm gì",d.goal,0,"Ví dụ: đá ngang cao, combo phản công")}${tf("ddose","Liều tập",d.dose,0,"Ví dụ: 3 x 10 mỗi chân")}
+      ${tf("dsteps","Các bước (mỗi dòng một bước, ghi 0:12 ở đầu dòng để nhảy tới đoạn đó)",d.steps,1)}${tf("dnotes","Lỗi hay gặp / ghi chú",d.notes,1)}
+      <div class="tf"><label>Nằm ở tab</label><div class="seg seg2">${[["dau","Đấu"],["quyen","Quyền"]].map(([k,l])=>`<button class="${(d.tab||"dau")===k?"on":""}" data-act="dtab" data-v="${k}">${l}</button>`).join("")}</div></div></section>`;
+  } else {
+    h+=`<section><h1>${esc(d.title||"Bài chưa đặt tên")}</h1>${d.goal||d.dose?`<p class="muted" style="margin-top:4px">${[d.goal,d.dose].filter(Boolean).map(esc).join(" · ")}</p>`:""}</section>`;
+  }
+  h+=`<section class="card"><div class="media dmedia">${mediaHtml(d.media,"d:"+id,E)||`<p class="hint">Chưa có video.</p>`}</div>${addMediaHtml("d:"+id)}</section>`;
+  if(!E){
+    h+=`<section class="card"><h3>Các bước</h3>${stepsHtml(d.steps,hasV)}${d.notes?`<div class="sec"><h4>Lỗi hay gặp / ghi chú</h4>${ul(String(d.notes).split("\n").map(x=>x.trim()).filter(Boolean))}</div>`:""}</section>`;
+  }
+  h+=`<section class="card"><h3>Gắn vào buổi tự tập</h3><div class="seg seg4">${Object.entries(ATTACH).map(([k,l])=>`<button class="${(d.attach||"")===k?"on":""}" data-act="dattach" data-v="${k}">${l}</button>`).join("")}</div><p class="hint">Gắn rồi thì bài này hiện trong buổi đó ở tab Ngày, có ô tick riêng.</p></section>`;
+  if(E)h+=`<button class="btn warn" data-act="ddel">${UI.confirm==="dd"?"Bấm lần nữa: xoá bài và video":"Xoá bài này"}</button>`;
+  return h;
+}
+function drillRows(d,sk){
+  const dd=day(d),L=Object.entries(S.drills).filter(([,x])=>x.attach===sk);
+  if(!L.length)return "";
+  return `<div class="ex"><div class="exp">Bài thêm từ video</div>${L.map(([id,x])=>{const on=!!(dd.dr&&dd.dr[id]);return `<div class="srow drow ${on?"done":""}"><button class="tick" data-act="drtick" data-id="${esc(id)}" aria-pressed="${on}" aria-label="Xong ${esc(x.title)}">${on?"✓":""}</button><div class="dname"><div class="exn">${esc(x.title||"Bài thêm")}</div>${x.dose?`<div class="exp">${esc(x.dose)}</div>`:""}</div><button class="btn sm" data-act="gotodrill" data-id="${esc(id)}">Video</button></div>`}).join("")}</div>`;
+}
+
 /* ===== khác ===== */
 function vMore(){
   let h=`<h1>Khác</h1>
@@ -1115,7 +1199,7 @@ let confT;
 function twoTap(key){if(UI.confirm===key){UI.confirm=null;return true}UI.confirm=key;clearTimeout(confT);confT=setTimeout(()=>{UI.confirm=null;render()},4000);render();return false}
 function curForm(){return S.forms[UI.form]}
 function findMove(mid){const f=curForm();return f&&(f.moves||[]).find(m=>m.id===mid)}
-function mediaList(ctx){const f=curForm();if(!f)return null;if(ctx==="f")return f.media||(f.media=[]);const m=findMove(ctx.slice(2));return m?(m.media||(m.media=[])):null}
+function mediaList(ctx){if(ctx.startsWith("d:")){const dr=S.drills[ctx.slice(2)];return dr?(dr.media||(dr.media=[])):null}const f=curForm();if(!f)return null;if(ctx==="f")return f.media||(f.media=[]);const m=findMove(ctx.slice(2));return m?(m.media||(m.media=[])):null}
 
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-act=tab]");if(!b)return;UI.tab=b.dataset.t;lsSet("sotap.tab",UI.tab);if(UI.tab==="day")UI.date=UI.date||today();render();window.scrollTo(0,0)});
 const main=document.getElementById("main");
@@ -1147,10 +1231,10 @@ main.addEventListener("click",async e=>{
     case "mup":case "mdown":{const f=curForm(),i=f.moves.findIndex(m=>m.id===b.dataset.mid),j=a==="mup"?i-1:i+1;if(j<0||j>=f.moves.length)break;[f.moves[i],f.moves[j]]=[f.moves[j],f.moves[i]];saveForm(UI.form);render();break}
     case "mdel":{const mid=b.dataset.mid;if(!twoTap("mv"+mid))break;const f=curForm(),m=findMove(mid);f.moves=f.moves.filter(x=>x.id!==mid);saveForm(UI.form);delAssets(m&&m.media);render();break}
     case "fdel":{if(!twoTap("fd"))break;const id=UI.form,f=S.forms[id];const all=[...(f.media||[]),...(f.moves||[]).flatMap(m=>m.media||[])];delete S.forms[id];saveForm(id);delAssets(all);UI.form=null;UI.edit=false;render();toast("Xoá rồi đó. Đừng có tiếc nha.");break}
-    case "mediadel":{const k=b.dataset.k;if(!twoTap("md"+k))break;const idx=k.lastIndexOf(":"),ctx=k.slice(0,idx),i=+k.slice(idx+1),L=mediaList(ctx);if(!L)break;const [rm]=L.splice(i,1);saveForm(UI.form);delAssets([rm]);render();break}
-    case "addlink":{const ctx=b.dataset.ctx,inp=document.getElementById("lk-"+ctx),v=(inp&&inp.value||"").trim();if(!okUrl(v)){toast("Link phải bắt đầu bằng http:// hoặc https://");break}const L=mediaList(ctx);L.push({kind:"link",url:v});saveForm(UI.form);render();break}
+    case "mediadel":{const k=b.dataset.k;if(!twoTap("md"+k))break;const idx=k.lastIndexOf(":"),ctx=k.slice(0,idx),i=+k.slice(idx+1),L=mediaList(ctx);if(!L)break;const [rm]=L.splice(i,1);saveCtx(ctx);delAssets([rm]);render();break}
+    case "addlink":{const ctx=b.dataset.ctx,inp=document.getElementById("lk-"+ctx),v=(inp&&inp.value||"").trim();if(!okUrl(v)){toast("Link phải bắt đầu bằng http:// hoặc https://");break}const L=mediaList(ctx);L.push({kind:"link",url:v});saveCtx(ctx);render();break}
     case "upload":{pendingCtx=b.dataset.ctx;const fi=document.getElementById("fileUp");fi.value="";fi.click();break}
-    case "seek":{const v=document.querySelector(".fmedia video");if(!v)break;const a2=+b.dataset.a,b2=+b.dataset.b;v.scrollIntoView({block:"center",behavior:"smooth"});v.currentTime=a2;const stop=()=>{if(v.currentTime>=b2){v.pause();v.removeEventListener("timeupdate",stop)}};v.addEventListener("timeupdate",stop);v.play().catch(()=>{});break}
+    case "seek":{const v=document.querySelector(".fmedia video, .dmedia video");if(!v)break;const a2=+b.dataset.a,b2=+b.dataset.b;v.scrollIntoView({block:"center",behavior:"smooth"});v.currentTime=a2;const stop=()=>{if(v.currentTime>=b2){v.pause();v.removeEventListener("timeupdate",stop)}};v.addEventListener("timeupdate",stop);v.play().catch(()=>{});break}
     case "rate":{const v=b.closest(".vid").querySelector("video");if(v){v.playbackRate=+b.dataset.r;b.parentElement.querySelectorAll("[data-r]").forEach(x=>x.classList.toggle("on",x===b))}break}
     case "export":doExport();break;
     case "import":{const fi=document.getElementById("fileImp");fi.value="";fi.click();break}
@@ -1162,6 +1246,16 @@ main.addEventListener("click",async e=>{
     case "card":{const cards=tacCards(),cd=cards[UI.order[UI.ci%UI.order.length]],ok=b.dataset.v==="1",old=S.tac.prog[cd.id]||{};
       S.tac.prog[cd.id]={ok,n:ok?(old.ok?(old.n||0)+1:1):0,d:today()};save("tactics/progress",()=>S.tac.prog);
       UI.ci++;UI.flip=false;if(UI.ci>=UI.order.length){UI.order=null}render();toast(pick(ok?"know":"again"));break}
+    case "poommode":UI.poomMode=b.dataset.v;UI.drill=null;UI.dedit=false;render();break;
+    case "adddrill":{const id=uid("d"),tab=b.dataset.tab;S.drills[id]={title:"",tab,goal:"",dose:"",steps:"",notes:"",attach:"",media:[],order:Date.now()};saveDrill(id);UI.drill=id;UI.dedit=true;render();window.scrollTo(0,0);break}
+    case "opendrill":UI.drill=b.dataset.id;UI.dedit=false;render();window.scrollTo(0,0);break;
+    case "dback":UI.drill=null;UI.dedit=false;render();break;
+    case "dedit":UI.dedit=!UI.dedit;if(!UI.dedit&&UI.drill)flush("drills/"+UI.drill);render();break;
+    case "dtab":{const dr=S.drills[UI.drill];dr.tab=b.dataset.v;saveDrill(UI.drill);render();break}
+    case "dattach":{const dr=S.drills[UI.drill];dr.attach=b.dataset.v;saveDrill(UI.drill);render();toast(dr.attach?"Gắn vô "+ATTACH[dr.attach]+" rồi đó. Tới ngày đó nhớ tập nghen.":"Gỡ ra rồi.");break}
+    case "ddel":{if(!twoTap("dd"))break;const id=UI.drill,dr=S.drills[id];delete S.drills[id];saveDrill(id);delAssets(dr&&dr.media);UI.drill=null;UI.dedit=false;render();toast("Xoá rồi đó.");break}
+    case "drtick":{const dd=mday(d);dd.dr=dd.dr||{};const id=b.dataset.id;if(dd.dr[id])delete dd.dr[id];else dd.dr[id]=true;if(!Object.keys(dd.dr).length)delete dd.dr;saveDay(d);render();if(dd.dr&&dd.dr[id])cheer(d,"tick");break}
+    case "gotodrill":{const dr=S.drills[b.dataset.id];if(!dr)break;if((dr.tab||"dau")==="quyen"){UI.tab="poom";UI.poomMode="video"}else{UI.tab="tac";UI.tacMode="video"}lsSet("sotap.tab",UI.tab);UI.drill=b.dataset.id;UI.dedit=false;render();window.scrollTo(0,0);break}
     case "copydump":{const ta=document.getElementById("dump");try{await navigator.clipboard.writeText(ta.value);toast("Chép rồi.")}catch(err){ta.focus();ta.select();toast("Hổng chép tự động được, Nhơn bôi đen sẵn rồi đó.")}break}
   }
 });
@@ -1177,6 +1271,7 @@ main.addEventListener("input",e=>{
   if(k==="pmf"||k==="pmm"||k==="pmn"){const en=mday(d).pm[+t.dataset.i];if(k==="pmf")en.f=t.value;if(k==="pmm"){const n=num(t.value);if(n==null)delete en.m;else en.m=n}if(k==="pmn")en.n=t.value;saveDay(d);return}
   if(k==="met"){const key="w"+t.dataset.w,m=S.metrics[key]||(S.metrics[key]={}),n=num(t.value);if(n==null)delete m[t.dataset.f];else m[t.dataset.f]=n;save("metrics/"+key,()=>{const o=S.metrics[key];return o&&Object.keys(o).length?o:null});return}
   if(k==="tnote"){const key=t.dataset.k;if(t.value)S.tac.notes[key]=t.value;else delete S.tac.notes[key];save("tactics/notes",()=>S.tac.notes);return}
+  if(k[0]==="d"&&["dtitle","dgoal","ddose","dsteps","dnotes"].includes(k)){const dr=S.drills[UI.drill];if(!dr)return;dr[{dtitle:"title",dgoal:"goal",ddose:"dose",dsteps:"steps",dnotes:"notes"}[k]]=t.value;saveDrill(UI.drill);return}
   if(k==="sf"){UI.scoreForm=t.value;lsSet("sotap.sf",t.value);render();return}
   const f=curForm();if(!f)return;
   if(k==="fname")f.name=t.value;
@@ -1201,7 +1296,7 @@ document.getElementById("fileUp").addEventListener("change",async e=>{
     const isMov=/quicktime/i.test(file.type)||/\.mov$/i.test(file.name);
     const r=await assets.upload(file,isMov||!file.type?{type:kind==="image"?(file.type||"image/jpeg"):"video/mp4"}:undefined);
     if(UI.form!==fid)UI.form=fid;
-    const L=mediaList(ctx);if(L){L.push({kind,asset:r.id,note:file.name});saveForm(fid)}
+    const L=mediaList(ctx);if(L){L.push({kind,asset:r.id,note:file.name});ctx.startsWith("d:")?saveDrill(ctx.slice(2)):saveForm(fid)}
     toast("Tải lên xong rồi. Hứ, nhanh dữ.");
   }catch(err){
     const c=err&&err.code;
@@ -1210,7 +1305,7 @@ document.getElementById("fileUp").addEventListener("change",async e=>{
   UI.uploading=null;render();
 });
 
-function snapshotAll(){return {app:"so-tap-taekwondo",version:1,exportedAt:new Date().toISOString(),settings:{phase:S.phase},tactics:S.tac,days:S.days,metrics:S.metrics,forms:S.forms}}
+function snapshotAll(){return {app:"so-tap-taekwondo",version:1,exportedAt:new Date().toISOString(),settings:{phase:S.phase},tactics:S.tac,drills:S.drills,days:S.days,metrics:S.metrics,forms:S.forms}}
 async function doExport(){
   const json=JSON.stringify(snapshotAll(),null,1);
   if(downloads){try{await downloads.save({filename:`so-tap-${today()}.json`,data:json});toast("Xuất xong rồi. Cất cho kỹ nha chị.");UI.dump=null;render();return}catch(e){if(e&&e.code==="declined"){toast("Hổng lưu thì thôi.");return}}}
@@ -1231,7 +1326,7 @@ async function doImport(){
   toast("Đang nhập…");
   if(o.settings&&[1,2,3].includes(o.settings.phase)){S.phase=o.settings.phase;await put("app/settings",{phase:o.settings.phase})}
   if(o.tactics&&typeof o.tactics==="object"){if(o.tactics.notes){S.tac.notes=clone(o.tactics.notes);await put("tactics/notes",o.tactics.notes)}if(o.tactics.prog){S.tac.prog=clone(o.tactics.prog);await put("tactics/progress",o.tactics.prog)}}
-  for(const [c,key] of [["days","days"],["metrics","metrics"],["forms","forms"]])for(const [k,v] of Object.entries(o[c]||{})){if(!safe(k))continue;S[key][k]=clone(v);await put(c+"/"+k,v)}
+  for(const [c,key] of [["days","days"],["metrics","metrics"],["forms","forms"],["drills","drills"]])for(const [k,v] of Object.entries(o[c]||{})){if(!safe(k))continue;S[key][k]=clone(v);await put(c+"/"+k,v)}
   toast(`Nhập xong ${n} mục.`);render();
 }
 
