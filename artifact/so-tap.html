@@ -48,8 +48,42 @@ p{margin:0}
 .sync.ok i{background:var(--accent)} .sync.busy i{background:var(--amber)} .sync.bad i{background:var(--accent)}
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.quip{font-size:15px;padding:12px 14px;border-radius:var(--r);background:var(--sunk);border-left:0}
-.quip b{font-family:var(--f-display);font-size:16px;letter-spacing:.02em}
+.nhon{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:start;padding:12px 14px;border-radius:var(--r);background:var(--sunk)}
+.nhon .ava{width:52px;height:52px}
+.na-bg,.na-leaf{fill:var(--accent)} .na-eye{fill:var(--on-accent)} .na-smile{fill:none;stroke:var(--on-accent);stroke-width:3;stroke-linecap:round} .na-blush{fill:var(--on-accent);opacity:.28}
+.nn{font-family:var(--f-display);font-weight:800;font-size:17px;color:var(--accent);line-height:1}
+.nb p{margin-top:4px;font-size:15px}
+.toast b{color:var(--bg);opacity:.75}
+.tsec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tsec>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;min-height:60px;cursor:pointer}
+.tsec>summary::-webkit-details-marker{display:none}
+.tsum{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tt{font-family:var(--f-display);font-weight:700;font-size:19px;line-height:1.15}
+.ts{font-size:12px;color:var(--muted)}
+.chev{font-size:24px;color:var(--muted);transition:transform .15s}
+.tsec[open] .chev{transform:rotate(90deg)}
+.tbody{padding:0 16px 16px;display:flex;flex-direction:column;gap:14px}
+.combo{background:var(--sunk);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.combo+.combo{margin-top:8px}
+.seq{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin-bottom:2px}
+.mv{font-weight:700;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:3px 8px;font-size:14px}
+.arr{color:var(--accent);font-weight:700}
+.tl{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.dl{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px}
+.dl li span{display:block;font-size:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:380px){.two{grid-template-columns:1fr}}
+.tblwrap{overflow-x:auto}
+.qt{width:100%;border-collapse:collapse;font-size:14px}
+.qt th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+.qt td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.qt td:first-child{font-weight:700;white-space:nowrap}
+.tnote textarea{min-height:64px}
+.seg.two-seg{grid-template-columns:1fr 1fr}
+.fc{min-height:260px}
+.fq{font-family:var(--f-display);font-weight:700;font-size:23px;line-height:1.2;text-wrap:balance}
+.fa{white-space:pre-line;font-size:17px;font-weight:600;background:var(--accent-tint);color:var(--ink);border-radius:10px;padding:12px 14px}
+.fbtn .btn{flex:1;min-height:52px}
 .banner{background:var(--warn-bg);color:var(--warn-ink);border-radius:var(--r);padding:12px 14px;font-size:14px}
 .banner b{display:block;margin-bottom:2px}
 
@@ -198,7 +232,7 @@ p{margin:0}
 .extlink{font-weight:600;color:var(--accent);word-break:break-all}
 
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(5,1fr);
+  display:grid;grid-template-columns:repeat(6,1fr);
   padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 .tabs button{min-height:62px;border:0;background:none;font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
 .tabs button i{width:22px;height:4px;border-radius:2px;background:transparent}
@@ -244,8 +278,8 @@ const fmtN=n=>n==null?"":(Math.round(n*10)/10).toString().replace(".",",");
 /* ===== giáo án ===== */
 const PH={
   1:{name:"Làm quen",weeks:"Tuần 1–4",tip:"Tạ vừa sức, chừa 2 rep trong bình. Đúng kỹ thuật trước, khoe sau."},
-  2:{name:"Tăng sức",weeks:"Tuần 5–8",tip:"Đủ rep ở mọi set thì buổi sau lên 2,5–5kg. Chưa đủ thì giữ nguyên, đừng cố sĩ."},
-  3:{name:"Bứt phá",weeks:"Tuần 9–12",tip:"Giữ chân lên 15 giây, đá chậm phải kiểm soát. Nặng chân lúc đấu là hết từ giờ, nghe chưa."}
+  2:{name:"Tăng sức",weeks:"Tuần 5–8",tip:"Đủ rep ở mọi set thì buổi sau lên 2,5–5kg. Chưa đủ thì giữ nguyên, đừng có ráng sĩ."},
+  3:{name:"Bứt phá",weeks:"Tuần 9–12",tip:"Giữ chân lên 15 giây, đá chậm phải kiểm soát. Nặng chân lúc đấu là hết từ giờ nghen."}
 };
 const EX={
   legpress:{n:"Leg press",sets:3,rep:"8–10",u:"kg",r:true},
@@ -283,7 +317,7 @@ const SCHED=[
 const STATUS={learning:"Đang học",known:"Thuộc",polish:"Cần trau chuốt"};
 
 /* ===== trạng thái ===== */
-const S={start:null,settingsLoaded:false,days:{},metrics:{},forms:{},loaded:{days:false,metrics:false,forms:false},conn:"loading",readonly:false};
+const S={tac:{notes:{},prog:{}},start:null,settingsLoaded:false,days:{},metrics:{},forms:{},loaded:{days:false,metrics:false,forms:false},conn:"loading",readonly:false};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const UI={tab:lsGet("sotap.tab")||"day",date:today(),week:null,form:null,edit:false,openMoves:new Set(),scoreForm:lsGet("sotap.sf")||"",confirm:null,dump:null,importData:null,uploading:null};
@@ -315,7 +349,7 @@ const saveDay=d=>save("days/"+d,()=>{const o=S.days[d];return o&&Object.keys(o).
 const saveForm=id=>save("forms/"+id,()=>S.forms[id]??null);
 function writeErr(e){
   const c=e&&e.code;
-  if(c==="invalid_argument"){S.readonly=true;toast("Không lưu được. Tài khoản này chỉ xem, đâu phải lỗi của mình đâu nhé.")}
+  if(c==="invalid_argument"){S.readonly=true;toast("Hổng lưu được. Tài khoản này chỉ xem thôi, hổng phải lỗi của Nhơn nha.")}
   else if(c==="quota_exceeded")toast("Kho đầy rồi. Xoá bớt dữ liệu cũ hoặc xuất backup rồi dọn.");
   else toast("Lưu lỗi ("+(c||"không rõ")+"). Thử lại sau chút.");
   S.conn="bad";setSync();
@@ -327,7 +361,7 @@ function setSync(force){
   if(S.conn==="none"){cls="bad";txt="Không có kho dữ liệu"}
   else if(S.conn==="bad"){cls="bad";txt="Lỗi lưu"}
   else if(S.conn==="loading"){cls="busy";txt="Đang tải…"}
-  else if(S.conn==="slow"){cls="busy";txt="Chưa với mìnhi kho"}
+  else if(S.conn==="slow"){cls="busy";txt="Chưa với tới kho"}
   else if(force==="busy"||busy){cls="busy";txt="Đang lưu…"}
   else {cls="ok";txt="Đã đồng bộ"}
   el.className="sync "+cls;el.querySelector("span").textContent=txt;
@@ -343,7 +377,7 @@ async function init(){
   c.use("assets").then(a=>{assets=a;render()}).catch(()=>{});
   c.use("downloads").then(d=>{downloads=d}).catch(()=>{});
   const slow=setTimeout(()=>{if(S.conn==="loading"){S.conn="slow";setSync();render()}},10000);
-  let pending=4;
+  let pending=5;
   const done=()=>{if(--pending===0){clearTimeout(slow);syncAch();if(S.conn==="loading"||S.conn==="slow")S.conn="ok";setSync();render()}};
   const marks={};
   const once=k=>{if(!marks[k]){marks[k]=1;done()}};
@@ -362,6 +396,17 @@ async function init(){
       if(ch){if(achSeen)syncAch();soft()}
     },onErr(key));
   }
+  db.collection("tactics").onSnapshot(snap=>{
+    let ch=false;
+    for(const x of snap.docChanges()){
+      const k=x.doc.id;if(k!=="notes"&&k!=="progress")continue;
+      if(dirty("tactics/"+k))continue;
+      const key=k==="notes"?"notes":"prog",nd=x.type==="removed"?{}:clone(x.doc.data());
+      if(JSON.stringify(nd)!==JSON.stringify(S.tac[key])){S.tac[key]=nd;ch=true}
+    }
+    if(!snap.metadata.fromCache)once("tactics");
+    if(ch)soft();
+  },onErr("tactics"));
   db.doc("app/settings").onSnapshot(s=>{
     if(!dirty("app/settings")){const st=s.exists?s.data().start:null;if(st!==S.start){S.start=st||null;soft()}}
     if(!s.metadata.fromCache){S.settingsLoaded=true;once("settings")}
@@ -424,8 +469,8 @@ function reminder(){
   const cur=avg(0,6),prev=avg(7,13);
   const drop=cur!=null&&prev!=null&&prev-cur>1;
   if(run<3&&!drop)return "";
-  const why=drop&&run>=3?"Cân giảm hơn 1kg trong tuần, lại mệt mấy ngày liền.":drop?"Cân giảm hơn 1kg trong một tuần.":`Cậu tick "mệt" ${run} ngày liền rồi.`;
-  return `<div class="banner" role="status"><b>Nghe mình nói này.</b>${why} Nghỉ ngơi, ăn đủ bữa, ngủ đủ giấc nhé. Nếu vẫn thấy vậy thì nên nói với huấn luyện viên hoặc bác sĩ.</div>`;
+  const why=drop&&run>=3?"Cân giảm hơn 1kg trong tuần, lại mệt mấy ngày liền.":drop?"Cân giảm hơn 1kg trong một tuần.":`Chị tick "mệt" ${run} ngày liền rồi đó.`;
+  return `<div class="banner" role="status"><b>Chị nghe Nhơn nói nè.</b>${why} Nghỉ ngơi, ăn đủ bữa, ngủ đủ giấc nghen. Nếu vẫn vậy hoài thì nói với thầy hoặc bác sĩ liền nha.</div>`;
 }
 
 /* ===== biểu đồ ===== */
@@ -486,15 +531,19 @@ function achievements(){
   ];
 }
 
+/* ===== Nhơn ===== */
+const NHON_SVG=`<svg viewBox="0 0 48 48" class="ava" aria-hidden="true"><path class="na-leaf" d="M24 1c-4 4-4 8 0 10 4-2 4-6 0-10z"/><rect class="na-bg" x="3" y="8" width="42" height="38" rx="14"/><circle class="na-eye" cx="17" cy="25" r="3"/><circle class="na-eye" cx="31" cy="25" r="3"/><path class="na-smile" d="M16 33c4 5 12 5 16 0"/><circle class="na-blush" cx="11" cy="32" r="2.6"/><circle class="na-blush" cx="37" cy="32" r="2.6"/></svg>`;
+const nhonSay=t=>`<div class="nhon">${NHON_SVG}<div class="nb"><div class="nn">Nhơn</div><p>${esc(t)}</p></div></div>`;
+
 /* ===== giao diện ===== */
-const TABS=[["day","Ngày"],["week","Tuần"],["prog","Tiến bộ"],["poom","Poomsae"],["more","Khác"]];
+const TABS=[["day","Ngày"],["week","Tuần"],["prog","Tiến bộ"],["tac","Đấu"],["poom","Quyền"],["more","Khác"]];
 function render(){
   document.getElementById("tabs").innerHTML=TABS.map(([k,l])=>`<button data-act="tab" data-t="${k}" class="${UI.tab===k?"on":""}" aria-current="${UI.tab===k?"page":"false"}"><i></i>${l}</button>`).join("");
   const m=document.getElementById("main");
   let h="";
-  if(S.conn==="none")h+=`<div class="banner"><b>Không mở được kho dữ liệu.</b>Đăng nhập claude.ai rồi mở lại trang này. Giờ có gõ gì cũng không được lưu đâu đấy.</div>`;
-  else if(S.conn==="slow")h+=`<div class="banner"><b>Chưa với mìnhi kho dữ liệu.</b>Mạng chậm thì phải. Dữ liệu hiện có thể chưa mới nhất.</div>`;
-  const v={day:vDay,week:vWeek,prog:vProg,poom:vPoom,more:vMore}[UI.tab]||vDay;
+  if(S.conn==="none")h+=`<div class="banner"><b>Không mở được kho dữ liệu.</b>Đăng nhập claude.ai rồi mở lại trang này nha chị. Giờ gõ gì cũng hổng lưu được đâu.</div>`;
+  else if(S.conn==="slow")h+=`<div class="banner"><b>Chưa với tới kho dữ liệu.</b>Mạng chậm thì phải. Dữ liệu hiện có thể chưa mới nhất.</div>`;
+  const v={day:vDay,week:vWeek,prog:vProg,tac:vTac,poom:vPoom,more:vMore}[UI.tab]||vDay;
   h+=v();
   m.innerHTML=h;
   setSync();
@@ -505,35 +554,37 @@ function missedText(){
   for(let i=1;i<=3;i++){const d=add(t,-i);if(weekOf(d)<1||day(d).tired)continue;
     const miss=reqItems(d).filter(it=>!sessDone(d,it)).map(it=>SESS[it.s].label+(it.light?" nhẹ":""));
     if(miss.length)out.push(`${i===1?"Hôm qua":i===2?"Hôm kia":DN[dow(d)]+" vừa rồi"} bỏ ${miss.join(", ")}`)}
-  return out.length?out.join(". ")+" đấy nhé.":"";
+  return out.length?out.join(". ")+" đó nghen.":"";
 }
 function quip(d){
   const dd=day(d),its=SCHED[dow(d)],w=weekOf(d);
   const all=its.filter(it=>!it.opt).every(it=>sessDone(d,it));
-  if(dd.tired)return all?"Xong rồi. Giờ thì nghỉ thật sự nhé: ăn đủ, uống nước, ngủ sớm.":"Hôm nay mệt thì cứ nhẹ nhàng thôi. 2 set là đủ và vẫn tính là đã tập. Nhớ ăn đủ, uống nước, ngủ sớm nha.";
-  if(all&&its.length)return "Hừm… xong hết rồi à. Cũng không tệ lắm, đừng có tự mãn!";
-  if(dd.hip)return "Đau hông thì đừng gồng. Tập phần không đau thôi, đau nhói thì dừng lại và hỏi huấn luyện viên.";
-  if(w<1)return "Chưa tới ngày bắt đầu giáo án đâu. Hứ, nôn nóng gì chứ.";
-  if(d===today()){const m=missedText();if(m)return m+" Hứ, đâu phải mình để ý đâu… nhưng hôm nay tập cho đàng hoàng đi!"}
+  if(dd.tired)return all?"Xong rồi đó chị. Giờ nghỉ thiệt nha: ăn cho đủ, uống nước, ngủ sớm. Nhơn canh đó.":"Nay chị mệt thì làm nhẹ thôi, 2 set là đủ, vẫn tính là tập. Ăn uống đàng hoàng rồi ngủ sớm nghen chị.";
+  if(all&&its.length)return "Trời đựu, xong hết rồi! Ừa… cũng được của ló. Mà đừng có vênh nha!";
+  if(dd.hip)return "Đau hông thì đừng gồng nha chị. Tập phần hổng đau thôi, nhói là ngừng, hỏi thầy liền.";
+  if(w<1)return "Chưa tới ngày bắt đầu mà chị đã mò lên rồi. Nôn dữ thần vậy cha!";
+  if(d===today()){const m=missedText();if(m)return m+" Hứ, Nhơn hổng có để ý đâu… mà nay tập lại cho đàng hoàng nghe!"}
   const s=its[0].s;
-  if(s==="spar")return "Hôm nay đối kháng 1 tiếng rưỡi. Hứ, đâu phải mình lo cho cậu đâu, nhưng mà tập cho đàng hoàng đi!";
-  if(s==="gymA")return "Gym A đó. Máy với thảm thôi, đừng có kiếm cớ lười.";
-  if(s==="gymB")return "Gym B. Hứ, đâu phải mình mong cậu tập đâu… nhưng làm cho hết bài đi.";
-  if(dow(d)===6)return "Chủ nhật tập nhẹ thôi. Nhẹ chứ không phải bỏ, nghe chưa!";
-  return "Có 10–12 phút thôi. Đừng bảo mình là không có thời gian.";
+  if(s==="spar")return "Nay đối kháng 1 tiếng rưỡi đó. Hứ, hổng phải Nhơn lo cho chị đâu, mà ra sân đá cho đàng hoàng đi! Coi lại tab Đấu trước khi đi nha.";
+  if(s==="gymA")return "Gym A nè. Máy với thảm thôi, đừng có kiếm cớ nằm ườn nha chị.";
+  if(s==="gymB")return "Gym B. Nhơn hổng có mong chị tập đâu… mà làm cho hết bài đi à.";
+  if(dow(d)===6)return "Chủ nhật tập nhẹ thôi. Nhẹ chứ hổng phải bỏ nghen!";
+  return "Có 10–12 phút thôi hà. Đừng nói với Nhơn là hổng có thời gian.";
 }
 
-/* lời thoại theo tình huống */
+/* lời thoại theo tình huống: Nhơn */
 const LINES={
-  tick:["Một set. Hứ, mới có một set thôi đấy.","Được, tiếp đi. Đâu phải mình đếm hộ cậu đâu.","Ừm, set này tạm được. Tập tiếp cho đàng hoàng!","Nghỉ giữa set thôi, đừng có cầm điện thoại lướt luôn đấy."],
-  sess:["Hừm… xong buổi rồi à. Cũng không tệ lắm, đừng có tự mãn!","Xong rồi đấy. Không phải mình vui đâu nhé… chỉ là thấy cậu cũng chăm.","Hứ, làm hết rồi à. Thôi được, công nhận một chút thôi."],
-  spar:["Đi đối kháng về rồi à. Hừm… cũng chăm đấy, đừng có tự mãn!","Một tiếng rưỡi đấy. Mình không khen đâu… nhưng nhớ giãn cơ đi."],
-  up:["Lên tạ rồi à? Hừm… cũng không tệ lắm. Đừng có tự mãn!","Nặng hơn lần trước đấy. Không phải mình để ý đâu nhé… tình cờ thấy thôi.","Hứ, tăng tạ được rồi. Giữ đúng kỹ thuật vào, đừng có làm ẩu."],
-  poom:["Luyện poomsae rồi à. Hừm… thế mới phải chứ.","Ghi rồi đấy. Đâu phải mình mong cậu luyện đâu, nhưng đều đặn vậy là được.","Xong poomsae. Cũng không tệ lắm… đừng có tự mãn!"],
-  phase:["Xong giai đoạn {p} rồi đấy. Hừm… mình công nhận. Một chút thôi!","Giai đoạn {p} xong. Không phải mình tự hào đâu… nhưng giỏi đấy. Đừng có tự mãn!"],
-  badge:["Mở huy hiệu “{b}”. Hứ, đâu phải mình vui hộ đâu.","Huy hiệu “{b}” đấy. Hừm… cũng không tệ lắm."],
-  soft:["Ừ, vậy là đủ rồi. Nghỉ ngơi đi nhé.","Tốt rồi. Uống nước, ăn đủ, tối nay ngủ sớm nha.","Mệt mà vẫn tập được chừng này là đủ rồi, đừng cố thêm."],
-  softSess:["Xong buổi nhẹ rồi. Giờ nghỉ đi, ăn uống đầy đủ, ngủ sớm nhé."]
+  tick:["Một set. Hứ, mới có một set thôi đó nghen.","Rồi, làm tiếp đi. Nhơn hổng đếm giùm đâu à.","Ừa, set này coi được. Tập tiếp cho đàng hoàng!","Nghỉ giữa set thôi nha, đừng cầm điện thoại lướt luôn à."],
+  sess:["Trời đựu, xong buổi rồi! Được của ló chị tui… mà đừng có vênh nha!","Xong rồi đó. Hổng phải Nhơn mừng đâu nghen… thấy chị chăm vậy thôi.","Hứ, làm hết rồi hả? Thôi được, Nhơn công nhận chút xíu."],
+  spar:["Đi đối kháng về rồi hả. Ừa… cũng chăm dữ, đừng có vênh nha!","Một tiếng rưỡi đó chị. Nhơn hổng khen đâu… mà nhớ giãn cơ à."],
+  up:["Lên tạ rồi hả? Mèn đét ơi… cũng hổng tệ. Đừng có vênh nha!","Nặng hơn bữa trước đó. Hổng phải Nhơn để ý đâu… tình cờ thấy thôi.","Hứ, tăng tạ được rồi. Giữ kỹ thuật cho đàng hoàng, đừng có làm ẩu."],
+  poom:["Luyện quyền rồi hả. Ừa… vậy mới phải chứ.","Ghi rồi đó. Hổng phải Nhơn mong chị luyện đâu, mà đều đều vậy là được.","Xong poomsae. Cũng hổng tệ… đừng có vênh nha!"],
+  phase:["Xong giai đoạn {p} rồi đó! Quá dữ… Nhơn công nhận. Chút xíu thôi nha!","Giai đoạn {p} xong rồi. Hổng phải Nhơn tự hào đâu… mà giỏi thiệt đó chị tui."],
+  badge:["Mở huy hiệu “{b}” rồi đó. Hứ, Nhơn hổng có mừng giùm đâu.","Huy hiệu “{b}” nè. Ừa… cũng được của ló."],
+  soft:["Ừa, vậy là đủ rồi. Nghỉ ngơi đi chị.","Được rồi. Uống nước, ăn cho đủ, tối ngủ sớm nghen.","Mệt mà còn tập được nhiêu đó là đủ rồi, đừng ráng thêm nha chị."],
+  softSess:["Xong buổi nhẹ rồi. Giờ nghỉ đi chị, ăn uống đầy đủ, ngủ sớm nghen."],
+  know:["Thuộc rồi hả? Bữa sau Nhơn hỏi lại coi còn nhớ hông.","Ừa, nhớ được cái này rồi. Lên sân khỏi đoán, cứ vậy mà đánh.","Hứ, cũng nhớ dai dữ ha."],
+  again:["Chưa thuộc thì đọc lại, có gì đâu. Nhơn để nó ra sau, lát hỏi lại.","Hổng sao, lát gặp lại thẻ này nha chị."]
 };
 const pick=k=>{const a=LINES[k];return a[Math.floor(Math.random()*a.length)]};
 let achSeen=null;
@@ -560,14 +611,14 @@ function vDay(){
     ${d===today()?`<span class="todaychip">Hôm nay</span>`:`<button class="link" data-act="dtoday">Về hôm nay</button>`}</div>
     <button class="iconbtn" data-act="dnext" aria-label="Ngày sau">›</button></section>`;
   if(d===today())h+=reminder();
-  h+=`<p class="quip">${esc(quip(d))}</p>`;
+  h+=`${nhonSay(quip(d))}`;
   h+=`<div class="toggles">
     <button class="tog ${dd.tired?"on":""}" data-act="tired" aria-pressed="${!!dd.tired}"><span class="box">${dd.tired?"✓":""}</span>Hôm nay mệt / ngủ ít</button>
     <button class="tog ${dd.hip?"on":""}" data-act="hip" aria-pressed="${!!dd.hip}"><span class="box">${dd.hip?"✓":""}</span>Đau hông</button></div>`;
-  if(dd.tired)h+=`<div class="banner"><b>Hôm nay mỗi bài chỉ 2 set thôi.</b>Tick đủ 2 set là tính đã tập rồi. Tập xong thì nghỉ, ăn đủ, ngủ đủ nhé.</div>`;
+  if(dd.tired)h+=`<div class="banner"><b>Nay mỗi bài chỉ 2 set thôi.</b>Tick đủ 2 set là tính đã tập rồi. Tập xong thì nghỉ, ăn đủ, ngủ đủ nghen chị.</div>`;
   h+=`<section class="card"><div class="shead"><h3>Cân buổi sáng</h3><span class="meta">tuỳ chọn</span></div>
     <div class="wrow"><label class="fld"><input id="w-${d}" inputmode="decimal" data-in="w" value="${dd.w!=null?esc(fmtN(dd.w)):""}" placeholder="–" aria-label="Cân nặng buổi sáng (kg)"><span>kg</span></label></div>
-    <p class="hint">Sau khi ngủ dậy, cùng giờ mỗi ngày. Bỏ trống cũng được, mình không ép.<br>Cân nặng dao động 1-2kg trong ngày là bình thường.</p></section>`;
+    <p class="hint">Sau khi ngủ dậy, cùng giờ mỗi ngày. Bỏ trống cũng được, Nhơn hổng ép.<br>Cân nặng dao động 1-2kg trong ngày là bình thường.</p></section>`;
   for(const it of SCHED[di])h+=sessHtml(d,it,ph||1);
   h+=poomCard(d);
   return h;
@@ -577,7 +628,7 @@ function sessHtml(d,it,ph){
   const s=SESS[it.s],dd=day(d);
   if(s.kind==="spar"){
     return `<section class="card sess spar"><div class="shead"><span class="tag t-spar">Đối kháng</span><span class="meta">1 giờ 30 phút</span></div>
-      <button class="bigtick ${dd.spar?"on":""}" data-act="spar" aria-pressed="${!!dd.spar}">${dd.spar?"✓ Đã tập. Hừm, cũng không tệ.":"Tick khi tập xong"}</button></section>`;
+      <button class="bigtick ${dd.spar?"on":""}" data-act="spar" aria-pressed="${!!dd.spar}">${dd.spar?"✓ Đã tập. Ừa, cũng hổng tệ.":"Tick khi tập xong"}</button></section>`;
   }
   const [k,t]=sessProgress(d,it),done=sessDone(d,it);
   const kindTag=s.kind==="gym"?`<span class="tag t-gym ${done?"t-done":""}">${s.label}</span>`:`<span class="tag t-home ${done?"t-done":""}">${s.label}${it.light?" · nhẹ":""}${it.opt?" · tùy chọn":""}</span>`;
@@ -618,8 +669,8 @@ function poomCard(d){
   const dd=day(d),di=dow(d),sugg=di===1||di===6,block=dd.tired||dd.hip;
   const entries=dd.pm||[];
   let msg;
-  if(block)msg=`Hôm nay ${dd.hip?"đau hông":"mệt"} thì nghỉ poomsae nhé. Nghỉ ngơi cũng là một phần của tập.`;
-  else if(sugg)msg="Ngày nghỉ, xen 10–15 phút poomsae nhé. Không bắt buộc… nhưng làm thì tốt hơn.";
+  if(block)msg=`Nay ${dd.hip?"đau hông":"mệt"} thì nghỉ quyền nha chị. Nghỉ cũng là tập đó.`;
+  else if(sugg)msg="Ngày nghỉ nè, xen 10–15 phút poomsae nha. Hổng bắt buộc… mà làm thì tốt hơn.";
   else msg="Không có lịch cố định. Hôm nào luyện thì ghi vào đây.";
   let h=`<section class="card sess poom"><div class="shead"><span class="tag t-poom">Poomsae</span><span class="meta">${sugg&&!block?"gợi ý 10–15 phút":""}</span></div><p class="hint">${esc(msg)}</p>`;
   const forms=formsSorted();
@@ -670,7 +721,7 @@ function vWeek(){
   h+=`<section class="card"><div class="shead"><h3>Chỉ số tuần ${w}</h3><span class="meta">đo 1 lần/tuần</span></div>
     <div class="metgrid">${mi("lp","(a) Leg press","kg",lp!=null?fmtN(lp):"")}${mi("lc","(a) Leg curl","kg",lc!=null?fmtN(lc):"")}
     ${mi("hold","(b) Giữ chân thẳng ở độ cao đá ngang","giây")}${mi("kicks","(c) Số cú đá trong 30 giây, vẫn giữ độ cao","cú")}</div>
-    <p class="hint">Ô (a) gợi ý sẵn mức tạ cao nhất trong tuần nếu cậu đã ghi. Đo (b) và (c) cùng một chân, cùng kiểu đá cho công bằng.</p></section>`;
+    <p class="hint">Ô (a) gợi ý sẵn mức tạ cao nhất trong tuần nếu chị đã ghi. Đo (b) và (c) cùng một chân, cùng kiểu đá cho công bằng.</p></section>`;
   return h;
 }
 
@@ -681,7 +732,7 @@ function vProg(){
   let h=`<section class="card"><div class="shead"><h2>Chỉ số theo tuần</h2></div>
     <h3>(a) Tạ leg press / leg curl</h3><div class="legend"><span><i style="background:var(--accent)"></i>Leg press</span><span><i style="background:var(--ink)"></i>Leg curl (nét đứt)</span></div>
     ${lineChart({series:[{pts:ser("lp"),c:"chung",line:1,dots:1,end:1},{pts:ser("lc"),c:"ink",line:1,dots:1,end:1,dash:1}],xmin:1,xmax:N,xticks:xt,label:"Tạ theo tuần",empty:"Chưa có số. Nhập ở tab Tuần, phần Chỉ số tuần."})}
-    <h3>(b) Giây giữ chân thẳng</h3>${lineChart({series:[{pts:ser("hold"),c:"home",line:1,dots:1,end:1}],xmin:1,xmax:N,xticks:xt,label:"Giây giữ chân",empty:"Chưa đo lần nào. Đo đi rồi mình vẽ cho."})}
+    <h3>(b) Giây giữ chân thẳng</h3>${lineChart({series:[{pts:ser("hold"),c:"home",line:1,dots:1,end:1}],xmin:1,xmax:N,xticks:xt,label:"Giây giữ chân",empty:"Chưa đo lần nào. Đo đi rồi Nhơn vẽ cho."})}
     <h3>(c) Cú đá liên tiếp trong 30 giây</h3>${lineChart({series:[{pts:ser("kicks"),c:"poom",line:1,dots:1,end:1}],xmin:1,xmax:N,xticks:xt,label:"Số cú đá",empty:"Chưa có số nào cả."})}
   </section>`;
   // cân nặng
@@ -696,7 +747,7 @@ function vProg(){
     <p class="hint">Cân nặng dao động 1-2kg trong ngày là bình thường.</p></section>`;
   const ach=achievements(),n=ach.filter(a=>a.on).length;
   h+=`<section class="card"><div class="shead"><h2>Huy hiệu</h2><span class="meta num">${n}/${ach.length}</span></div>
-    <p class="hint">${n?"Hừm… mở được mấy cái rồi đấy. Đừng có tự mãn!":"Chưa mở cái nào. Cố lên… à không, tuỳ cậu."}</p>
+    <p class="hint">${n?"Ừa… mở được mấy cái rồi đó. Đừng có vênh nha!":"Chưa mở cái nào. Ráng lên… à mà thôi, tuỳ chị."}</p>
     <div class="badges">${ach.map(a=>`<div class="badge ${a.on?"on":""}"><div class="medal" aria-hidden="true">${a.g}</div><div class="bn">${esc(a.n)}</div><div class="bd">${a.on?"Đã mở":esc(a.d)}</div></div>`).join("")}</div></section>`;
   return h;
 }
@@ -707,7 +758,7 @@ function vPoom(){
   UI.form=null;
   const forms=formsSorted(),pd2=pmDays();
   let h=`<section class="shead"><h1>Poomsae</h1><button class="btn pri" data-act="addform">+ Thêm bài</button></section>`;
-  if(!forms.length)h+=`<div class="chart-empty">${S.loaded.forms?"Thư viện trống. Bấm “Thêm bài” để tạo Taegeuk, Koryo… tuỳ cậu.":"Đang lấy thư viện… đợi chút, đừng giục."}</div>`;
+  if(!forms.length)h+=`<div class="chart-empty">${S.loaded.forms?"Thư viện trống. Bấm “Thêm bài” để tạo Taegeuk, Koryo… tuỳ chị.":"Đang lấy thư viện… đợi chút, đừng hối."}</div>`;
   h+=`<div class="flist">`;
   for(const [id,f] of forms){
     const logs=pd2.flatMap(d=>(S.days[d].pm||[]).filter(e=>e.f===id).map(e=>({d,...e})));
@@ -778,7 +829,7 @@ function vForm(id){
     h+=`<section><h1>${esc(f.name)}</h1>${f.desc?`<p class="muted" style="margin-top:6px">${esc(f.desc)}</p>`:""}</section>`;
   }
   h+=`<div class="seg" role="group" aria-label="Tình trạng">${Object.entries(STATUS).map(([k,l])=>`<button class="${st===k?"on":""}" data-act="fstatus" data-v="${k}" aria-pressed="${st===k}">${l}</button>`).join("")}</div>`;
-  h+=`${reviewHtml(f,E)}<section class="card"><div class="shead"><h3>Video cả bài</h3></div><div class="media fmedia">${mediaHtml(f.media,"f",E)||`<p class="hint">Chưa có video. Gửi cho Claude kèm lời nhắn là mình gắn vào đúng chỗ.</p>`}</div>${addMediaHtml("f")}</section>`;
+  h+=`${reviewHtml(f,E)}<section class="card"><div class="shead"><h3>Video cả bài</h3></div><div class="media fmedia">${mediaHtml(f.media,"f",E)||`<p class="hint">Chưa có video. Gửi cho Claude kèm lời nhắn là Nhơn gắn vô đúng chỗ.</p>`}</div>${addMediaHtml("f")}</section>`;
   const mv=f.moves||[];
   h+=`<section class="shead"><h2>Động tác (${mv.length})</h2>${E?`<button class="btn sm pri" data-act="addmove">+ Thêm động tác</button>`:""}</section>`;
   if(!mv.length)h+=`<div class="chart-empty">Chưa chia động tác nào. ${E?"Bấm “Thêm động tác”.":"Bấm “Sửa” để thêm, hoặc gửi video cho Claude để điền giúp."}</div>`;
@@ -798,7 +849,7 @@ function vForm(id){
       h+=`<div class="btnrow"><button class="btn sm" data-act="mup" data-mid="${esc(m.id)}" ${i===0?"disabled":""}>Lên</button><button class="btn sm" data-act="mdown" data-mid="${esc(m.id)}" ${i===mv.length-1?"disabled":""}>Xuống</button><button class="btn sm warn" data-act="mdel" data-mid="${esc(m.id)}">${UI.confirm==="mv"+m.id?"Bấm lần nữa để xoá":"Xoá động tác"}</button></div>`;
     } else {
       const how=secView("Các bước",ht.steps,1)+secView("Bài tập bổ trợ",ht.drills)+secView("Lỗi hay gặp",ht.mistakes)+secView("Thăng bằng và xoay hông",ht.balance);
-      h+=`<div class="sec"><h4 style="color:var(--ink);font-size:14px">Cách tập để làm được</h4></div>${how||`<p class="sec"><span class="empty">Trống. Gửi video kèm lời nhắn thì mình điền cho… không phải vì rảnh đâu.</span></p>`}`;
+      h+=`<div class="sec"><h4 style="color:var(--ink);font-size:14px">Cách tập để làm được</h4></div>${how||`<p class="sec"><span class="empty">Trống trơn. Gửi video kèm lời nhắn thì Nhơn điền cho… hổng phải tại rảnh đâu nha.</span></p>`}`;
       h+=secView("Cách áp dụng",m.apply)||`<div class="sec"><h4>Cách áp dụng</h4><span class="empty">Chưa có.</span></div>`;
     }
     h+=`</div></details>`;
@@ -807,10 +858,260 @@ function vForm(id){
   return h;
 }
 
+/* ===== chiến thuật đối kháng (chị đứng bộ trái) ===== */
+const c=(seq,when,tgt)=>({seq,when,tgt});
+const TAC={
+  defaults:[
+    {k:"Chuyền trước → lùi",t:"Mở màn, dò, hoặc khi chưa đọc được gì",d:"Ăn 1 cú vào sườn rồi ra khỏi tầm. Dùng được với mọi kiểu đối thủ."},
+    {k:"Lùi → vòng cầu sau",t:"Chân họ vừa rơi xuống hoặc đang thu về",d:"Đòn phản chính. Cùng bộ: vào lưng. Khác bộ: vào bụng."},
+    {k:"Đẩy đánh",t:"Bị ép sát, vịn được vai",d:"Không lùi thẳng nữa, vịn vai, lùi hông, vòng cầu ngắn vào sườn."},
+    {k:"Chẻ trước",t:"Họ lùi thẳng hoặc đứng thẳng người ở khoảng vừa",d:"Nhắm mặt. Đá xong thủ lại ngay."}
+  ],
+  opening:[
+    {h:"Hiệp 1 · 10 giây đầu: chỉ đọc, chưa cần điểm",items:[
+      "Vào thế, nhún đều hai chân, đếm thầm “một – hai”. Không bao giờ đứng im.",
+      "Nhìn đúng 3 thứ theo thứ tự: họ đứng bộ nào → có nhún không → đang tiến hay đứng.",
+      "Đòn dò: giả (giậm chân trước nửa bước) ở mép tầm. Họ lùi = Di chuyển. Họ nhấc chân hoặc đá = Chờ phản. Họ tiến vào = Dồn ép. Họ nhảy đổi chân = Đổi bộ.",
+      "Đòn thật đầu tiên: chuyền trước → lùi, vào sườn.",
+      "Gọi tên kiểu đối thủ trong đầu bằng một từ: “chờ”, “ép”, “chạy”, “đổi”. Từ đó chỉ dùng combo mặc định của kiểu đó (xem Bảng chọn nhanh)."]},
+    {h:"Hiệp 2",items:["Mở bằng combo đã ăn điểm ở hiệp 1.","Nếu họ đổi cách đánh: giả lại 1 lần để đọc lại, rồi gọi tên kiểu mới."]},
+    {h:"Hiệp 3",items:["Đang dẫn: đứng xa, chuyền trước → lùi. Không đổi chân.","Đang thua: dùng combo 3 đòn, ép sát để ăn đẩy đánh, quẹt. Bắn 4 chỉ khi họ lao thẳng vào."]}
+  ],
+  quick:[
+    ["Chờ phản","giả → lùi → vòng cầu sau"],
+    ["Dồn ép","lùi chéo → vòng cầu sau · bị sát thì đẩy đánh"],
+    ["Di chuyển","chuyền trước → chẻ trước"],
+    ["Đổi bộ liên tục","vòng cầu sau vào sườn, không cần đọc bộ"],
+    ["Chẻ","lùi → vòng cầu sau khi chân chẻ rơi"],
+    ["Đá cao lên đầu","ép sát → quẹt (hoặc đấm tạt)"],
+    ["Đá đôi","lùi → lùi → vòng cầu sau"],
+    ["Bắn 4","giả → lùi → vòng cầu sau vào lưng"],
+    ["Cò → đạp → chẻ","bỏ qua cò, lùi → vòng cầu sau"],
+    ["Chưa đọc được","chuyền trước → lùi"]
+  ],
+  matrix:[
+    {id:"Lt",title:"Họ bộ trái · ra đòn chân trước",tag:"Cùng bộ",
+     note:"Cùng bộ với chị. Vòng cầu sau của chị tạt vào lưng họ, chuyền trước vào bụng/sườn trước. Chân trước của họ đá tới phía bụng chị.",
+     cong:[c("chuyền trước → vòng cầu sau → lùi","Họ đứng yên, chân trước chưa nhấc. Chuyền trước làm họ co tay đỡ phía trước, vòng cầu sau tạt vào chỗ hở.","Sườn trước → lưng"),
+           c("giả → vòng cầu sau → chẻ trước","Họ hay nhấc chân trước để chặn. Giả cho họ nhấc, đợi chân rơi xuống mới vào. Sau vòng cầu sau, chân phải thành chân trước nên chẻ bằng chân phải.","Lưng → mặt"),
+           c("vòng cầu sau → đẩy đánh","Họ hay lao vào ôm sau khi trúng đòn.","Lưng → sườn")],
+     thu:[c("lùi nửa bước → nhún → lùi","Chân trước họ đang lên. Chỉ cho hụt, không đánh.","Không tạt"),
+          c("lệch trái → chẻ trước","Họ vừa tiến vừa đá chân trước liên tục. Ra khỏi đường đá rồi chẻ chặn bước tiếp theo.","Mặt"),
+          c("ép sát → đẩy đánh","Họ đá chân trước quá gần, không kịp lùi.","Sườn")],
+     doi:[c("(ngoài tầm) nhảy đổi chân → vòng cầu sau → lùi","Họ đứng chờ ở xa và đã quen canh chân phải của chị. Đổi xong là khác bộ, vòng cầu sau vào bụng.","Bụng"),
+          c("giả → nhảy đổi chân → chuyền trước","Họ lùi khi bị giả. Đổi xong chân phải ở trước, chuyền trước vào lưng.","Lưng")],
+     phan:[c("lùi → vòng cầu sau","Chân trước họ vừa đặt xuống hoặc đang thu về.","Lưng"),
+           c("lệch trái → chuyền trước → lùi","Họ đá xong còn đứng chồm về trước.","Bụng/sườn trước"),
+           c("ép sát → quẹt","Họ đá ở khoảng sát, chân vừa rơi.","Mặt")]},
+    {id:"Ls",title:"Họ bộ trái · ra đòn chân sau",tag:"Cùng bộ",
+     note:"Chân sau họ đá tới phía lưng chị, vung rộng và chậm hơn chân trước. Đá xong nếu họ đặt chân xuống phía trước thì họ thành bộ phải (khác bộ): lúc đó vòng cầu sau của chị vào bụng.",
+     cong:[c("chuyền trước → lùi","Họ đứng chờ để phản bằng chân sau. Đánh một cú rồi ra khỏi tầm ngay, không đứng lại.","Sườn trước"),
+           c("chuyền trước → chẻ trước → lùi","Họ lùi sau cú đầu.","Sườn → mặt"),
+           c("giả → vòng cầu sau → lùi","Họ giật mình nhấc chân sau định phản. Đợi chân rơi rồi mới vào.","Lưng")],
+     thu:[c("lùi chéo phải → nhún","Chân sau họ đang vung. Lùi chéo ra khỏi vòng cung cú đá.","Không tạt"),
+          c("lùi → chẻ trước","Họ đá xong vẫn tiếp tục tiến.","Mặt"),
+          c("ép sát → đẩy đánh","Thấy họ dồn trọng tâm lên chân trước để chuẩn bị đá, chân chưa nhấc.","Sườn")],
+     doi:[c("(ngoài tầm) nhảy đổi chân → vòng cầu sau","Họ đứng xa chờ. Đổi xong là khác bộ, vòng cầu sau vào bụng.","Bụng"),
+          c("giả → nhảy đổi chân → đấm tạt","Họ lùi sau cú giả rồi đứng lại ở khoảng vừa – sát.","Sườn")],
+     phan:[c("lùi → vòng cầu sau","Chân sau họ vừa đặt xuống phía trước (họ thành bộ phải = khác bộ).","Bụng"),
+           c("lùi → chuyền trước → lùi","Họ đá xong đứng lại, chưa thủ lại.","Lưng"),
+           c("lùi → bắn 4 (chốt)","Họ lao thẳng vào bằng chân sau lần thứ hai, đúng đường thẳng chị đã dự tính.","Bụng")]},
+    {id:"Rt",title:"Họ bộ phải · ra đòn chân trước",tag:"Khác bộ",
+     note:"Khác bộ với chị. Vòng cầu sau của chị vào bụng họ, chuyền trước tạt vào lưng họ. Chân trước họ đá tới phía lưng chị.",
+     cong:[c("chuyền trước → vòng cầu sau → lùi","Họ đứng yên ở khoảng vừa.","Lưng → bụng"),
+           c("vòng cầu sau → chẻ trước","Họ lùi thẳng sau cú đầu.","Bụng → mặt"),
+           c("chuyền trước → ngoài trong","Họ hạ tay xuống đỡ sườn sau cú chuyền trước.","Lưng → mặt")],
+     thu:[c("lệch phải → nhún","Chân trước họ đá tới từ phía trái chị (phía lưng chị).","Không tạt"),
+          c("lùi → chẻ trước","Họ vừa đá chân trước vừa tiến liên tục.","Mặt"),
+          c("ép sát → đẩy đánh","Họ đá chân trước quá gần.","Sườn")],
+     doi:[c("(ngoài tầm) nhảy đổi chân → vòng cầu sau → lùi","Họ quen đỡ vòng cầu sau vào bụng. Đổi xong là cùng bộ, vòng cầu sau tạt vào lưng.","Lưng"),
+          c("giả → nhảy đổi chân → chẻ trước","Họ lùi sau cú giả, đầu đưa ra trước.","Mặt")],
+     phan:[c("lùi → vòng cầu sau","Chân trước họ đang thu về.","Bụng"),
+           c("lệch phải → chuyền trước","Chân họ vừa rơi, chị đã ra ngoài đường đòn.","Lưng"),
+           c("ép sát → quẹt","Họ đá ở khoảng sát, chân vừa rơi.","Mặt")]},
+    {id:"Rs",title:"Họ bộ phải · ra đòn chân sau",tag:"Khác bộ",
+     note:"Chân sau họ đá tới phía bụng chị: đây là kiểu đổi đòn bụng – bụng quen thuộc. Đá xong nếu họ đặt chân xuống phía trước thì họ thành bộ trái (cùng bộ): lúc đó vòng cầu sau của chị vào lưng.",
+     cong:[c("chuyền trước → lùi","Họ chờ để phản bằng chân sau. Đánh xong ra ngay.","Lưng"),
+           c("giả → vòng cầu sau → lùi","Họ nhấc chân sau phản sớm. Đợi chân rơi rồi vào.","Bụng"),
+           c("đấm tạt → lùi","Họ đứng sát, chân sau không có chỗ để đá.","Sườn")],
+     thu:[c("lệch trái → lùi","Chân sau họ đang vung tới từ phía phải chị (phía bụng chị).","Không tạt"),
+          c("ép sát → đẩy đánh","Họ dồn trọng tâm lên chân trước để chuẩn bị đá, chân chưa nhấc.","Sườn"),
+          c("lùi → chẻ trước","Họ đá xong vẫn tiến.","Mặt")],
+     doi:[c("(ngoài tầm) nhảy đổi chân → vòng cầu sau","Đổi xong là cùng bộ, vòng cầu sau tạt vào lưng.","Lưng"),
+          c("giả → nhảy đổi chân → chuyền trước","Họ lùi sau cú giả. Đổi xong chân phải ở trước, chuyền trước vào bụng.","Bụng")],
+     phan:[c("lùi → vòng cầu sau","Chân sau họ vừa đặt xuống phía trước (họ thành bộ trái = cùng bộ).","Lưng"),
+           c("lùi → chẻ trước","Họ đá xong vẫn tiến tới.","Mặt"),
+           c("lùi → bắn 4 (chốt)","Họ lao thẳng vào lần thứ hai.","Bụng")]}
+  ],
+  tempo:[
+    {id:"cho",name:"Chờ phản",
+     signs:["Đứng yên, thường không nhún.","Chị tiến thì họ không lùi mà hạ trọng tâm.","Chị giả thì họ nhấc chân hoặc co tay ngay nhưng không đuổi theo."],
+     strong:["Phản công chính xác, đọc được đòn đầu của chị."],
+     weak:["Khởi động chậm, ít điểm chủ động.","Ghét bị giả nhiều lần.","Đứng yên nên dễ dính chuyền trước nhanh."],
+     dist:"Vừa – xa. Đứng ở mép tầm, giả để kéo họ ra đòn trước rồi phản. Đừng đứng vừa tầm mà chờ nhau.",
+     combos:[c("giả → lùi → vòng cầu sau","Giả để họ phản trước. Họ phản hụt, chân rơi xuống thì vào.","Lưng (cùng bộ) / bụng (khác bộ)"),
+             c("chuyền trước → lùi","Ăn một cú rồi ra ngay, trước khi họ kịp phản.","Sườn"),
+             c("giả → chẻ trước","Họ co người đỡ phía dưới.","Mặt")]},
+    {id:"ep",name:"Dồn ép",
+     signs:["Trong 10 giây đã tiến 2–3 lần.","Ép chị lùi về gần vạch.","Đá xong không lùi mà tiến tiếp."],
+     strong:["Ăn điểm bằng sức ép, làm chị rối và đơ."],
+     weak:["Tiến thẳng, chân đá rơi xuống ngay gần chị.","Dễ bị phản khi đang bước.","Mệt về cuối hiệp."],
+     dist:"Sát hoặc vừa. Đừng lùi thẳng: lùi chéo, hoặc đứng lại và ép sát.",
+     combos:[c("lùi chéo → vòng cầu sau","Họ bước tới, chân vừa đặt xuống.","Lưng hoặc bụng tuỳ bộ"),
+             c("ép sát → đẩy đánh → quẹt","Họ đã sát, chị vịn được vai.","Sườn → mặt"),
+             c("lùi → bắn 4 (chốt)","Họ lao thẳng, chị đã dự tính sẵn.","Bụng")]},
+    {id:"chay",name:"Di chuyển",
+     signs:["Chị tiến là họ lùi.","Chạy vòng, đổi hướng, ít ra đòn trước."],
+     strong:["Khó bắt, chờ chị đá hụt rồi chạy hoặc phản."],
+     weak:["Ít điểm.","Hay lùi thẳng hoặc vòng cùng một hướng.","Bị dồn tới mép thì đá vội."],
+     dist:"Vừa, ép dần. Đi theo, chặn đường vòng, đẩy họ về mép.",
+     combos:[c("chuyền trước → chẻ trước","Họ lùi thẳng. Chuyền trước rút ngắn khoảng cách, chẻ trúng mặt lúc họ dừng.","Sườn → mặt"),
+             c("chuyền trước → vòng cầu sau","Họ lùi rồi đứng lại để phản.","Sườn → lưng/bụng"),
+             c("tiến chặn đường → đấm tạt","Họ bị dồn mép và đứng lại.","Sườn")]},
+    {id:"doi",name:"Đổi bộ liên tục",
+     signs:["Trong 10 giây đổi chân trước 2 lần trở lên.","Hay nhảy tại chỗ."],
+     strong:["Khó đọc, có thể bẫy chị bằng cách đổi chân rồi đá."],
+     weak:["Lúc đang đổi chân là lúc hở: chân chưa chạm đất, chưa thủ.","Hay đổi theo nhịp đều."],
+     dist:"Vừa, ngay mép tầm, đủ gần để vào khi họ đang đổi. Chị đừng đổi chân theo họ.",
+     combos:[c("chuyền trước → lùi","Thấy họ nhảy đổi, vào ngay khi chân họ vừa chạm đất.","Sườn"),
+             c("vòng cầu sau → lùi","Không cần đọc bộ, nhắm giữa thân.","Sườn"),
+             c("đứng nhún đếm nhịp → chẻ trước","Họ đổi chân theo nhịp đều. Canh nhịp kế tiếp.","Mặt")]}
+  ],
+  weapon:[
+    {id:"che",name:"Chẻ (chân trước hoặc chân sau)",
+     signs:["Lúc dò hay giơ chân thẳng cao.","Tiến nửa bước rồi nhấc gối cao.","Nhắm mặt."],
+     strong:["Điểm mặt cao, ở gần thì khó thấy."],
+     weak:["Chân lên rất cao nên lâu rơi.","Đứng trụ một chân.","Chẻ hụt thì chân rơi ngay trước mặt chị, thân họ mở."],
+     dist:"Sát hoặc xa. Sát thì chân họ không có chỗ giơ lên, xa thì chẻ hụt. Tránh khoảng vừa.",
+     combos:[c("lùi → vòng cầu sau","Chẻ hụt, chân họ vừa rơi.","Lưng hoặc bụng tuỳ bộ"),
+             c("lệch → chuyền trước","Chân chẻ rơi xuống, chị đã ra ngoài đường đòn.","Sườn"),
+             c("ép sát → đẩy đánh","Chân họ đã rơi mà họ còn đứng gần.","Sườn")]},
+    {id:"cao",name:"Đá cao lên đầu",
+     signs:["Đá dò nhắm đầu.","Đứng thẳng người, hông xoay sẵn.","Hay để tay thấp."],
+     strong:["Một cú là điểm cao."],
+     weak:["Đá cao thì lâu, thân dưới hở.","Chân rơi chậm, dễ mất trụ."],
+     dist:"Sát. Vào gần để họ hết khoảng đá cao, rồi đánh thấp vào thân.",
+     combos:[c("lùi (tay che đầu) → vòng cầu sau","Chân họ rơi xuống.","Sườn"),
+             c("ép sát → quẹt","Họ đứng thẳng ở khoảng sát.","Mặt"),
+             c("ép sát → đấm tạt","Họ đứng sát, tay để thấp.","Sườn")]},
+    {id:"doi2",name:"Đá đôi (hai cú vòng cầu liên tiếp)",
+     signs:["Cú đầu xong chân không về mà đổi chân đá tiếp.","Nhịp “bốp – bốp”."],
+     strong:["Cú thứ hai bắt chị đúng lúc chị đang phản."],
+     weak:["Cú đầu thường nhẹ để nhử.","Giữa hai cú họ đang chuyển chân.","Cú thứ hai hụt thì rất mất thăng bằng."],
+     dist:"Xa hoặc sát. Khoảng vừa là chỗ họ mạnh nhất.",
+     combos:[c("lùi → lùi → vòng cầu sau","Lùi hai nhịp cho cả hai cú hụt, vào khi cú thứ hai rơi.","Sườn hoặc lưng"),
+             c("lùi → chuyền trước","Cú thứ hai rơi xuống mà họ chưa thủ lại.","Sườn"),
+             c("lùi → bắn 4 (chốt)","Họ đá xong lao thẳng tới tiếp.","Bụng")]},
+    {id:"ban4",name:"Đá sau xoay người (bắn 4)",
+     signs:["Hay xoay vai hoặc quay lưng trước khi đá.","Đứng chờ khi chị tiến thẳng."],
+     strong:["Điểm cao, phản công mạnh khi chị lao thẳng vào."],
+     weak:["Phải xoay trước khi đá nên lộ ý đồ.","Lúc quay lưng thì mất tầm nhìn.","Đá hụt thì lưng hở."],
+     dist:"Vừa, nhưng không lao thẳng. Vào chéo hoặc lệch.",
+     combos:[c("giả → lùi → vòng cầu sau","Giả cho họ xoay bắn 4. Cú đá hụt, lưng họ quay về phía chị.","Lưng"),
+             c("lệch → chuyền trước","Chị vào chéo thay vì vào thẳng.","Sườn"),
+             c("ép sát → đẩy đánh","Ở sát thì họ không xoay được.","Sườn")]},
+    {id:"chuoi",name:"Chuỗi nhử rồi chốt (cò → đạp → chẻ)",
+     signs:["Chân trước nhấp nhấp liên tục, ít lực (cò).","Sau đó đạp đẩy.","Chẻ là đòn ăn điểm ở cuối."],
+     strong:["Giữ nhịp trận, kéo chị phản ứng với cú cò rồi chẻ trúng."],
+     weak:["Cò không có lực, không đáng sợ.","Chuỗi cố định nên đoán được.","Chẻ luôn ở cuối chuỗi."],
+     dist:"Xa (ngoài tầm cò) để họ phải bước vào, hoặc sát để chuỗi gãy.",
+     combos:[c("lùi → vòng cầu sau","Không phản ứng với cò. Lùi khỏi đạp và chẻ, vào khi chân chẻ rơi.","Lưng hoặc bụng tuỳ bộ"),
+             c("lùi → chuyền trước","Chân cò vừa thu về, chưa kịp đạp.","Sườn"),
+             c("ép sát → đẩy đánh","Sau cú đạp họ vẫn còn sát.","Sườn")]}
+  ],
+  distance:[
+    ["Xa","Chuyền trước, nhảy đổi chân (chỗ an toàn nhất để đổi)."],
+    ["Vừa","Vòng cầu sau, chẻ, trong ngoài, ngoài trong."],
+    ["Sát","Đẩy đánh, quẹt, đấm tạt."]
+  ],
+  drills:[
+    {n:"Tín hiệu im lặng",how:"Bạn tập cầm vợt, không hô. Vợt ngang sườn = vòng cầu sau, vợt giơ cao = chẻ trước, vợt rút về = chuyền trước → lùi. 3 hiệp × 1 phút. Tuần sau mời 1–2 người đứng xem, tuần sau nữa quay video.",why:"Phản xạ theo hình ảnh thay vì chờ tiếng hô, giống lúc đấu thật."},
+    {n:"Đấu một kịch bản",how:"Đấu tập 1 phút, chị chỉ được dùng 1 combo mặc định và lùi. Bạn tập đánh tự do. Có người đứng xem và đếm điểm to. Mỗi hiệp đổi sang combo khác.",why:"Bỏ thói quen đoán. Đầu chỉ chờ một tín hiệu: chân họ rơi."},
+    {n:"Nhún – thở – gọi tên",how:"Đứng giữa vòng 3–4 người. Hít 4 nhịp, thở ra 4 nhịp, nhún liên tục. Mỗi người hô ngẫu nhiên tên kiểu đối thủ (“chờ!”, “ép!”, “chạy!”, “đổi!”) và chị đánh combo mặc định trong 2 giây.",why:"Chân không bao giờ đứng im (hết đeo chì), đầu chỉ cần nhớ một từ."}
+  ],
+  suggest:[
+    "Gợi ý học thêm: đạp chặn bằng chân trước (đạp vào bụng để chặn người dồn ép). Không có trong danh sách của chị, hỏi HLV trước khi dùng."
+  ],
+  unsure:[
+    "Phía lưng: theo hình dung của Nhơn, khi đứng nghiêng thì lưng đối thủ nằm cùng phía với chân trước của họ. Nguyên tắc của chị lại ghi “phía xa chân trước”. Hai ý này có thể chỉ khác nhau cách gọi. Kiểm: đứng cùng bộ với bạn tập, đá vòng cầu sau chậm, xem chạm giáp phía lưng hay bụng; rồi đổi sang khác bộ làm lại.",
+    "Mục tiêu theo bộ: Nhơn ghi cùng bộ thì vòng cầu sau vào lưng, chuyền trước vào bụng; khác bộ thì ngược lại. Mọi combo trong bảng dựa trên điều này, nên kiểm chứng nó đầu tiên.",
+    "Hướng lệch: Nhơn dùng quy tắc “lệch ra phía ngược với hướng cú đá tới” (đá tới từ bên phải thì lệch trái). Lệch trái hay phải trong từng tổ hợp cần thử chậm: bạn tập đá chậm, chị thử cả hai hướng, chọn hướng vừa né được vừa đứng sẵn cho vòng cầu sau.",
+    "Lùi chéo: Nhơn chưa chắc lùi chéo về bên nào là tốt hơn trong từng trường hợp. Thử cùng bài trên.",
+    "Đổi bộ sau cú đá chân sau: Nhơn giả định đá chân sau xong thì đặt chân xuống phía trước nên người đá đổi bộ (cả chị lẫn đối thủ). Nhiều người lại thu chân về chỗ cũ. Mười giây đầu, xem họ đặt chân xuống đâu.",
+    "Bắn 4: chiều xoay thân phụ thuộc chân đá. Nhơn không ghi chiều xoay, hỏi HLV cho chắc."
+  ]
+};
+function tacCards(){
+  const out=[];
+  TAC.quick.forEach(([k,v],i)=>out.push({id:"q"+i,q:`Gặp kiểu “${k}”: combo mặc định?`,a:v}));
+  TAC.defaults.forEach((d,i)=>out.push({id:"d"+i,q:`Đòn mặc định: ${d.t}?`,a:d.k}));
+  const lbl={cong:"Mình công",thu:"Thủ",doi:"Nhảy đổi chân",phan:"Phản công"};
+  TAC.matrix.forEach(m=>Object.keys(lbl).forEach(s=>out.push({id:"m"+m.id+s,q:`${m.title} → ${lbl[s]}?`,a:m[s].map(x=>x.seq).join("\n")})));
+  [...TAC.tempo,...TAC.weapon].forEach(t=>{
+    out.push({id:"s"+t.id,q:`Dấu hiệu nhận ra kiểu “${t.name}”?`,a:t.signs.join("\n")});
+    out.push({id:"w"+t.id,q:`“${t.name}”: điểm yếu và khoảng cách nên đứng?`,a:t.weak.join("\n")+"\nKhoảng cách: "+t.dist});
+  });
+  return out;
+}
+
+UI.tacMode="read";UI.tacOpen=new Set(["defaults"]);UI.ci=0;UI.flip=false;UI.order=null;
+const tnote=key=>`<div class="tf tnote"><label for="tn-${key}">Ghi chú của chị</label><textarea id="tn-${key}" data-in="tnote" data-k="${key}" placeholder="Bạn tập nói gì, thử thấy sao…">${esc(S.tac.notes[key]||"")}</textarea></div>`;
+function tblock(key,title,body,sub){
+  return `<details class="tsec" data-tk="${key}" ${UI.tacOpen.has(key)?"open":""}><summary><span class="tsum"><span class="tt">${title}</span>${sub?`<span class="ts">${sub}</span>`:""}</span><span class="chev" aria-hidden="true">›</span></summary><div class="tbody">${body}${tnote(key)}</div></details>`;
+}
+function comboHtml(x){
+  return `<div class="combo"><div class="seq">${x.seq.split("→").map(m=>`<span class="mv">${esc(m.trim())}</span>`).join('<span class="arr">→</span>')}</div><p><b>Khi nào:</b> ${esc(x.when)}</p><p><b>Tạt vào:</b> ${esc(x.tgt)}</p></div>`;
+}
+const ul=a=>`<ul class="tl">${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
+function typeBody(t){
+  return `<div class="sec"><h4>Dấu hiệu trong 10 giây đầu</h4>${ul(t.signs)}</div>
+    <div class="two"><div class="sec"><h4>Mạnh</h4>${ul(t.strong)}</div><div class="sec"><h4>Yếu</h4>${ul(t.weak)}</div></div>
+    <div class="sec"><h4>Khoảng cách nên đánh</h4><p>${esc(t.dist)}</p></div>
+    <div class="sec"><h4>Combo</h4>${t.combos.map(comboHtml).join("")}</div>`;
+}
+function vTac(){
+  const cards=tacCards(),known=cards.filter(cd=>S.tac.prog[cd.id]&&S.tac.prog[cd.id].ok).length;
+  let h=`<section class="shead"><h1>Đối kháng</h1><span class="meta small muted">chị đứng bộ trái</span></section>`;
+  h+=nhonSay(UI.tacMode==="read"?"Học như học bài nha chị. Lên sân khỏi đoán, thấy dấu hiệu nào thì ra combo đó. Mấy chỗ Nhơn hổng chắc, Nhơn ghi ở cuối, chị đem hỏi bạn tập.":`Thuộc ${known}/${cards.length} thẻ rồi đó. Hứ, còn nhiêu đó nữa thôi.`);
+  h+=`<div class="seg two-seg" role="group" aria-label="Chế độ"><button class="${UI.tacMode==="read"?"on":""}" data-act="tacmode" data-v="read">Đọc bảng</button><button class="${UI.tacMode==="learn"?"on":""}" data-act="tacmode" data-v="learn">Học thuộc · ${known}/${cards.length}</button></div>`;
+  if(UI.tacMode==="learn")return h+vLearn(cards);
+  h+=`<p class="eyebrow">Thuộc trước tiên</p>`;
+  h+=tblock("defaults","4 đòn mặc định","<ol class=\"dl\">"+TAC.defaults.map(d=>`<li><b>${esc(d.k)}</b><span>Khi: ${esc(d.t)}</span><span class="muted">${esc(d.d)}</span></li>`).join("")+"</ol>","ít phải suy nghĩ nhất");
+  h+=tblock("opening","Kịch bản mở đầu mỗi hiệp",TAC.opening.map(o=>`<div class="sec"><h4>${esc(o.h)}</h4><ol class="tl">${o.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>`).join(""),"đòn dò đầu tiên, cách đọc");
+  h+=tblock("quick","Bảng chọn nhanh",`<div class="tblwrap"><table class="qt"><thead><tr><th>Kiểu đối thủ</th><th>Combo mặc định</th></tr></thead><tbody>${TAC.quick.map(([a,b])=>`<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></div>`,"nhìn kiểu là ra combo");
+  h+=`<p class="eyebrow">Theo bộ đứng × chân ra đòn</p>`;
+  const lbl=[["cong","Mình công"],["thu","Thủ"],["doi","Nhảy đổi chân"],["phan","Phản công"]];
+  for(const m of TAC.matrix){
+    const body=`<p class="hint">${esc(m.note)}</p>`+lbl.map(([k,l])=>`<div class="sec"><h4>${l}${k==="doi"?" · chỉ khi ngoài tầm hoặc sau cú giả":""}</h4>${m[k].map(comboHtml).join("")}</div>`).join("");
+    h+=tblock("m"+m.id,m.title,body,m.tag);
+  }
+  h+=`<p class="eyebrow">Theo nhịp độ</p>`;
+  for(const t of TAC.tempo)h+=tblock("t"+t.id,t.name,typeBody(t),"");
+  h+=`<p class="eyebrow">Theo đòn sở trường</p>`;
+  for(const t of TAC.weapon)h+=tblock("w"+t.id,t.name,typeBody(t),"");
+  h+=`<p class="eyebrow">Khoảng cách và luyện tập</p>`;
+  h+=tblock("dist","Khoảng cách: đòn nào ở đâu",`<div class="tblwrap"><table class="qt"><tbody>${TAC.distance.map(([a,b])=>`<tr><td><b>${esc(a)}</b></td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></div>`,"");
+  h+=tblock("drills","3 bài tập cho hết đơ khi có người xem",TAC.drills.map((d,i)=>`<div class="sec"><h4>${i+1}. ${esc(d.n)}</h4><p>${esc(d.how)}</p><p class="muted small">Để làm gì: ${esc(d.why)}</p></div>`).join(""),"");
+  h+=tblock("unsure","Chỗ Nhơn chưa chắc: kiểm với bạn tập",ul(TAC.unsure)+`<div class="sec"><h4>Gợi ý ngoài danh sách</h4>${ul(TAC.suggest)}</div>`,"hướng xoay, hướng lệch");
+  return h;
+}
+function vLearn(cards){
+  if(!UI.order||UI.order.length!==cards.length){
+    const lvl=id=>{const p=S.tac.prog[id];return p?(p.ok?1+(p.n||0):0):-1};
+    UI.order=cards.map((cd,i)=>({i,l:lvl(cd.id),r:Math.random()})).sort((a,b)=>a.l-b.l||a.r-b.r).map(x=>x.i);UI.ci=0;UI.flip=false;
+  }
+  const cd=cards[UI.order[UI.ci%UI.order.length]],p=S.tac.prog[cd.id];
+  return `<section class="card fc"><div class="shead"><span class="meta num">Thẻ ${UI.ci%UI.order.length+1}/${UI.order.length}</span><span class="tag ${p&&p.ok?"t-gym":"t-ghost"}">${p?(p.ok?"đã thuộc":"chưa thuộc"):"mới"}</span></div>
+    <p class="fq">${esc(cd.q)}</p>
+    ${UI.flip?`<div class="fa">${esc(cd.a)}</div>`:`<p class="hint">Nói to đáp án trong đầu trước, rồi mới lật.</p>`}
+    <div class="btnrow fbtn">${UI.flip?`<button class="btn" data-act="card" data-v="0">Chưa thuộc</button><button class="btn pri" data-act="card" data-v="1">Thuộc rồi</button>`:`<button class="btn pri" data-act="flip">Lật thẻ</button>`}</div></section>
+    <div class="btnrow"><button class="btn sm" data-act="reshuffle">Xáo lại, thẻ chưa thuộc lên trước</button></div>`;
+}
+
 /* ===== khác ===== */
 function vMore(){
   let h=`<h1>Khác</h1>
-  <section class="card"><h3>Ngày bắt đầu giáo án</h3><p class="hint">Thứ 2 của tuần 1. Chọn ngày khác thứ 2 thì mình tự lùi về thứ 2 tuần đó.</p>
+  <section class="card"><h3>Ngày bắt đầu giáo án</h3><p class="hint">Thứ 2 của tuần 1. Chọn ngày khác thứ 2 thì Nhơn tự lùi về thứ 2 tuần đó.</p>
     <div class="linkrow"><input type="date" id="set-start" value="${esc(startDate())}" aria-label="Ngày bắt đầu"><button class="btn pri" data-act="setstart">Lưu</button></div></section>
   <section class="card"><h3>Sao lưu</h3><p class="hint">Dữ liệu chính nằm trong kho của trang, đồng bộ theo tài khoản trên mọi thiết bị. File JSON chỉ để phòng hờ. Video không nằm trong file, chỉ có mã tham chiếu.</p>
     <div class="btnrow"><button class="btn" data-act="export">Xuất JSON</button><button class="btn" data-act="import">Nhập JSON</button></div>`;
@@ -823,7 +1124,7 @@ function vMore(){
 
 /* ===== sự kiện ===== */
 let toastT;
-function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3200)}
+function toast(t){const el=document.getElementById("toast");el.innerHTML=`<b>Nhơn:</b> ${esc(t)}`;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3200)}
 let confT;
 function twoTap(key){if(UI.confirm===key){UI.confirm=null;return true}UI.confirm=key;clearTimeout(confT);confT=setTimeout(()=>{UI.confirm=null;render()},4000);render();return false}
 function curForm(){return S.forms[UI.form]}
@@ -832,7 +1133,7 @@ function mediaList(ctx){const f=curForm();if(!f)return null;if(ctx==="f")return 
 
 document.getElementById("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-act=tab]");if(!b)return;UI.tab=b.dataset.t;lsSet("sotap.tab",UI.tab);if(UI.tab==="day")UI.date=UI.date||today();render();window.scrollTo(0,0)});
 const main=document.getElementById("main");
-main.addEventListener("toggle",e=>{const d=e.target;if(d.matches&&d.matches("details.move")){d.open?UI.openMoves.add(d.dataset.mid):UI.openMoves.delete(d.dataset.mid)}},true);
+main.addEventListener("toggle",e=>{const d=e.target;if(d.matches&&d.matches("details.tsec")){d.open?UI.tacOpen.add(d.dataset.tk):UI.tacOpen.delete(d.dataset.tk);return}if(d.matches&&d.matches("details.move")){d.open?UI.openMoves.add(d.dataset.mid):UI.openMoves.delete(d.dataset.mid)}},true);
 main.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");if(!b||b.disabled)return;
   const a=b.dataset.act,d=UI.date;
@@ -843,7 +1144,7 @@ main.addEventListener("click",async e=>{
     case "goday":UI.date=b.dataset.d;UI.tab="day";lsSet("sotap.tab","day");render();window.scrollTo(0,0);break;
     case "wprev":UI.week=Math.max(1,UI.week-1);render();break;
     case "wnext":UI.week=UI.week+1;render();break;
-    case "tired":case "hip":{const dd=mday(d);if(dd[a])delete dd[a];else dd[a]=true;saveDay(d);render();if(a==="tired"&&dd.tired)toast("Ừ, hôm nay nhẹ thôi. Nghỉ, ăn, ngủ đủ nhé.");break}
+    case "tired":case "hip":{const dd=mday(d);if(dd[a])delete dd[a];else dd[a]=true;saveDay(d);render();if(a==="tired"&&dd.tired)toast("Ừa, nay nhẹ thôi. Nghỉ, ăn, ngủ cho đủ nghen chị.");break}
     case "spar":{const dd=mday(d);if(dd.spar)delete dd.spar;else dd.spar=true;saveDay(d);render();if(dd.spar)cheer(d,"spar");else syncAch();break}
     case "tick":{const dd=mday(d);dd.ex=dd.ex||{};const arr=dd.ex[b.dataset.ex]||(dd.ex[b.dataset.ex]=[]);const i=+b.dataset.i;while(arr.length<=i)arr.push({});const it0=itemForEx(d,b.dataset.ex),was=it0&&sessDone(d,it0);arr[i]={...arr[i],d:!arr[i].d};if(!arr[i].d)delete arr[i].d;saveDay(d);render();if(arr[i].d)cheer(d,it0&&!was&&sessDone(d,it0)?"sess":"tick");else syncAch();break}
     case "tickall":{const it={s:b.dataset.s,light:!!b.dataset.light},dd=mday(d);dd.ex=dd.ex||{};for(const id of SESS[it.s].ex){const e2=EX[id];if(e2.opt)continue;const n=rowCount(e2,dd,it.light),arr=dd.ex[id]||(dd.ex[id]=[]);while(arr.length<n)arr.push({});for(let i=0;i<n;i++)arr[i]={...arr[i],d:true}}saveDay(d);render();cheer(d,"sess");break}
@@ -851,7 +1152,7 @@ main.addEventListener("click",async e=>{
     case "pmdel":{const i=+b.dataset.i;if(!twoTap("pm"+i))break;const dd=mday(d);dd.pm.splice(i,1);if(!dd.pm.length)delete dd.pm;saveDay(d);render();break}
     case "pmscore":{const dd=mday(d),en=dd.pm[+b.dataset.i];en.s=+b.dataset.s;saveDay(d);render();break}
     case "setstart-now":setStart(mondayOf(today()));break;
-    case "setstart":{const v=document.getElementById("set-start").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){toast("Chọn ngày đã chứ.");break}setStart(mondayOf(v));break}
+    case "setstart":{const v=document.getElementById("set-start").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){toast("Chọn ngày đi chị.");break}setStart(mondayOf(v));break}
     case "addform":{const id=uid("f"),mx=Math.max(0,...Object.values(S.forms).map(f=>f.order||0));S.forms[id]={name:"Bài mới",desc:"",status:"learning",order:mx+1,media:[],moves:[]};saveForm(id);UI.form=id;UI.edit=true;render();window.scrollTo(0,0);break}
     case "openform":UI.form=b.dataset.id;UI.edit=false;render();window.scrollTo(0,0);break;
     case "back":UI.form=null;UI.edit=false;render();break;
@@ -860,7 +1161,7 @@ main.addEventListener("click",async e=>{
     case "addmove":{const f=curForm();f.moves=f.moves||[];const m={id:uid("m"),name:"",stance:"",media:[],howTo:{steps:"",drills:"",mistakes:"",balance:""},apply:""};f.moves.push(m);UI.openMoves.add(m.id);saveForm(UI.form);render();break}
     case "mup":case "mdown":{const f=curForm(),i=f.moves.findIndex(m=>m.id===b.dataset.mid),j=a==="mup"?i-1:i+1;if(j<0||j>=f.moves.length)break;[f.moves[i],f.moves[j]]=[f.moves[j],f.moves[i]];saveForm(UI.form);render();break}
     case "mdel":{const mid=b.dataset.mid;if(!twoTap("mv"+mid))break;const f=curForm(),m=findMove(mid);f.moves=f.moves.filter(x=>x.id!==mid);saveForm(UI.form);delAssets(m&&m.media);render();break}
-    case "fdel":{if(!twoTap("fd"))break;const id=UI.form,f=S.forms[id];const all=[...(f.media||[]),...(f.moves||[]).flatMap(m=>m.media||[])];delete S.forms[id];saveForm(id);delAssets(all);UI.form=null;UI.edit=false;render();toast("Xoá rồi. Đừng hối hận đấy.");break}
+    case "fdel":{if(!twoTap("fd"))break;const id=UI.form,f=S.forms[id];const all=[...(f.media||[]),...(f.moves||[]).flatMap(m=>m.media||[])];delete S.forms[id];saveForm(id);delAssets(all);UI.form=null;UI.edit=false;render();toast("Xoá rồi đó. Đừng có tiếc nha.");break}
     case "mediadel":{const k=b.dataset.k;if(!twoTap("md"+k))break;const idx=k.lastIndexOf(":"),ctx=k.slice(0,idx),i=+k.slice(idx+1),L=mediaList(ctx);if(!L)break;const [rm]=L.splice(i,1);saveForm(UI.form);delAssets([rm]);render();break}
     case "addlink":{const ctx=b.dataset.ctx,inp=document.getElementById("lk-"+ctx),v=(inp&&inp.value||"").trim();if(!okUrl(v)){toast("Link phải bắt đầu bằng http:// hoặc https://");break}const L=mediaList(ctx);L.push({kind:"link",url:v});saveForm(UI.form);render();break}
     case "upload":{pendingCtx=b.dataset.ctx;const fi=document.getElementById("fileUp");fi.value="";fi.click();break}
@@ -870,7 +1171,13 @@ main.addEventListener("click",async e=>{
     case "import":{const fi=document.getElementById("fileImp");fi.value="";fi.click();break}
     case "importcancel":UI.importData=null;render();break;
     case "importgo":doImport();break;
-    case "copydump":{const ta=document.getElementById("dump");try{await navigator.clipboard.writeText(ta.value);toast("Chép rồi.")}catch(err){ta.focus();ta.select();toast("Không chép tự động được, mình bôi đen sẵn rồi đó.")}break}
+    case "tacmode":UI.tacMode=b.dataset.v;UI.order=null;render();break;
+    case "flip":UI.flip=true;render();break;
+    case "reshuffle":UI.order=null;render();break;
+    case "card":{const cards=tacCards(),cd=cards[UI.order[UI.ci%UI.order.length]],ok=b.dataset.v==="1",old=S.tac.prog[cd.id]||{};
+      S.tac.prog[cd.id]={ok,n:ok?(old.ok?(old.n||0)+1:1):0,d:today()};save("tactics/progress",()=>S.tac.prog);
+      UI.ci++;UI.flip=false;if(UI.ci>=UI.order.length){UI.order=null}render();toast(pick(ok?"know":"again"));break}
+    case "copydump":{const ta=document.getElementById("dump");try{await navigator.clipboard.writeText(ta.value);toast("Chép rồi.")}catch(err){ta.focus();ta.select();toast("Hổng chép tự động được, Nhơn bôi đen sẵn rồi đó.")}break}
   }
 });
 main.addEventListener("change",e=>{
@@ -884,6 +1191,7 @@ main.addEventListener("input",e=>{
   if(k==="v"||k==="r"){const dd=mday(d);dd.ex=dd.ex||{};const arr=dd.ex[t.dataset.ex]||(dd.ex[t.dataset.ex]=[]);const i=+t.dataset.i;while(arr.length<=i)arr.push({});const val=t.value.trim();arr[i]={...arr[i]};if(val)arr[i][k]=val;else delete arr[i][k];saveDay(d);return}
   if(k==="pmf"||k==="pmm"||k==="pmn"){const en=mday(d).pm[+t.dataset.i];if(k==="pmf")en.f=t.value;if(k==="pmm"){const n=num(t.value);if(n==null)delete en.m;else en.m=n}if(k==="pmn")en.n=t.value;saveDay(d);return}
   if(k==="met"){const key="w"+t.dataset.w,m=S.metrics[key]||(S.metrics[key]={}),n=num(t.value);if(n==null)delete m[t.dataset.f];else m[t.dataset.f]=n;save("metrics/"+key,()=>{const o=S.metrics[key];return o&&Object.keys(o).length?o:null});return}
+  if(k==="tnote"){const key=t.dataset.k;if(t.value)S.tac.notes[key]=t.value;else delete S.tac.notes[key];save("tactics/notes",()=>S.tac.notes);return}
   if(k==="sf"){UI.scoreForm=t.value;lsSet("sotap.sf",t.value);render();return}
   const f=curForm();if(!f)return;
   if(k==="fname")f.name=t.value;
@@ -910,7 +1218,7 @@ document.getElementById("fileUp").addEventListener("change",async e=>{
     const r=await assets.upload(file,isMov||!file.type?{type:kind==="image"?(file.type||"image/jpeg"):"video/mp4"}:undefined);
     if(UI.form!==fid)UI.form=fid;
     const L=mediaList(ctx);if(L){L.push({kind,asset:r.id,note:file.name});saveForm(fid)}
-    toast("Tải lên xong. Hừ, nhanh đấy chứ.");
+    toast("Tải lên xong rồi. Hứ, nhanh dữ.");
   }catch(err){
     const c=err&&err.code;
     toast(c==="too_large"?"File quá lớn (tối đa 20MB).":c==="unsupported_type"?"Định dạng này không nhận. Dùng MP4/WebM hoặc ảnh JPG/PNG.":c==="quota_or_state"?"Hết dung lượng lưu file rồi.":"Tải lên lỗi ("+(c||"không rõ")+").");
@@ -918,10 +1226,10 @@ document.getElementById("fileUp").addEventListener("change",async e=>{
   UI.uploading=null;render();
 });
 
-function snapshotAll(){return {app:"so-tap-taekwondo",version:1,exportedAt:new Date().toISOString(),settings:{start:S.start},days:S.days,metrics:S.metrics,forms:S.forms}}
+function snapshotAll(){return {app:"so-tap-taekwondo",version:1,exportedAt:new Date().toISOString(),settings:{start:S.start},tactics:S.tac,days:S.days,metrics:S.metrics,forms:S.forms}}
 async function doExport(){
   const json=JSON.stringify(snapshotAll(),null,1);
-  if(downloads){try{await downloads.save({filename:`so-tap-${today()}.json`,data:json});toast("Xuất xong. Cất kỹ vào.");UI.dump=null;render();return}catch(e){if(e&&e.code==="declined"){toast("Không lưu thì thôi.");return}}}
+  if(downloads){try{await downloads.save({filename:`so-tap-${today()}.json`,data:json});toast("Xuất xong rồi. Cất cho kỹ nha chị.");UI.dump=null;render();return}catch(e){if(e&&e.code==="declined"){toast("Hổng lưu thì thôi.");return}}}
   UI.dump=json;render();
 }
 document.getElementById("fileImp").addEventListener("change",e=>{
@@ -938,6 +1246,7 @@ async function doImport(){
   const safe=k=>/^[A-Za-z0-9_\-.~:@+]{1,120}$/.test(k)&&k!=="."&&k!=="..";
   toast("Đang nhập…");
   if(o.settings&&typeof o.settings.start==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(o.settings.start)){S.start=o.settings.start;await put("app/settings",{start:o.settings.start})}
+  if(o.tactics&&typeof o.tactics==="object"){if(o.tactics.notes){S.tac.notes=clone(o.tactics.notes);await put("tactics/notes",o.tactics.notes)}if(o.tactics.prog){S.tac.prog=clone(o.tactics.prog);await put("tactics/progress",o.tactics.prog)}}
   for(const [c,key] of [["days","days"],["metrics","metrics"],["forms","forms"]])for(const [k,v] of Object.entries(o[c]||{})){if(!safe(k))continue;S[key][k]=clone(v);await put(c+"/"+k,v)}
   toast(`Nhập xong ${n} mục.`);render();
 }
