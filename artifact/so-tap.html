@@ -197,6 +197,7 @@ p{margin:0}
 .addmedia{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:10px}
 .linkrow{display:grid;grid-template-columns:1fr auto;gap:8px}
 .linkrow input{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);padding:0 10px;font-size:15px;min-width:0}
+.review{border-top:4px solid var(--poom)}
 .extlink{font-weight:600;color:var(--chung);word-break:break-all}
 
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
@@ -220,7 +221,7 @@ textarea.dump{width:100%;min-height:160px;font-family:ui-monospace,Menlo,monospa
 </div>
 <nav class="tabs" id="tabs" aria-label="Mục"></nav>
 <div class="toast" id="toast" hidden></div>
-<input type="file" id="fileUp" accept="video/mp4,video/webm,video/*,image/*" hidden>
+<input type="file" id="fileUp" accept="video/mp4,video/webm,video/quicktime,.mov,video/*,image/*" hidden>
 <input type="file" id="fileImp" accept="application/json,.json" hidden>
 
 <script>
@@ -720,9 +721,18 @@ function mediaHtml(list,ctx,edit){
 }
 function addMediaHtml(ctx){
   const up=UI.uploading===ctx;
-  return `<div class="addmedia">${assets?`<button class="btn sm" data-act="upload" data-ctx="${esc(ctx)}" ${up?"disabled":""}>${up?"Đang tải lên…":"Tải video / ảnh lên (tối đa 20MB)"}</button>`:`<p class="hint">Trang này không tải file lên được ở chế độ xem hiện tại, dán link thay thế.</p>`}
+  return `<div class="addmedia">${assets?`<button class="btn sm" data-act="upload" data-ctx="${esc(ctx)}" ${up?"disabled":""}>${up?"Đang tải lên…":"Tải video / ảnh lên (MP4, MOV, ảnh · tối đa 20MB)"}</button>`:`<p class="hint">Trang này không tải file lên được ở chế độ xem hiện tại, dán link thay thế.</p>`}
     <div class="linkrow"><input id="lk-${esc(ctx)}" placeholder="Hoặc dán link video (YouTube, Drive…)" inputmode="url" aria-label="Link video"><button class="btn sm" data-act="addlink" data-ctx="${esc(ctx)}">Thêm link</button></div></div>`;
 }
+function reviewHtml(f,E){
+  const rv=f.review||{};
+  if(E)return `<section class="card"><div class="tf"><label for="frv">Nhận xét tổng (mỗi dòng một ý)</label><textarea id="frv" data-in="freview" style="min-height:160px">${esc(rv.text||"")}</textarea></div></section>`;
+  if(!rv.text)return "";
+  const blocks=String(rv.text).split(/\n\s*\n/).map(b=>{const L=b.split("\n").map(x=>x.trim()).filter(Boolean);if(!L.length)return "";const head=/:$/.test(L[0])?`<h4>${esc(L.shift().replace(/:$/,""))}</h4>`:"";const items=L.map(x=>x.replace(/^\s*([-•*]|\d+[.)])\s*/,""));return `<div class="sec">${head}${items.length>1?`<ul>${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:items.length?`<p>${esc(items[0])}</p>`:""}</div>`}).join("");
+  return `<section class="card review"><div class="shead"><h3>Nhận xét</h3><span class="meta">${rv.date?"video ngày "+esc(fmtD(rv.date)):""}</span></div>${blocks}</section>`;
+}
+const parseT=s=>{const m=String(s||"").match(/(\d+):?(\d{0,2})\s*[-–]\s*(\d+):?(\d{0,2})/);if(!m)return null;const t=(a,b)=>b!==""?+a*60+ +b:+a;return [t(m[1],m[2]),t(m[3],m[4])]};
+const fmtT=x=>`${Math.floor(x/60)}:${pad(x%60)}`;
 function vForm(id){
   const f=S.forms[id],E=UI.edit;
   const st=f.status||"learning";
@@ -734,7 +744,7 @@ function vForm(id){
     h+=`<section><h1>${esc(f.name)}</h1>${f.desc?`<p class="muted" style="margin-top:6px">${esc(f.desc)}</p>`:""}</section>`;
   }
   h+=`<div class="seg" role="group" aria-label="Tình trạng">${Object.entries(STATUS).map(([k,l])=>`<button class="st-${k} ${st===k?"on":""}" data-act="fstatus" data-v="${k}" aria-pressed="${st===k}">${l}</button>`).join("")}</div>`;
-  h+=`<section class="card"><div class="shead"><h3>Video cả bài</h3></div><div class="media">${mediaHtml(f.media,"f",E)||`<p class="hint">Chưa có video. Gửi cho Claude kèm lời nhắn là tớ gắn vào đúng chỗ.</p>`}</div>${addMediaHtml("f")}</section>`;
+  h+=`${reviewHtml(f,E)}<section class="card"><div class="shead"><h3>Video cả bài</h3></div><div class="media fmedia">${mediaHtml(f.media,"f",E)||`<p class="hint">Chưa có video. Gửi cho Claude kèm lời nhắn là tớ gắn vào đúng chỗ.</p>`}</div>${addMediaHtml("f")}</section>`;
   const mv=f.moves||[];
   h+=`<section class="shead"><h2>Động tác (${mv.length})</h2>${E?`<button class="btn sm pri" data-act="addmove">+ Thêm động tác</button>`:""}</section>`;
   if(!mv.length)h+=`<div class="chart-empty">Chưa chia động tác nào. ${E?"Bấm “Thêm động tác”.":"Bấm “Sửa” để thêm, hoặc gửi video cho Claude để điền giúp."}</div>`;
@@ -742,11 +752,13 @@ function vForm(id){
     const open=UI.openMoves.has(m.id)||E;
     const ht=m.howTo||{};
     h+=`<details class="move" data-mid="${esc(m.id)}" ${open?"open":""}><summary><span class="mno">${i+1}</span><span><div class="mt">${esc(m.name||"Động tác "+(i+1))}</div>${m.stance?`<div class="ms">${esc(m.stance)}</div>`:""}</span></summary><div class="mbody">`;
+    const tt=parseT(m.t),hasV=(f.media||[]).some(x=>x.kind==="video");
+    if(tt&&hasV&&!E)h+=`<div class="btnrow"><button class="btn sm" data-act="seek" data-a="${tt[0]}" data-b="${tt[1]}">▶ Xem đoạn ${fmtT(tt[0])}–${fmtT(tt[1])} trong video cả bài</button></div>`;
     h+=`<div class="media">${mediaHtml(m.media,"m:"+m.id,E)}</div>`;
     if(E){
       const tf=(k,l,v,ta)=>`<div class="tf"><label for="${k}-${m.id}">${l}</label>${ta?`<textarea id="${k}-${m.id}" data-in="${k}" data-mid="${esc(m.id)}" placeholder="Mỗi dòng một ý">${esc(v||"")}</textarea>`:`<input id="${k}-${m.id}" data-in="${k}" data-mid="${esc(m.id)}" value="${esc(v||"")}">`}</div>`;
       h+=addMediaHtml("m:"+m.id);
-      h+=tf("mname","Tên động tác",m.name)+tf("mstance","Tư thế",m.stance);
+      h+=tf("mname","Tên động tác",m.name)+tf("mstance","Tư thế",m.stance)+tf("mtime","Mốc trong video cả bài (vd 0:08-0:20)",m.t);
       h+=`<div class="sec"><h4>Cách tập để làm được</h4></div>`+tf("msteps","Các bước tách nhỏ",ht.steps,1)+tf("mdrills","Bài tập bổ trợ",ht.drills,1)+tf("mmist","Lỗi hay gặp",ht.mistakes,1)+tf("mbal","Mẹo thăng bằng và xoay hông",ht.balance,1);
       h+=tf("mapply","Cách áp dụng (thực chiến, đối kháng)",m.apply,1);
       h+=`<div class="btnrow"><button class="btn sm" data-act="mup" data-mid="${esc(m.id)}" ${i===0?"disabled":""}>Lên</button><button class="btn sm" data-act="mdown" data-mid="${esc(m.id)}" ${i===mv.length-1?"disabled":""}>Xuống</button><button class="btn sm warn" data-act="mdel" data-mid="${esc(m.id)}">${UI.confirm==="mv"+m.id?"Bấm lần nữa để xoá":"Xoá động tác"}</button></div>`;
@@ -818,6 +830,7 @@ main.addEventListener("click",async e=>{
     case "mediadel":{const k=b.dataset.k;if(!twoTap("md"+k))break;const idx=k.lastIndexOf(":"),ctx=k.slice(0,idx),i=+k.slice(idx+1),L=mediaList(ctx);if(!L)break;const [rm]=L.splice(i,1);saveForm(UI.form);delAssets([rm]);render();break}
     case "addlink":{const ctx=b.dataset.ctx,inp=document.getElementById("lk-"+ctx),v=(inp&&inp.value||"").trim();if(!okUrl(v)){toast("Link phải bắt đầu bằng http:// hoặc https://");break}const L=mediaList(ctx);L.push({kind:"link",url:v});saveForm(UI.form);render();break}
     case "upload":{pendingCtx=b.dataset.ctx;const fi=document.getElementById("fileUp");fi.value="";fi.click();break}
+    case "seek":{const v=document.querySelector(".fmedia video");if(!v)break;const a2=+b.dataset.a,b2=+b.dataset.b;v.scrollIntoView({block:"center",behavior:"smooth"});v.currentTime=a2;const stop=()=>{if(v.currentTime>=b2){v.pause();v.removeEventListener("timeupdate",stop)}};v.addEventListener("timeupdate",stop);v.play().catch(()=>{});break}
     case "rate":{const v=b.closest(".vid").querySelector("video");if(v){v.playbackRate=+b.dataset.r;b.parentElement.querySelectorAll("[data-r]").forEach(x=>x.classList.toggle("on",x===b))}break}
     case "export":doExport();break;
     case "import":{const fi=document.getElementById("fileImp");fi.value="";fi.click();break}
@@ -835,9 +848,10 @@ main.addEventListener("input",e=>{
   if(k==="sf"){UI.scoreForm=t.value;lsSet("sotap.sf",t.value);render();return}
   const f=curForm();if(!f)return;
   if(k==="fname")f.name=t.value;
+  else if(k==="freview"){f.review={...(f.review||{}),text:t.value}}
   else if(k==="fdesc")f.desc=t.value;
   else {const m=findMove(t.dataset.mid);if(!m)return;m.howTo=m.howTo||{};
-    const map={mname:["name"],mstance:["stance"],mapply:["apply"],msteps:["howTo","steps"],mdrills:["howTo","drills"],mmist:["howTo","mistakes"],mbal:["howTo","balance"]}[k];
+    const map={mtime:["t"],mname:["name"],mstance:["stance"],mapply:["apply"],msteps:["howTo","steps"],mdrills:["howTo","drills"],mmist:["howTo","mistakes"],mbal:["howTo","balance"]}[k];
     if(!map)return;if(map.length===1)m[map[0]]=t.value;else m.howTo[map[1]]=t.value}
   saveForm(UI.form);
 });
@@ -850,10 +864,11 @@ document.getElementById("fileUp").addEventListener("change",async e=>{
   const file=e.target.files&&e.target.files[0],ctx=pendingCtx;if(!file||!ctx||!assets)return;
   const fid=UI.form;
   const kind=file.type.startsWith("image/")?"image":"video";
-  if(file.size>20*1024*1024){toast("File quá 20MB. Nén hoặc cắt ngắn rồi thử lại, hoặc dán link.");return}
+  if(file.size>20*1024*1024){toast("File "+Math.round(file.size/1048576)+"MB, quá 20MB. Cắt ngắn hoặc xuất chất lượng thấp hơn (iPhone: Chia sẻ → Tuỳ chọn → bỏ \"Tất cả dữ liệu ảnh\"), hoặc gửi cho Claude nén giúp.");return}
   UI.uploading=ctx;render();
   try{
-    const r=await assets.upload(file);
+    const isMov=/quicktime/i.test(file.type)||/\.mov$/i.test(file.name);
+    const r=await assets.upload(file,isMov||!file.type?{type:kind==="image"?(file.type||"image/jpeg"):"video/mp4"}:undefined);
     if(UI.form!==fid)UI.form=fid;
     const L=mediaList(ctx);if(L){L.push({kind,asset:r.id,note:file.name});saveForm(fid)}
     toast("Tải lên xong. Hừ, nhanh đấy chứ.");
