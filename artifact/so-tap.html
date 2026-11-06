@@ -317,16 +317,15 @@ const SCHED=[
 const STATUS={learning:"Đang học",known:"Thuộc",polish:"Cần trau chuốt"};
 
 /* ===== trạng thái ===== */
-const S={tac:{notes:{},prog:{}},start:null,settingsLoaded:false,days:{},metrics:{},forms:{},loaded:{days:false,metrics:false,forms:false},conn:"loading",readonly:false};
+const S={tac:{notes:{},prog:{}},phase:1,days:{},metrics:{},forms:{},loaded:{days:false,metrics:false,forms:false},conn:"loading",readonly:false};
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const UI={tab:lsGet("sotap.tab")||"day",date:today(),week:null,form:null,edit:false,openMoves:new Set(),scoreForm:lsGet("sotap.sf")||"",confirm:null,dump:null,importData:null,uploading:null};
 let db=null,assets=null,downloads=null;
 
-const startDate=()=>S.start||mondayOf(today());
-const weekOf=d=>Math.floor(diff(startDate(),d)/7)+1;
-const phaseOf=w=>w<1?0:Math.min(3,Math.ceil(w/4));
-const weekStart=w=>add(startDate(),(w-1)*7);
+const wkey=d=>"w"+mondayOf(d);
+const firstDay=()=>{const k=Object.keys(S.days).filter(x=>{const o=S.days[x];return o&&Object.keys(o).length}).sort();return k[0]||null};
+function weekLabel(ws){const cur=mondayOf(today()),n=diff(ws,cur)/7;return n===0?"Tuần này":n===1?"Tuần trước":n===-1?"Tuần sau":`${fmtD(ws)} – ${fmtD(add(ws,6))}`}
 const day=d=>S.days[d]||{};
 const mday=d=>S.days[d]||(S.days[d]={});
 
@@ -408,8 +407,8 @@ async function init(){
     if(ch)soft();
   },onErr("tactics"));
   db.doc("app/settings").onSnapshot(s=>{
-    if(!dirty("app/settings")){const st=s.exists?s.data().start:null;if(st!==S.start){S.start=st||null;soft()}}
-    if(!s.metadata.fromCache){S.settingsLoaded=true;once("settings")}
+    if(!dirty("app/settings")){const ph=s.exists?+s.data().phase:1;const v=ph>=1&&ph<=3?ph:1;if(v!==S.phase){S.phase=v;soft()}}
+    if(!s.metadata.fromCache)once("settings");
   },onErr("settings"));
 }
 
@@ -434,11 +433,6 @@ function sessProgress(d,it){
   return [k,t];
 }
 const reqItems=d=>SCHED[dow(d)].filter(it=>!it.opt);
-function phaseProgress(p){
-  let t=0,k=0;
-  for(let w=(p-1)*4+1;w<=p*4;w++)for(let i=0;i<7;i++){const d=add(weekStart(w),i);for(const it of reqItems(d)){t++;if(sessDone(d,it))k++}}
-  return {k,t,pct:t?k/t:0};
-}
 function rowText(e,r){
   const u=e.u==="s"?"s":"kg";
   if(r.v&&r.r)return `${r.v}${u}×${r.r}`;
@@ -458,7 +452,7 @@ function prevFor(id,d){
   return null;
 }
 const maxV=a=>{let m=null;for(const r of a||[]){const n=r&&num(r.v);if(n!=null&&(m==null||n>m))m=n}return m};
-function weekMax(w,id){let m=null;for(let i=0;i<7;i++){const v=maxV(day(add(weekStart(w),i)).ex?.[id]);if(v!=null&&(m==null||v>m))m=v}return m}
+function weekMax(ws,id){let m=null;for(let i=0;i<7;i++){const v=maxV(day(add(ws,i)).ex?.[id]);if(v!=null&&(m==null||v>m))m=v}return m}
 const pmDays=()=>Object.keys(S.days).filter(k=>(S.days[k].pm||[]).length).sort();
 
 /* lời nhắc nhẹ */
@@ -506,26 +500,25 @@ function barChart(vals,labels,label){
 
 /* ===== thành tựu ===== */
 function achievements(){
-  const keys=Object.keys(S.days).sort(),cw=Math.max(1,weekOf(today()));
+  const keys=Object.keys(S.days).sort(),f0=firstDay(),cur=mondayOf(today());
   const first=keys.some(d=>SCHED[dow(d)].some(it=>sessDone(d,it)));
   let up=false;const best={};
   for(const d of keys)for(const id of ["legpress","legcurl"]){const m=maxV(day(d).ex?.[id]);if(m==null)continue;if(best[id]!=null&&m>best[id])up=true;best[id]=Math.max(best[id]??-Infinity,m)}
   let full=false;
-  for(let w=1;w<=cw&&!full;w++){let ok=true;for(let i=0;i<7&&ok;i++){const d=add(weekStart(w),i);for(const it of reqItems(d))if(!sessDone(d,it)){ok=false;break}}if(ok)full=true}
+  for(let ws=f0?mondayOf(f0):cur;ws<=cur&&!full;ws=add(ws,7)){let ok=true;for(let i=0;i<7&&ok;i++){const d=add(ws,i);for(const it of reqItems(d))if(!sessDone(d,it)){ok=false;break}}if(ok)full=true}
   let hold=false,hb=null;
-  for(let w=1;w<=Math.max(cw,12);w++){const h=S.metrics["w"+w]?.hold;if(h==null)continue;if(hb!=null&&h>hb)hold=true;hb=Math.max(hb??-Infinity,h)}
+  for(const mk of Object.keys(S.metrics).filter(k=>/^w\d{4}-/.test(k)).sort()){const h=S.metrics[mk]?.hold;if(h==null)continue;if(hb!=null&&h>hb)hold=true;hb=Math.max(hb??-Infinity,h)}
   if(!hold){let kb=null;for(const d of keys){const m=maxV(day(d).ex?.kickhold);if(m==null)continue;if(kb!=null&&m>kb){hold=true;break}kb=Math.max(kb??-Infinity,m)}}
-  const pdays=pmDays(),perW={};for(const d of pdays){const w=weekOf(d);perW[w]=(perW[w]||0)+1}
-  let reg=false;const ws=Object.keys(perW).map(Number).sort((a,b)=>a-b);
-  for(const w of ws)if(perW[w]>=2&&perW[w+1]>=2&&perW[w+2]>=2)reg=true;
+  const pdays=pmDays(),perW={};for(const d of pdays){const w=mondayOf(d);perW[w]=(perW[w]||0)+1}
+  let reg=false;
+  for(const w of Object.keys(perW))if(perW[w]>=2&&perW[add(w,7)]>=2&&perW[add(w,14)]>=2)reg=true;
   return [
     {g:"1",n:"Buổi đầu tiên",d:"Xong một buổi bất kỳ.",on:first},
     {g:"+kg",n:"Lên tạ",d:"Lần đầu tăng tạ leg press hoặc leg curl.",on:up},
     {g:"7/7",n:"Tuần không bỏ buổi",d:"Đủ gym, đối kháng và bài nhà bắt buộc trong một tuần.",on:full},
     {g:"+s",n:"Giữ chân lâu hơn",d:"Số giây giữ chân tăng so với trước.",on:hold},
-    {g:"I",n:"Xong Làm quen",d:"Đạt 80% số buổi tuần 1–4.",on:phaseProgress(1).pct>=.8},
-    {g:"II",n:"Xong Tăng sức",d:"Đạt 80% số buổi tuần 5–8.",on:phaseProgress(2).pct>=.8},
-    {g:"III",n:"Xong Bứt phá",d:"Đạt 80% số buổi tuần 9–12.",on:phaseProgress(3).pct>=.8},
+    {g:"II",n:"Lên Tăng sức",d:"Chuyển sang giai đoạn Tăng sức.",on:S.phase>=2},
+    {g:"III",n:"Lên Bứt phá",d:"Chuyển sang giai đoạn Bứt phá.",on:S.phase>=3},
     {g:"P3",n:"Poomsae đều",d:"Luyện poomsae từ 2 lần/tuần, 3 tuần liền.",on:reg},
     {g:"10",n:"10 buổi poomsae",d:"Ghi đủ 10 ngày luyện poomsae.",on:pdays.length>=10}
   ];
@@ -551,18 +544,18 @@ function render(){
 
 function missedText(){
   const t=today(),out=[];
-  for(let i=1;i<=3;i++){const d=add(t,-i);if(weekOf(d)<1||day(d).tired)continue;
+  const f0=firstDay();
+  for(let i=1;i<=3;i++){const d=add(t,-i);if(!f0||d<f0||day(d).tired)continue;
     const miss=reqItems(d).filter(it=>!sessDone(d,it)).map(it=>SESS[it.s].label+(it.light?" nhẹ":""));
     if(miss.length)out.push(`${i===1?"Hôm qua":i===2?"Hôm kia":DN[dow(d)]+" vừa rồi"} bỏ ${miss.join(", ")}`)}
   return out.length?out.join(". ")+" đó nghen.":"";
 }
 function quip(d){
-  const dd=day(d),its=SCHED[dow(d)],w=weekOf(d);
+  const dd=day(d),its=SCHED[dow(d)];
   const all=its.filter(it=>!it.opt).every(it=>sessDone(d,it));
   if(dd.tired)return all?"Xong rồi đó chị. Giờ nghỉ thiệt nha: ăn cho đủ, uống nước, ngủ sớm. Nhơn canh đó.":"Nay chị mệt thì làm nhẹ thôi, 2 set là đủ, vẫn tính là tập. Ăn uống đàng hoàng rồi ngủ sớm nghen chị.";
   if(all&&its.length)return "Trời đựu, xong hết rồi! Ừa… cũng được của ló. Mà đừng có vênh nha!";
   if(dd.hip)return "Đau hông thì đừng gồng nha chị. Tập phần hổng đau thôi, nhói là ngừng, hỏi thầy liền.";
-  if(w<1)return "Chưa tới ngày bắt đầu mà chị đã mò lên rồi. Nôn dữ thần vậy cha!";
   if(d===today()){const m=missedText();if(m)return m+" Hứ, Nhơn hổng có để ý đâu… mà nay tập lại cho đàng hoàng nghe!"}
   const s=its[0].s;
   if(s==="spar")return "Nay đối kháng 1 tiếng rưỡi đó. Hứ, hổng phải Nhơn lo cho chị đâu, mà ra sân đá cho đàng hoàng đi! Coi lại tab Đấu trước khi đi nha.";
@@ -579,7 +572,7 @@ const LINES={
   spar:["Đi đối kháng về rồi hả. Ừa… cũng chăm dữ, đừng có vênh nha!","Một tiếng rưỡi đó chị. Nhơn hổng khen đâu… mà nhớ giãn cơ à."],
   up:["Lên tạ rồi hả? Mèn đét ơi… cũng hổng tệ. Đừng có vênh nha!","Nặng hơn bữa trước đó. Hổng phải Nhơn để ý đâu… tình cờ thấy thôi.","Hứ, tăng tạ được rồi. Giữ kỹ thuật cho đàng hoàng, đừng có làm ẩu."],
   poom:["Luyện quyền rồi hả. Ừa… vậy mới phải chứ.","Ghi rồi đó. Hổng phải Nhơn mong chị luyện đâu, mà đều đều vậy là được.","Xong poomsae. Cũng hổng tệ… đừng có vênh nha!"],
-  phase:["Xong giai đoạn {p} rồi đó! Quá dữ… Nhơn công nhận. Chút xíu thôi nha!","Giai đoạn {p} xong rồi. Hổng phải Nhơn tự hào đâu… mà giỏi thiệt đó chị tui."],
+  phase:["Xong giai đoạn {p}, lên {n} rồi đó! Quá dữ… Nhơn công nhận. Chút xíu thôi nha!","Qua {n} rồi hả. Hổng phải Nhơn tự hào đâu… mà giỏi thiệt đó chị tui."],
   badge:["Mở huy hiệu “{b}” rồi đó. Hứ, Nhơn hổng có mừng giùm đâu.","Huy hiệu “{b}” nè. Ừa… cũng được của ló."],
   soft:["Ừa, vậy là đủ rồi. Nghỉ ngơi đi chị.","Được rồi. Uống nước, ăn cho đủ, tối ngủ sớm nghen.","Mệt mà còn tập được nhiêu đó là đủ rồi, đừng ráng thêm nha chị."],
   softSess:["Xong buổi nhẹ rồi. Giờ nghỉ đi chị, ăn uống đầy đủ, ngủ sớm nghen."],
@@ -592,8 +585,6 @@ const achOn=()=>new Set(achievements().filter(a=>a.on).map(a=>a.n));
 function syncAch(){achSeen=achOn()}
 function cheer(d,kind){
   const now=achOn(),fresh=achSeen?[...now].filter(n=>!achSeen.has(n)):[];achSeen=now;
-  const ph=fresh.find(n=>/^Xong (Làm quen|Tăng sức|Bứt phá)$/.test(n));
-  if(ph)return toast(pick("phase").replace("{p}",ph.slice(5)));
   if(day(d).tired&&kind!=="poom")return toast(pick(kind==="sess"?"softSess":"soft"));
   if(fresh.length)return toast(pick("badge").replace("{b}",fresh[0]));
   toast(pick(kind));
@@ -603,11 +594,10 @@ function bestBefore(id,d){let m=null;for(const k of Object.keys(S.days)){if(k>=d
 const upShown=new Set();
 
 function vDay(){
-  const d=UI.date,dd=day(d),di=dow(d),w=weekOf(d),ph=phaseOf(w);
-  const phName=w<1?"Chưa bắt đầu":w>12?"Sau giáo án":PH[ph].name;
+  const d=UI.date,dd=day(d),di=dow(d),ph=S.phase;
   let h=`<section class="dayhead">
     <button class="iconbtn" data-act="dprev" aria-label="Ngày trước">‹</button>
-    <div class="dtitle"><div class="eyebrow">${w>=1?`Tuần ${w} · ${phName}`:phName}</div><h1>${DN[di]}, ${fmtD(d)}</h1>
+    <div class="dtitle"><div class="eyebrow">Giai đoạn ${PH[ph].name}</div><h1>${DN[di]}, ${fmtD(d)}</h1>
     ${d===today()?`<span class="todaychip">Hôm nay</span>`:`<button class="link" data-act="dtoday">Về hôm nay</button>`}</div>
     <button class="iconbtn" data-act="dnext" aria-label="Ngày sau">›</button></section>`;
   if(d===today())h+=reminder();
@@ -619,7 +609,7 @@ function vDay(){
   h+=`<section class="card"><div class="shead"><h3>Cân buổi sáng</h3><span class="meta">tuỳ chọn</span></div>
     <div class="wrow"><label class="fld"><input id="w-${d}" inputmode="decimal" data-in="w" value="${dd.w!=null?esc(fmtN(dd.w)):""}" placeholder="–" aria-label="Cân nặng buổi sáng (kg)"><span>kg</span></label></div>
     <p class="hint">Sau khi ngủ dậy, cùng giờ mỗi ngày. Bỏ trống cũng được, Nhơn hổng ép.<br>Cân nặng dao động 1-2kg trong ngày là bình thường.</p></section>`;
-  for(const it of SCHED[di])h+=sessHtml(d,it,ph||1);
+  for(const it of SCHED[di])h+=sessHtml(d,it,ph);
   h+=poomCard(d);
   return h;
 }
@@ -694,17 +684,15 @@ function poomCard(d){
 }
 
 function vWeek(){
-  const cw=weekOf(today());
-  if(UI.week==null)UI.week=Math.max(1,cw);
-  const w=UI.week,ws=weekStart(w),ph=phaseOf(w);
-  let h=`<section class="card"><div class="shead"><h2>Ba giai đoạn</h2><span class="meta">12 tuần · từ ${fmtD(startDate())}</span></div><div class="phases">`;
-  for(const p of [1,2,3]){const pr=phaseProgress(p);h+=`<div class="ph ${phaseOf(cw)===p?"cur":""}"><span class="pn">${PH[p].name}</span><span class="small muted num">${PH[p].weeks} · ${pr.k}/${pr.t} buổi</span><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${pr.t}" aria-valuenow="${pr.k}" aria-label="${PH[p].name}"><i style="width:${(pr.pct*100).toFixed(1)}%"></i></div></div>`}
-  h+=`</div>`;
-  if(S.settingsLoaded&&!S.start)h+=`<div class="banner"><b>Chưa chốt ngày bắt đầu.</b>Đang tạm tính từ thứ 2 tuần này. <button class="link" data-act="setstart-now">Chốt luôn</button> hoặc sửa ở tab Khác.</div>`;
-  h+=`</section>`;
+  if(!UI.wk)UI.wk=mondayOf(today());
+  const ws=UI.wk,w=wkey(ws).slice(1);
+  let h=`<section class="card"><div class="shead"><h2>Giai đoạn đang tập</h2><span class="meta">tự chọn khi thấy sẵn sàng</span></div>
+    <div class="seg" role="group" aria-label="Giai đoạn">${[1,2,3].map(p=>`<button class="${S.phase===p?"on":""}" data-act="phase" data-v="${p}" aria-pressed="${S.phase===p}">${PH[p].name}</button>`).join("")}</div>
+    <p class="hint">${esc(PH[S.phase].tip)}</p></section>`;
   h+=`<section class="weeknav"><button class="iconbtn" data-act="wprev" aria-label="Tuần trước">‹</button>
-    <div><div class="eyebrow">${ph?PH[ph].name:"Trước giáo án"}</div><h2>Tuần ${w}</h2><div class="small muted">${fmtD(ws)} – ${fmtD(add(ws,6))}</div></div>
+    <div><div class="eyebrow">Lịch tuần</div><h2>${weekLabel(ws)}</h2><div class="small muted">${fmtD(ws)} – ${fmtD(add(ws,6))}</div></div>
     <button class="iconbtn" data-act="wnext" aria-label="Tuần sau">›</button></section><div class="days">`;
+  const f0=firstDay();
   for(let i=0;i<7;i++){
     const d=add(ws,i),dd=day(d);
     let chips=SCHED[i].map(it=>{const s=SESS[it.s],done=sessDone(d,it);const c=s.kind==="spar"?"t-spar":s.kind==="gym"?"t-gym":"t-home";return `<span class="tag ${c} ${done?"t-done":""}">${s.label}${it.opt?" (tùy chọn)":""}${it.light?" nhẹ":""}</span>`}).join("");
@@ -712,13 +700,13 @@ function vWeek(){
     else if((i===1||i===6)&&!dd.tired&&!dd.hip)chips+=`<span class="tag t-ghost">Gợi ý poomsae</span>`;
     if(dd.tired)chips+=`<span class="tag t-tired">mệt</span>`;
     if(dd.hip)chips+=`<span class="tag t-tired">đau hông</span>`;
-    if(d<today()&&w>=1&&!dd.tired&&reqItems(d).some(it=>!sessDone(d,it)))chips+=`<span class="tag t-miss">bỏ buổi</span>`;
+    if(d<today()&&f0&&d>=f0&&!dd.tired&&reqItems(d).some(it=>!sessDone(d,it)))chips+=`<span class="tag t-miss">bỏ buổi</span>`;
     h+=`<button class="wday ${d===today()?"today":""}" data-act="goday" data-d="${d}"><div><div class="dn">${DS[i]}</div><div class="dd">${fmtD(d)}</div></div><div class="chips">${chips}</div></button>`;
   }
   h+=`</div>`;
-  const m=S.metrics["w"+w]||{},lp=weekMax(w,"legpress"),lc=weekMax(w,"legcurl");
+  const m=S.metrics["w"+w]||{},lp=weekMax(ws,"legpress"),lc=weekMax(ws,"legcurl");
   const mi=(f,l,u,ph2)=>`<div class="tf"><label for="m-${w}-${f}">${l}</label><label class="fld"><input id="m-${w}-${f}" inputmode="decimal" data-in="met" data-w="${w}" data-f="${f}" value="${m[f]!=null?esc(fmtN(m[f])):""}" placeholder="${ph2??""}"><span>${u}</span></label></div>`;
-  h+=`<section class="card"><div class="shead"><h3>Chỉ số tuần ${w}</h3><span class="meta">đo 1 lần/tuần</span></div>
+  h+=`<section class="card"><div class="shead"><h3>Chỉ số ${weekLabel(ws).toLowerCase().replace(/^(\d)/,"tuần $1")}</h3><span class="meta">đo 1 lần/tuần</span></div>
     <div class="metgrid">${mi("lp","(a) Leg press","kg",lp!=null?fmtN(lp):"")}${mi("lc","(a) Leg curl","kg",lc!=null?fmtN(lc):"")}
     ${mi("hold","(b) Giữ chân thẳng ở độ cao đá ngang","giây")}${mi("kicks","(c) Số cú đá trong 30 giây, vẫn giữ độ cao","cú")}</div>
     <p class="hint">Ô (a) gợi ý sẵn mức tạ cao nhất trong tuần nếu chị đã ghi. Đo (b) và (c) cùng một chân, cùng kiểu đá cho công bằng.</p></section>`;
@@ -726,14 +714,14 @@ function vWeek(){
 }
 
 function vProg(){
-  const cw=Math.max(1,weekOf(today())),N=Math.max(12,cw);
-  const xt=[];for(let w=1;w<=N;w+=N>12?2:1)xt.push({x:w,label:"T"+w});
-  const ser=f=>{const p=[];for(let w=1;w<=N;w++){const v=S.metrics["w"+w]?.[f];if(v!=null)p.push({x:w,y:v})}return p};
-  let h=`<section class="card"><div class="shead"><h2>Chỉ số theo tuần</h2></div>
+  const N=12,m0=add(mondayOf(today()),-7*(N-1));
+  const xt=[0,3,6,9,11].map(i=>({x:i,label:fmtD(add(m0,7*i))}));
+  const ser=f=>{const p=[];for(let i=0;i<N;i++){const v=S.metrics[wkey(add(m0,7*i))]?.[f];if(v!=null)p.push({x:i,y:v})}return p};
+  let h=`<section class="card"><div class="shead"><h2>Chỉ số theo tuần</h2><span class="meta">12 tuần gần nhất</span></div>
     <h3>(a) Tạ leg press / leg curl</h3><div class="legend"><span><i style="background:var(--accent)"></i>Leg press</span><span><i style="background:var(--ink)"></i>Leg curl (nét đứt)</span></div>
-    ${lineChart({series:[{pts:ser("lp"),c:"chung",line:1,dots:1,end:1},{pts:ser("lc"),c:"ink",line:1,dots:1,end:1,dash:1}],xmin:1,xmax:N,xticks:xt,label:"Tạ theo tuần",empty:"Chưa có số. Nhập ở tab Tuần, phần Chỉ số tuần."})}
-    <h3>(b) Giây giữ chân thẳng</h3>${lineChart({series:[{pts:ser("hold"),c:"home",line:1,dots:1,end:1}],xmin:1,xmax:N,xticks:xt,label:"Giây giữ chân",empty:"Chưa đo lần nào. Đo đi rồi Nhơn vẽ cho."})}
-    <h3>(c) Cú đá liên tiếp trong 30 giây</h3>${lineChart({series:[{pts:ser("kicks"),c:"poom",line:1,dots:1,end:1}],xmin:1,xmax:N,xticks:xt,label:"Số cú đá",empty:"Chưa có số nào cả."})}
+    ${lineChart({series:[{pts:ser("lp"),c:"chung",line:1,dots:1,end:1},{pts:ser("lc"),c:"ink",line:1,dots:1,end:1,dash:1}],xmin:0,xmax:N-1,xticks:xt,label:"Tạ theo tuần",empty:"Chưa có số. Nhập ở tab Tuần, phần Chỉ số tuần."})}
+    <h3>(b) Giây giữ chân thẳng</h3>${lineChart({series:[{pts:ser("hold"),c:"home",line:1,dots:1,end:1}],xmin:0,xmax:N-1,xticks:xt,label:"Giây giữ chân",empty:"Chưa đo lần nào. Đo đi rồi Nhơn vẽ cho."})}
+    <h3>(c) Cú đá liên tiếp trong 30 giây</h3>${lineChart({series:[{pts:ser("kicks"),c:"poom",line:1,dots:1,end:1}],xmin:0,xmax:N-1,xticks:xt,label:"Số cú đá",empty:"Chưa có số nào cả."})}
   </section>`;
   // cân nặng
   const t=today(),D=56,s0=add(t,-(D-1)),dots=[],avg=[];
@@ -769,8 +757,8 @@ function vPoom(){
   }
   h+=`</div>`;
   // tần suất theo tuần
-  const cw=Math.max(1,weekOf(today())),from=Math.max(1,cw-11),vals=[],lbl=[];
-  for(let w=from;w<from+12;w++){vals.push(pd2.filter(d=>weekOf(d)===w).length);lbl.push("T"+w)}
+  const m0=add(mondayOf(today()),-77),vals=[],lbl=[];
+  for(let i=0;i<12;i++){const ws=add(m0,7*i);vals.push(pd2.filter(d=>mondayOf(d)===ws).length);lbl.push(i%3===0||i===11?fmtD(ws):"")}
   h+=`<section class="card"><div class="shead"><h3>Số ngày luyện mỗi tuần</h3><span class="meta">gợi ý: T3 và CN</span></div>${barChart(vals,lbl,"Tần suất luyện poomsae theo tuần")}</section>`;
   // độ chuẩn
   let sf=UI.scoreForm&&S.forms[UI.scoreForm]?UI.scoreForm:(forms[0]&&forms[0][0])||"";
@@ -1111,8 +1099,6 @@ function vLearn(cards){
 /* ===== khác ===== */
 function vMore(){
   let h=`<h1>Khác</h1>
-  <section class="card"><h3>Ngày bắt đầu giáo án</h3><p class="hint">Thứ 2 của tuần 1. Chọn ngày khác thứ 2 thì Nhơn tự lùi về thứ 2 tuần đó.</p>
-    <div class="linkrow"><input type="date" id="set-start" value="${esc(startDate())}" aria-label="Ngày bắt đầu"><button class="btn pri" data-act="setstart">Lưu</button></div></section>
   <section class="card"><h3>Sao lưu</h3><p class="hint">Dữ liệu chính nằm trong kho của trang, đồng bộ theo tài khoản trên mọi thiết bị. File JSON chỉ để phòng hờ. Video không nằm trong file, chỉ có mã tham chiếu.</p>
     <div class="btnrow"><button class="btn" data-act="export">Xuất JSON</button><button class="btn" data-act="import">Nhập JSON</button></div>`;
   if(UI.importData){const c=UI.importData;h+=`<div class="banner"><b>Sẵn sàng nhập:</b>${Object.keys(c.days||{}).length} ngày, ${Object.keys(c.metrics||{}).length} tuần chỉ số, ${Object.keys(c.forms||{}).length} bài poomsae. Mục trùng sẽ bị ghi đè.<div class="btnrow" style="margin-top:8px"><button class="btn pri sm" data-act="importgo">Nhập luôn</button><button class="btn sm" data-act="importcancel">Thôi</button></div></div>`}
@@ -1142,8 +1128,9 @@ main.addEventListener("click",async e=>{
     case "dnext":UI.date=add(d,1);render();break;
     case "dtoday":UI.date=today();render();break;
     case "goday":UI.date=b.dataset.d;UI.tab="day";lsSet("sotap.tab","day");render();window.scrollTo(0,0);break;
-    case "wprev":UI.week=Math.max(1,UI.week-1);render();break;
-    case "wnext":UI.week=UI.week+1;render();break;
+    case "wprev":UI.wk=add(UI.wk,-7);render();break;
+    case "wnext":UI.wk=add(UI.wk,7);render();break;
+    case "phase":{const v=+b.dataset.v;if(v===S.phase)break;const up=v>S.phase;S.phase=v;save("app/settings",()=>({phase:S.phase}));render();if(up)toast(pick("phase").replace("{p}",PH[v-1].name).replace("{n}",PH[v].name));else{syncAch();toast("Lùi về "+PH[v].name+" cũng được, tập chắc quan trọng hơn tập nhanh nha chị.")}if(up)syncAch();break}
     case "tired":case "hip":{const dd=mday(d);if(dd[a])delete dd[a];else dd[a]=true;saveDay(d);render();if(a==="tired"&&dd.tired)toast("Ừa, nay nhẹ thôi. Nghỉ, ăn, ngủ cho đủ nghen chị.");break}
     case "spar":{const dd=mday(d);if(dd.spar)delete dd.spar;else dd.spar=true;saveDay(d);render();if(dd.spar)cheer(d,"spar");else syncAch();break}
     case "tick":{const dd=mday(d);dd.ex=dd.ex||{};const arr=dd.ex[b.dataset.ex]||(dd.ex[b.dataset.ex]=[]);const i=+b.dataset.i;while(arr.length<=i)arr.push({});const it0=itemForEx(d,b.dataset.ex),was=it0&&sessDone(d,it0);arr[i]={...arr[i],d:!arr[i].d};if(!arr[i].d)delete arr[i].d;saveDay(d);render();if(arr[i].d)cheer(d,it0&&!was&&sessDone(d,it0)?"sess":"tick");else syncAch();break}
@@ -1151,8 +1138,6 @@ main.addEventListener("click",async e=>{
     case "pmadd":{const dd=mday(d);dd.pm=dd.pm||[];const used=dd.pm.map(x=>x.f);const nxt=formsSorted().find(([id,f])=>!used.includes(id)&&f.status!=="known")||formsSorted().find(([id])=>!used.includes(id));dd.pm.push({f:nxt?nxt[0]:"",m:15});saveDay(d);render();cheer(d,"poom");break}
     case "pmdel":{const i=+b.dataset.i;if(!twoTap("pm"+i))break;const dd=mday(d);dd.pm.splice(i,1);if(!dd.pm.length)delete dd.pm;saveDay(d);render();break}
     case "pmscore":{const dd=mday(d),en=dd.pm[+b.dataset.i];en.s=+b.dataset.s;saveDay(d);render();break}
-    case "setstart-now":setStart(mondayOf(today()));break;
-    case "setstart":{const v=document.getElementById("set-start").value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){toast("Chọn ngày đi chị.");break}setStart(mondayOf(v));break}
     case "addform":{const id=uid("f"),mx=Math.max(0,...Object.values(S.forms).map(f=>f.order||0));S.forms[id]={name:"Bài mới",desc:"",status:"learning",order:mx+1,media:[],moves:[]};saveForm(id);UI.form=id;UI.edit=true;render();window.scrollTo(0,0);break}
     case "openform":UI.form=b.dataset.id;UI.edit=false;render();window.scrollTo(0,0);break;
     case "back":UI.form=null;UI.edit=false;render();break;
@@ -1203,7 +1188,6 @@ main.addEventListener("input",e=>{
   saveForm(UI.form);
 });
 
-function setStart(v){S.start=v;save("app/settings",()=>({start:S.start}));UI.week=null;render();toast("Chốt ngày bắt đầu: thứ 2, "+fmtD(v)+".")}
 async function delAssets(list){if(!assets)return;for(const m of list||[]){if(m&&okId(m.asset)&&(m.kind==="video"||m.kind==="image")){try{await assets.delete(m.asset)}catch(e){}}}}
 
 let pendingCtx=null;
@@ -1226,7 +1210,7 @@ document.getElementById("fileUp").addEventListener("change",async e=>{
   UI.uploading=null;render();
 });
 
-function snapshotAll(){return {app:"so-tap-taekwondo",version:1,exportedAt:new Date().toISOString(),settings:{start:S.start},tactics:S.tac,days:S.days,metrics:S.metrics,forms:S.forms}}
+function snapshotAll(){return {app:"so-tap-taekwondo",version:1,exportedAt:new Date().toISOString(),settings:{phase:S.phase},tactics:S.tac,days:S.days,metrics:S.metrics,forms:S.forms}}
 async function doExport(){
   const json=JSON.stringify(snapshotAll(),null,1);
   if(downloads){try{await downloads.save({filename:`so-tap-${today()}.json`,data:json});toast("Xuất xong rồi. Cất cho kỹ nha chị.");UI.dump=null;render();return}catch(e){if(e&&e.code==="declined"){toast("Hổng lưu thì thôi.");return}}}
@@ -1245,7 +1229,7 @@ async function doImport(){
   const put=async(p,data)=>{if(!data||typeof data!=="object"||Array.isArray(data))return;try{await db.doc(p).set(clone(data));n++}catch(e){writeErr(e)}};
   const safe=k=>/^[A-Za-z0-9_\-.~:@+]{1,120}$/.test(k)&&k!=="."&&k!=="..";
   toast("Đang nhập…");
-  if(o.settings&&typeof o.settings.start==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(o.settings.start)){S.start=o.settings.start;await put("app/settings",{start:o.settings.start})}
+  if(o.settings&&[1,2,3].includes(o.settings.phase)){S.phase=o.settings.phase;await put("app/settings",{phase:o.settings.phase})}
   if(o.tactics&&typeof o.tactics==="object"){if(o.tactics.notes){S.tac.notes=clone(o.tactics.notes);await put("tactics/notes",o.tactics.notes)}if(o.tactics.prog){S.tac.prog=clone(o.tactics.prog);await put("tactics/progress",o.tactics.prog)}}
   for(const [c,key] of [["days","days"],["metrics","metrics"],["forms","forms"]])for(const [k,v] of Object.entries(o[c]||{})){if(!safe(k))continue;S[key][k]=clone(v);await put(c+"/"+k,v)}
   toast(`Nhập xong ${n} mục.`);render();
