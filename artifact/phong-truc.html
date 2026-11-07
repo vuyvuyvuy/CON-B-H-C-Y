@@ -635,7 +635,9 @@ const allQs = () => subjectList().flatMap((s) => qsAll(s.code).map((q) => ({ ...
 /* Thẻ đang học/học lại (hẹn 1–10 phút) tính là đến hạn sớm 20 phút như Anki, để bấm "Quên" xong thoát ra vẫn thấy thẻ trong Thắp nhang. */
 const LEARN_AHEAD = 20 * MIN;
 const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now + (q.card.state === "learning" || q.card.state === "relearning" ? LEARN_AHEAD : 0);
-const dueList = () => allQs().filter((q) => !isAnki(q) && isDue(q)).sort((a, b) => a.card.due - b.card.due);
+/* Môn đã thi xong (có lịch thi, không còn kỳ nào sắp tới) thì không đòi Thắp nhang nữa; dữ liệu vẫn giữ, vào lại môn để ôn được. */
+const examOver = (code, now = Date.now()) => { const ex = S.subjects[code]?.exams || []; return ex.length > 0 && !ex.some((e) => !e.done && Date.parse(e.at) > now); };
+const dueList = () => allQs().filter((q) => !isAnki(q) && isDue(q) && !examOver(q.code)).sort((a, b) => a.card.due - b.card.due);
 const lessonName = (code, lid) => (S.subjects[code]?.lessons || []).find((l) => l.id === lid)?.name || "Chưa xếp bài";
 const PATIENTS = ["Anh Tuấn, 34t", "Bà Lan, 67t", "Bé Na, 4t", "Ông Ba, 72t", "Chị Hoa, 28t", "Cô Mai, 45t", "Chú Hùng, 58t", "Em Khoa, 17t", "Bà Sáu, 81t", "Anh Dũng, 41t", "Chị Thảo, 32t", "Bé Bin, 2t"];
 
@@ -1725,7 +1727,7 @@ function viewReview() {
   const R = S.review;
   if (!R) {
     const due = dueList();
-    const upcoming = allQs().filter((q) => !isAnki(q) && q.card && !isDue(q)).sort((a, b) => a.card.due - b.card.due)[0];
+    const upcoming = allQs().filter((q) => !isAnki(q) && q.card && !isDue(q) && !examOver(q.code)).sort((a, b) => a.card.due - b.card.due)[0];
     const bySub = {};
     for (const q of due) ((bySub[q.code] ||= {})[q.lesson] ||= []).push(q);
     const subs = subjectList().filter((x) => bySub[x.code]);
