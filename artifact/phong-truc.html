@@ -185,6 +185,8 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .zoom { position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,.88); display: flex; align-items: center; justify-content: center; padding: 12px; cursor: zoom-out; }
 .zoom img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 .rich ul, .rich ol { margin: 4px 0; padding-left: 20px; }
+.relpick { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.relpick input { margin-top: 4px; width: 18px; height: 18px; flex: none; }
 .rich table { border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; }
 .rich td, .rich th { border: 1px solid var(--line); padding: 3px 6px; }
 .stem.rich { font-weight: 600; }
@@ -379,6 +381,8 @@ function rich(html) {
   const out = root.innerHTML; richCache.set(html, out); return out;
 }
 const isAnki = (q) => q?.kind === "anki";
+/* Trắc nghiệm lý thuyết tự soạn (id lt_…): nằm ở mục riêng, không lẫn vào Đề cũ. */
+const isLT = (q) => typeof q?.id === "string" && q.id.startsWith("lt_");
 const isCase = (q) => q?.kind === "case";
 const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.img) ? `<img class="qimg" src="${S.media?.[q.img] || q.img}" alt="Hình minh họa">` : "");
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem) + qImg(q);
@@ -451,7 +455,7 @@ function write(path, fn) {
 const qPath = (code, id) => `subjects/${code}/questions/${id}`;
 /* Mỗi câu có b = hash(id) % 8: kho chỉ trả tối đa 1000 câu/truy vấn, môn nhiều câu thì chia nhóm theo b. */
 const bucket = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) % 8; };
-const STATE_FIELDS = ["firstSeenAt", "seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "aiNote", "deleted"];
+const STATE_FIELDS = ["firstSeenAt", "seen", "wrong", "card", "lastWrongAt", "explanation", "aiExplained", "aiNote", "deleted", "thap"];
 function rebuild(code) {
   const pack = S.pack[code]?.cards || {}, docs = S.docs[code] || {}, m = {};
   for (const id in pack) { const d = docs[id]; if (d?.deleted) continue; m[id] = { ...pack[id], ...(d || {}), id }; }
@@ -637,7 +641,7 @@ const LEARN_AHEAD = 20 * MIN;
 const isDue = (q, now = Date.now()) => q.card && q.card.state !== "suspended" && q.card.due <= now + (q.card.state === "learning" || q.card.state === "relearning" ? LEARN_AHEAD : 0);
 /* Môn đã thi xong (có lịch thi, không còn kỳ nào sắp tới) thì không đòi Thắp nhang nữa; dữ liệu vẫn giữ, vào lại môn để ôn được. */
 const examOver = (code, now = Date.now()) => { const ex = S.subjects[code]?.exams || []; return ex.length > 0 && !ex.some((e) => !e.done && Date.parse(e.at) > now); };
-const dueList = () => allQs().filter((q) => !isAnki(q) && isDue(q) && !examOver(q.code)).sort((a, b) => a.card.due - b.card.due);
+const dueList = () => allQs().filter((q) => (!isAnki(q) || q.thap) && isDue(q) && !examOver(q.code)).sort((a, b) => a.card.due - b.card.due);
 const lessonName = (code, lid) => (S.subjects[code]?.lessons || []).find((l) => l.id === lid)?.name || "Chưa xếp bài";
 const PATIENTS = ["Anh Tuấn, 34t", "Bà Lan, 67t", "Bé Na, 4t", "Ông Ba, 72t", "Chị Hoa, 28t", "Cô Mai, 45t", "Chú Hùng, 58t", "Em Khoa, 17t", "Bà Sáu, 81t", "Anh Dũng, 41t", "Chị Thảo, 32t", "Bé Bin, 2t"];
 
@@ -680,11 +684,11 @@ function liveStreak() {
 /* ------------------------------------------------------------------ */
 /* Thanh trên cùng chỉ có thứ dùng chung mọi môn; đề cũ, tình huống, cấp cứu, nạp đề nằm trong từng môn. */
 const TABS = [["home", "Các môn"], ["review", "Thắp nhang"], ["ask", "Hỏi bài"], ["graves", "Nghĩa trang"]];
-const SUBTABS = [["subject", "Bài học"], ["cases", "Tình huống"], ["exams", "Đề cũ"], ["anki", "Thẻ Anki"]];
+const SUBTABS = [["subject", "Bài học"], ["cases", "Tình huống"], ["exams", "Đề cũ"], ["lt", "Trắc nghiệm LT"], ["anki", "Thẻ Anki"]];
 const SUBVIEWS = ["subject", "cases", "practice", "er", "import", "reader"];
 const inSubject = () => !!S.subject && !!S.subjects[S.subject] && SUBVIEWS.includes(S.tab);
 /* Mục con nào đang sáng: Cấp cứu nằm trong Tình huống, Nạp đề nằm trong Đề cũ. */
-const curSub = () => S.tab === "practice" ? (S.practice?.kind === "exam" ? "exams" : "anki") : S.tab === "import" ? "exams" : S.tab === "er" ? "cases" : S.tab === "reader" ? "subject" : S.tab;
+const curSub = () => S.tab === "practice" ? (S.practice?.kind === "exam" ? "exams" : S.practice?.kind === "lt" ? "lt" : "anki") : S.tab === "import" ? "exams" : S.tab === "er" ? "cases" : S.tab === "reader" ? "subject" : S.tab;
 const scope = (list) => (S.subject && S.subjects[S.subject] ? list.filter((x) => x.code === S.subject) : list);
 function subjectBar() {
   const s = S.subjects[S.subject];
@@ -702,8 +706,8 @@ function renderNav() {
 }
 function go(tab) {
   if (tab !== (S.practice?.caseRef ? "cases" : "practice")) stashRun();   // về đúng màn hình của phiên thì giữ nguyên
-  if (tab === "exams" || tab === "anki") { S.practice = { code: S.subject, kind: tab === "exams" ? "exam" : "anki" }; tab = "practice"; }
-  if (tab === "practice" && (S.practice?.caseRef || (S.subject && S.practice?.code !== S.subject))) S.practice = { code: S.subject || S.practice.code, kind: S.practice?.kind === "exam" ? "exam" : "anki" };
+  if (tab === "exams" || tab === "anki" || tab === "lt") { S.practice = { code: S.subject, kind: tab === "exams" ? "exam" : tab }; tab = "practice"; }
+  if (tab === "practice" && (S.practice?.caseRef || (S.subject && S.practice?.code !== S.subject))) S.practice = { code: S.subject || S.practice.code, kind: ["exam", "lt"].includes(S.practice?.kind) ? S.practice.kind : "anki" };
   if (S.subject) {          // mục trong môn: trỏ mọi phiên về môn đang mở
     if (tab === "cases") S.cs = { code: S.subject };
     if (tab === "er" && S.er?.code !== S.subject) S.er = { code: S.subject };
@@ -856,8 +860,8 @@ const ANKI_SELF = new Set(["TMH0054"]);
 const ankiTracked = (code) => !ANKI_SELF.has(code);
 /* Cột 5: đề cũ/tình huống chỉ bắt đầu đòi khi còn ≤ 10 ngày thi; trước đó chỉ đòi thẻ Anki. */
 const CASE_START = 10;
-const DEBT_KINDS = [["exam", "Đề cũ", "exams", REVIEW_DAYS, CASE_START], ["case", "Tình huống", "cases", REVIEW_DAYS, CASE_START], ["anki", "Thẻ Anki", "anki", ANKI_FINAL + ANKI_RAMP, Infinity]];
-const kindOf = (q) => isAnki(q) ? "anki" : isCase(q) ? "case" : "exam";
+const DEBT_KINDS = [["exam", "Đề cũ", "exams", REVIEW_DAYS, CASE_START], ["lt", "Trắc nghiệm LT", "lt", REVIEW_DAYS, CASE_START], ["case", "Tình huống", "cases", REVIEW_DAYS, CASE_START], ["anki", "Thẻ Anki", "anki", ANKI_FINAL + ANKI_RAMP, Infinity]];
+const kindOf = (q) => isAnki(q) ? "anki" : isCase(q) ? "case" : isLT(q) ? "lt" : "exam";
 function debtPlan(code, now = new Date()) {
   const examAt = nextExamAt(code); if (!examAt) return null;
   const today = ymd(now), t0 = Date.parse(today);
@@ -1093,7 +1097,7 @@ function viewSubject() {
 
   const rows = lessons.map((l, li) => {
     const items = (byLesson[l.id] || []).sort((a, b) => (isAnki(a) - isAnki(b)) || (isAnki(a) ? ((a.n || 0) - (b.n || 0)) || ((a.createdAt || 0) - (b.createdAt || 0)) : byYear(a, b)));
-    const nAnki = items.filter(isAnki).length, nExam = items.length - nAnki;
+    const nAnki = items.filter(isAnki).length, nLT = items.filter(isLT).length, nExam = items.length - nAnki - nLT;
     const wrong = items.filter((q) => q.wrong > 0).length;
     const due = items.filter((q) => isDue(q)).length;
     const hot = items.filter((q) => q.prio === 3).length;
@@ -1102,7 +1106,7 @@ function viewSubject() {
     const hasNotes = !!S.pack[s.code]?.notes?.[l.id];
     return `<div class="lesson">
       <div style="min-width:0"><h3>${l.id === "_none" ? "" : `<span class="mono dim">${li + 1}.</span> `}${esc(l.name)}</h3>
-        <div class="row" style="gap:6px;margin-top:4px">${nExam ? `<span class="chip blue">${nExam} câu đề</span>` : ""}${nAnki ? `<span class="chip">${nAnki} thẻ Anki</span>` : ""}${!items.length ? `<span class="chip">trống</span>` : ""}${hot ? `<span class="chip amber">★★★ ${hot}</span>` : ""}${wrong ? `<span class="chip red">${wrong} từng sai</span>` : ""}${due ? `<span class="chip amber">${due} đến hạn</span>` : ""}</div></div>
+        <div class="row" style="gap:6px;margin-top:4px">${nExam ? `<span class="chip blue">${nExam} câu đề</span>` : ""}${nLT ? `<span class="chip blue">${nLT} câu LT</span>` : ""}${nAnki ? `<span class="chip">${nAnki} thẻ Anki</span>` : ""}${!items.length ? `<span class="chip">trống</span>` : ""}${hot ? `<span class="chip amber">★★★ ${hot}</span>` : ""}${wrong ? `<span class="chip red">${wrong} từng sai</span>` : ""}${due ? `<span class="chip amber">${due} đến hạn</span>` : ""}</div></div>
       <div class="acts">
         ${items.length ? `<button class="btn small" data-act="toggle-lesson" data-id="${l.id}">${open ? "Đóng" : "Xem"}</button><button class="btn small red" data-act="practice-lesson" data-code="${s.code}" data-id="${l.id}">Luyện</button>` : ""}
         ${S.cases[s.code]?.[l.id]?.length ? `<button class="btn small" data-act="open-cases" data-code="${s.code}" data-lesson="${l.id}">🚑 ${S.cases[s.code][l.id].length} ca</button>` : ""}
@@ -1116,7 +1120,7 @@ function viewSubject() {
   setTimeout(() => backfillCards(s.code), 0);
   const dp = debtPlan(s.code);
   return `${dp ? `<section class="panel stack"><p class="eyebrow" style="color:var(--alarm)">📒 Sổ đòi nợ</p>${debtCard(dp, false)}</section>` : ""}<section class="panel">
-    <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.filter((q) => !isAnki(q)).length} câu đề cũ · ${list.filter(isAnki).length} thẻ Anki</p></div>
+    <div class="row between"><p class="eyebrow">${(s.lessons || []).length} bài · ${list.filter((q) => !isAnki(q) && !isLT(q)).length} câu đề cũ · ${list.filter(isLT).length ? list.filter(isLT).length + " câu trắc nghiệm LT · " : ""}${list.filter(isAnki).length} thẻ Anki</p></div>
     ${lessons.length ? `<div class="lessons">${rows}</div>` : `<div class="empty"><p>Môn này chưa có danh sách bài.</p><p class="note">Thêm bài bên dưới, hoặc cứ nạp đề — Claude sẽ đề xuất bài.</p></div>`}
     <form class="row" data-form="add-lesson" style="margin-top:12px"><input type="text" id="new-lesson" placeholder="Tên bài mới, ví dụ: Viêm tai giữa mạn" style="flex:1;min-width:180px" required><button class="btn">+ Thêm bài</button></form>
   </section>
@@ -1233,18 +1237,56 @@ function feedbackBlock(q, ans, code) {
     ${bad && S.pack[code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><div class="lecture"><span class="eyebrow">📖 Bài soạn</span>Đang tìm đoạn liên quan…</div></div>` : ""}
     ${isCase(q) ? `<div class="explain">${esc(q.why)}</div>` : bad || q.explanation ? `<div class="explain" id="explain">${q.explanation ? esc(q.explanation) : ans.explaining ? "Đang gọi Claude nêu lại kiến thức…" : S.sample ? `<button class="btn small" data-act="explain">Nhờ Claude giảng lại câu này</button>` : "Chưa có giải thích cho câu này."}</div>` : ""}
     ${isCase(q) ? caseExtras(q, code, bad) : ""}
+    ${relatedPanel(q, code, bad)}
     ${q.aiAnswer ? `<p class="note">⚠ Đáp án câu này do AI giải, đề gốc không có đáp án. Thấy sai thì sửa trong trang môn.</p>` : ""}
     <div class="row"><button class="btn ${bad ? "red" : "green"}" data-act="next-q" id="next">${last ? "Xem tổng kết" : "Câu tiếp →"}</button><span class="kbd">Enter</span></div>
   </div>`;
 }
 /* Câu tình huống: thẻ Anki mà câu này phủ + nhờ Claude giảng sâu hơn (lưu riêng, không đè lời giải soạn sẵn). */
 function caseExtras(q, code, bad) {
-  const cards = (q.covers || []).map((id) => S.questions[code]?.[id]).filter(Boolean);
-  const queued = cards.filter((c) => c.card && c.card.due <= Date.now() + DAY).length;
-  return `${cards.length ? `<details class="covers" ${bad ? "open" : ""}><summary class="eyebrow">🗂 ${cards.length} thẻ Anki của bài liên quan câu này</summary>
-      <div class="qlist">${cards.map((c) => `<div class="qitem"><div class="row between">${stars(c)}${c.slide ? `<span class="eyebrow">slide ${esc(c.slide)}</span>` : ""}</div><div class="rich"><b>${rich(c.front)}</b></div><div class="rich note">${qBack(c)}</div></div>`).join("")}</div>
-      ${queued >= cards.length ? `<p class="note mono">Mấy thẻ này đã nằm trong bộ thẻ Anki hôm nay.</p>` : `<button class="btn small amber" data-act="cover-review" data-code="${code}" data-id="${q.id}">Đẩy ${cards.length} thẻ này vào bộ thẻ hôm nay</button>`}</details>` : ""}
-    <div class="explain" id="ainote" ${q.aiNote ? "" : 'style="border-left-color:var(--dim)"'}>${q.aiNote ? esc(q.aiNote) : S.sample ? `<button class="btn small" data-act="explain-deep">Vẫn chưa thông? Nhờ Claude giảng sâu hơn</button>` : ""}</div>`;
+  return `<div class="explain" id="ainote" ${q.aiNote ? "" : 'style="border-left-color:var(--dim)"'}>${q.aiNote ? esc(q.aiNote) : S.sample ? `<button class="btn small" data-act="explain-deep">Vẫn chưa thông? Nhờ Claude giảng sâu hơn</button>` : ""}</div>`;
+}
+/* Thẻ Anki liên quan một câu: câu tình huống dùng danh sách thẻ soạn sẵn (covers); câu khác so cặp âm tiết giữa
+   câu hỏi + đáp án đúng + giải thích với nội dung thẻ (từ hiếm nặng ký hơn), cùng bài được cộng điểm. */
+const relCache = {};
+const plainTxt = (h) => String(h || "").replace(/<[^>]+>/g, " ").toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const bigrams = (t) => { const w = t.split(" ").filter(Boolean), b = new Set(); for (let i = 0; i + 1 < w.length; i++) b.add(w[i] + " " + w[i + 1]); return b; };
+function cardIndex(code) {
+  const qq = S.questions[code] || {}, key = Object.keys(qq).length;
+  if (relCache[code]?.key === key) return relCache[code];
+  const cards = Object.values(qq).filter(isAnki).map((c) => ({ id: c.id, lesson: c.lesson, g: bigrams(plainTxt(`${c.front} ${c.back}`)) }));
+  const df = new Map(); for (const c of cards) for (const g of c.g) df.set(g, (df.get(g) || 0) + 1);
+  return (relCache[code] = { key, cards, df, n: cards.length });
+}
+function relatedCards(code, q, max = 6) {
+  if (q.covers?.length) return q.covers.map((id) => S.questions[code]?.[id]).filter(Boolean);
+  const ix = cardIndex(code); if (!ix.n) return [];
+  const right = (q.options || []).find((o) => o.k === q.answer)?.t || q.answer || "";
+  const qg = bigrams(plainTxt(`${q.stem} ${right} ${q.explanation || q.why || ""}`));
+  const scored = [];
+  for (const c of ix.cards) {
+    let sc = 0; for (const g of qg) if (c.g.has(g)) sc += Math.log(1 + ix.n / ix.df.get(g));
+    if (c.lesson === q.lesson) sc *= 1.3;
+    if (sc >= 4) scored.push([sc, c.id]);
+  }
+  return scored.sort((a, b) => b[0] - a[0]).slice(0, max).map(([, id]) => S.questions[code][id]);
+}
+/* Đúng hay sai đều cho chọn từng thẻ đưa vào Thắp nhang (không ép đưa hết). */
+function relatedPanel(q, code, open) {
+  const cards = relatedCards(code, q); if (!cards.length) return "";
+  const inQ = (c) => !!(c.thap && c.card);
+  return `<details class="covers" ${open || S.relOpen === q.id ? "open" : ""} id="relcards"><summary class="eyebrow">🗂 ${cards.length} thẻ Anki liên quan · chọn thẻ muốn đưa vào Thắp nhang</summary>
+    <div class="qlist">${cards.map((c) => `<label class="qitem relpick"><input type="checkbox" class="relbox" value="${c.id}" ${inQ(c) ? "checked disabled" : ""}><div style="min-width:0;flex:1"><div class="row between">${stars(c)}${inQ(c) ? `<span class="chip amber">đã ở Thắp nhang</span>` : ""}</div><div class="rich"><b>${rich(c.front)}</b></div><div class="rich note">${qBack(c)}</div></div></label>`).join("")}</div>
+    ${cards.every(inQ) ? `<p class="note mono">Mấy thẻ này đã nằm sẵn trong Thắp nhang.</p>` : `<div class="row"><button class="btn small amber" data-act="thap-add" data-code="${code}" data-id="${q.id}">Đưa thẻ đã chọn vào Thắp nhang</button><button class="btn small ghost" data-act="thap-check-all">Chọn hết</button></div>`}</details>`;
+}
+function thapAdd(code, qid) {
+  const ids = [...document.querySelectorAll("#relcards .relbox:checked:not(:disabled)")].map((x) => x.value);
+  if (!ids.length) { toast("Chưa tick thẻ nào. Muốn thắp thì chọn đi."); return; }
+  const now = Date.now();
+  for (const id of ids) { const c = S.questions[code]?.[id]; if (c) saveQuestion(code, { ...c, thap: now, card: c.card ? { ...c.card, due: Math.min(c.card.due, now) } : newCard(now) }); }
+  S.relOpen = qid;
+  toast(`${ids.length} thẻ đã vào Thắp nhang. Nén nhang thêm, tội thêm.`);
+  render();
 }
 function queueCovers(code, id) {
   const q = S.questions[code]?.[id]; if (!q) return;
@@ -1263,16 +1305,17 @@ function practiceSetup() {
   const code = S.subject && S.subjects[S.subject] ? S.subject : P.code;
   const s = S.subjects[code];
   if (!s) return `<div class="empty"><p class="muted">Chọn một môn trước.</p></div>`;
-  const exam = P.kind === "exam";
-  const list = qs(code).filter((q) => (exam ? !isAnki(q) : isAnki(q)));
-  const head = exam
+  const lt = P.kind === "lt", exam = P.kind === "exam" || lt;
+  const list = qs(code).filter((q) => (lt ? isLT(q) : exam ? !isAnki(q) && !isLT(q) : isAnki(q)));
+  const head = lt ? `<h2>Trắc nghiệm lý thuyết</h2><p class="muted">Câu tự soạn từ bài soạn, chia theo bài, 4 lựa chọn, gài bẫy kiểu đổi nửa ý, số liệu, ngoại trừ. Không trộn với đề cũ. Sai câu nào thì câu đó vào Thắp nhang; làm xong mỗi câu có thể chọn thẻ Anki liên quan đưa vào Thắp nhang.</p>`
+    : exam
     ? `<div class="row between"><h2>Đề cũ</h2><button class="btn small" data-act="sub" data-id="import">+ Nạp đề năm khác</button></div><p class="muted">Câu thi các năm trước, đã xếp vào từng bài. Làm lại nguyên một đề theo đúng thứ tự, hoặc trộn câu theo bài. Sai câu nào thì câu đó vào Thắp nhang.</p>`
     : `<h2>Thẻ Anki</h2><p class="muted">Thẻ của bạn, mặt sau có câu cà khịa. Mỗi phiên là một bệnh nhân 100 HP; sai một thẻ mất 20 HP và thẻ đó vào Thắp nhang.</p>`;
-  if (!list.length) return head + (exam
+  if (!list.length) return head + (lt ? `<div class="empty"><h2>Môn này chưa có trắc nghiệm lý thuyết</h2><p class="muted">Nhờ Claude soạn trong khung chat.</p></div>` : exam
     ? `<div class="empty"><h2>Chưa có đề cũ nào</h2><p class="muted">Dán đề các năm trước vào, Claude tách câu và xếp vào đúng bài.</p><button class="btn red" data-act="sub" data-id="import">Nạp đề cũ</button></div>`
     : `<div class="empty"><h2>Môn này chưa có thẻ Anki</h2><p class="muted">Gửi file .apkg cho Claude trong khung chat.</p></div>`);
   const lessonsWithQ = (s.lessons || []).filter((l) => list.some((q) => q.lesson === l.id));
-  const sources = exam ? Object.entries(list.reduce((m, q) => { const k = q.source || "Không rõ nguồn"; (m[k] ||= []).push(q); return m; }, {}))
+  const sources = exam && !lt ? Object.entries(list.reduce((m, q) => { const k = q.source || "Không rõ nguồn"; (m[k] ||= []).push(q); return m; }, {}))
     .sort((a, b) => Math.max(...b[1].map((q) => q.year || 0)) - Math.max(...a[1].map((q) => q.year || 0))) : [];
   const nRep = exam ? list.filter((q) => repN(q) >= 2).length : 0;
   return head + `
@@ -1283,14 +1326,14 @@ function practiceSetup() {
   ${exam ? "" : deckPanel(code, list, lessonsWithQ)}
   <form class="panel stack" data-form="start-practice">
     <p class="eyebrow">${exam ? "Hoặc trộn câu theo bài" : "Hoặc luyện tự chọn"}</p>
-    <input type="hidden" id="p-code" value="${code}"><input type="hidden" id="p-kind" value="${exam ? "exam" : "anki"}">
+    <input type="hidden" id="p-code" value="${code}"><input type="hidden" id="p-kind" value="${lt ? "lt" : exam ? "exam" : "anki"}">
     <div class="row" style="align-items:end">
       <label class="field" style="flex:1;min-width:180px">Bài<select id="p-lesson"><option value="">Cả môn (${list.length})</option>${lessonsWithQ.map((l) => `<option value="${l.id}" ${P.lesson === l.id ? "selected" : ""}>${esc(l.name)} (${list.filter((q) => q.lesson === l.id).length})</option>`).join("")}</select></label>
       ${exam ? `<input type="hidden" id="p-prio" value="0">` : `<label class="field" style="flex:1;min-width:150px">Mức<select id="p-prio">
         <option value="0">Mọi mức</option><option value="3">Chỉ ★★★ hay thi</option><option value="2">Bỏ câu ít ra thi</option></select></label>`}
       <label class="field" style="flex:1;min-width:150px">Lọc<select id="p-mode">
-        <option value="all">Tất cả</option>${exam ? `<option value="rep">Chỉ câu ra ≥ 2 đề (${nRep})</option>` : ""}<option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
-      ${exam ? `<label class="field" style="flex:1;min-width:150px">Thứ tự<select id="p-order"><option value="year">Năm mới → cũ</option><option value="rep">Ra nhiều lần trước</option><option value="rand">Ngẫu nhiên</option></select></label>` : `<input type="hidden" id="p-order" value="rand">`}
+        <option value="all">Tất cả</option>${exam && !lt ? `<option value="rep">Chỉ câu ra ≥ 2 đề (${nRep})</option>` : ""}<option value="wrong">Chỉ câu từng sai</option><option value="new">Chỉ câu chưa làm</option></select></label>
+      ${exam && !lt ? `<label class="field" style="flex:1;min-width:150px">Thứ tự<select id="p-order"><option value="year">Năm mới → cũ</option><option value="rep">Ra nhiều lần trước</option><option value="rand">Ngẫu nhiên</option></select></label>` : `<input type="hidden" id="p-order" value="rand">`}
     </div>
     <div class="row" style="align-items:end">
       <label class="field" style="width:120px">Số câu<input type="number" id="p-n" min="1" max="300" value="20"></label>
@@ -1362,7 +1405,8 @@ function practiceSummary() {
 }
 function startPractice(code, lesson, mode, n, kind = "all", prio = 0, order = "rand") {
   let pool = qs(code).filter((q) => !lesson || q.lesson === lesson);
-  if (kind === "exam") pool = pool.filter((q) => !isAnki(q));
+  if (kind === "exam") pool = pool.filter((q) => !isAnki(q) && !isLT(q));
+  if (kind === "lt") pool = pool.filter(isLT);
   if (kind === "anki") pool = pool.filter(isAnki);
   if (prio) pool = pool.filter((q) => !q.prio || q.prio >= prio);
   if (mode === "wrong") pool = pool.filter((q) => q.wrong > 0);
@@ -1756,6 +1800,7 @@ function viewReview() {
       ${!q.options?.length ? `<div class="back rich">${qBack(q)}</div>` : ""}
       ${S.pack[it.code]?.notes?.[q.lesson] ? `<div id="lecture" class="stack" style="gap:8px"><button class="btn small ghost" data-act="show-lecture" style="justify-self:start">📖 Xem đoạn bài soạn</button></div>` : ""}
       ${isCase(q) ? `<div class="explain">${esc(q.why)}</div>${q.aiNote ? `<div class="explain">${esc(q.aiNote)}</div>` : ""}` : q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : S.sample ? `<div class="explain" id="explain"><button class="btn small" data-act="explain-review">Nhờ Claude giảng lại</button></div>` : ""}
+      ${isAnki(q) ? "" : relatedPanel(q, it.code, false)}
       <div class="row">
         <button class="btn red" data-act="rate" data-r="again">Quên <span class="kbd">1</span></button>
         <button class="btn" data-act="rate" data-r="hard">Lờ mờ <span class="kbd">2</span></button>
@@ -1774,6 +1819,7 @@ function rateCard(r) {
   const q = { ...S.questions[it.code][it.id] };
   const now = Date.now();
   q.card = schedule(q.card || newCard(now), r, now, nextExamAt(it.code));
+  if (q.thap && r !== "again") q.thap = undefined;   // thẻ Anki thắp tay: nhớ rồi thì trả về bộ thẻ
   bumpStreak(it.code);
   saveQuestion(it.code, q);
   saveStats();
@@ -2146,7 +2192,7 @@ document.addEventListener("click", async (ev) => {
     case "toggle-lesson": S.openLesson = S.openLesson === d.id ? null : d.id; S.openLimit = 40; render(); break;
     case "practice-subject": S.subject = d.code; go("anki"); break;
     case "sub": go(d.id); break;
-    case "pay-debt": stashRun(); S.subject = d.code; if (d.id === "exams" || d.id === "anki") { S.practice = { code: d.code, kind: d.id === "exams" ? "exam" : "anki" }; } go(d.id); break;
+    case "pay-debt": stashRun(); S.subject = d.code; if (d.id === "exams" || d.id === "anki" || d.id === "lt") { S.practice = { code: d.code, kind: d.id === "exams" ? "exam" : d.id }; } go(d.id); break;
     case "practice-lesson": startPractice(d.code, d.id === "_none" ? "" : d.id, "all", 20); break;
     case "import-subject": S.subject = d.code; S.imp = { code: d.code, source: "", text: "", items: null }; go("import"); break;
     case "rename-lesson": {
@@ -2180,6 +2226,8 @@ document.addEventListener("click", async (ev) => {
     case "explain": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice); break; }
     case "explain-deep": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice, "aiNote"); break; }
     case "cover-review": queueCovers(d.code, d.id); break;
+    case "thap-add": thapAdd(d.code, d.id); break;
+    case "thap-check-all": document.querySelectorAll("#relcards .relbox:not(:disabled)").forEach((x) => { x.checked = true; }); break;
     case "play-case": playCase(d.id); break;
     case "case-wrong": playWrong(d.code, d.lesson); break;
     case "case-subject": S.cs = { code: d.code }; render(); break;
