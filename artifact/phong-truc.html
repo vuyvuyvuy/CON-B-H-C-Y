@@ -208,6 +208,7 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 /* ---------- câu bựa ---------- */
 .fun { margin: 0; font-size: 16.5px; line-height: 1.6; }
 .fun mark { background: none; color: #ff8f80; font-weight: 700; }
+.fun.meo { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(127,127,127,.35); font-size: 15.5px; }
 details.orig { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 14px; color: var(--muted); }
 details.orig > summary { cursor: pointer; }
 
@@ -390,9 +391,11 @@ const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem) + qImg(q);
 /* Thẻ Anki có câu "bựa" (fun, **đậm** = keyword) thì hiện câu bựa trước, bản gốc gập lại bên dưới (mở sẵn nếu có hình). */
 const funHTML = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<mark>$1</mark>");
+/* Mẹo nhớ (meo): dòng riêng dưới câu bựa, chủ yếu cho thẻ liệt kê. */
+const meoHTML = (q) => q.meo ? `<p class="fun meo">🧠 <b>Mẹo:</b> ${funHTML(q.meo)}</p>` : "";
 const qBack = (q) => !isAnki(q) ? esc(q.answer)
-  : q.fun ? `<p class="fun">${funHTML(q.fun)}</p><details class="orig" ${/<img|<table/.test(q.back) ? "open" : ""}><summary class="eyebrow">Bản gốc (Anki)</summary>${rich(q.back)}</details>`
-  : rich(q.back);
+  : q.fun ? `<p class="fun">${funHTML(q.fun)}</p>${meoHTML(q)}<details class="orig" ${/<img|<table/.test(q.back) ? "open" : ""}><summary class="eyebrow">Bản gốc (Anki)</summary>${rich(q.back)}</details>`
+  : meoHTML(q) + rich(q.back);
 const STARS = { 3: "★★★ hay thi", 2: "★★ cần nhớ", 1: "★ ít ra thi" };
 const stars = (q) => q.prio ? `<span class="stars">${STARS[q.prio]}</span>` : "";
 /* Câu đề cũ: năm thi (YYYYMMDD) và danh sách các đề từng ra câu này (hoặc biến thể của nó). */
