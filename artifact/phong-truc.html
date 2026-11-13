@@ -217,8 +217,8 @@ details.orig > summary { cursor: pointer; }
 .chip.rep { border-color: var(--warn); color: var(--warn); }
 .rep-line { margin-top: 6px; }
 .grid2 > *, .stack > * { min-width: 0; }
-.tchart { overflow: hidden; padding: 0 14px; display: flex; align-items: stretch; gap: 3px; height: 150px; }
-.tcol { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; flex: 1; min-width: 0; display: grid; grid-template-rows: 14px 1fr 14px; align-items: end; justify-items: center; }
+.tchart { overflow-x: auto; overflow-y: hidden; padding: 0 14px; display: flex; align-items: stretch; gap: 3px; height: 150px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: thin; overscroll-behavior-x: contain; }
+.tcol { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; flex: 0 0 calc((100% - 39px) / 14); min-width: 0; scroll-snap-align: end; display: grid; grid-template-rows: 14px 1fr 14px; align-items: end; justify-items: center; }
 .tstack { width: 100%; max-width: 22px; align-self: end; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; background: var(--line); opacity: .8; }
 .tstack.now { opacity: 1; outline: 1px solid var(--fg); outline-offset: 1px; }
 .tstack i { display: block; min-height: 2px; }
@@ -995,21 +995,25 @@ function studyRoast(k, min) {
 /* Mỗi môn một màu cố định theo thứ tự môn; bảng màu tách bạch được trên nền tối. */
 const SUBJ_COLORS = ["#5cc8ff", "#ff8a5c", "#3ddc97", "#c58cff", "#ffd166", "#ff5c8a", "#4fd1c5", "#a3e635", "#f472b6", "#94a3b8"];
 const subjColor = (code) => { if (code === "?") return "#6b7a80"; const i = subjectList().findIndex((x) => x.code === code); return SUBJ_COLORS[(i < 0 ? 9 : i) % SUBJ_COLORS.length]; };
+/* Hiện 14 ngày gần nhất, lướt ngang sang trái xem ngày cũ (tới ngày có dữ liệu sớm nhất, tối đa 120 ngày). Số liệu tổng tính trên 14 ngày gần nhất. */
 function studyChart(days = 14) {
   const m = S.stats.studyMs || {}, now = Date.now();
-  const rows = Array.from({ length: days }, (_, i) => {
-    const t = now - (days - 1 - i) * DAY; const k = ymd(new Date(t)); const parts = dayStudy(m[k]);
+  const first = Object.keys(m).sort()[0];
+  const all = Math.min(120, Math.max(days, first ? Math.round((Date.parse(ymd(new Date(now))) - Date.parse(first)) / DAY) + 1 : days));
+  const rowsAll = Array.from({ length: all }, (_, i) => {
+    const t = now - (all - 1 - i) * DAY; const k = ymd(new Date(t)); const parts = dayStudy(m[k]);
     const by = Object.entries(parts).map(([c, ms]) => [c, ms / 60e3]).sort((a, b) => subjectList().findIndex((x) => x.code === a[0]) - subjectList().findIndex((x) => x.code === b[0]));
     return { k, by, min: Math.round(by.reduce((a, [, v]) => a + v, 0)), d: k.slice(8) + "/" + k.slice(5, 7) };
   });
+  const rows = rowsAll.slice(-days), maxAll = Math.max(60, ...rowsAll.map((r) => r.min)), topAll = Math.max(...rowsAll.map((x) => x.min));
   const max = Math.max(60, ...rows.map((r) => r.min)), tot = rows.reduce((a, r) => a + r.min, 0), act = rows.filter((r) => r.min).length;
   const fmt = (n) => n >= 60 ? `${Math.floor(n / 60)}h${String(n % 60).padStart(2, "0")}` : `${n}p`;
   const name = (c) => c === "?" ? "Chưa rõ môn" : S.subjects[c]?.name || c;
   const today = rows[rows.length - 1].min, top = Math.max(...rows.map((x) => x.min));
   const sum = {}; for (const r of rows) for (const [c, v] of r.by) sum[c] = (sum[c] || 0) + v;
   const legend = Object.entries(sum).sort((a, b) => b[1] - a[1]);
-  return `<section class="panel stack"><div class="row between" style="align-items:baseline"><p class="eyebrow">Thời gian học · ${days} ngày</p><span class="mono">${fmt(today)} hôm nay</span></div>
-    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày, chia màu theo môn">${rows.map((r, i) => `<button class="tcol" data-act="study-roast" data-k="${r.k}" data-m="${r.min}" title="${r.d}: ${fmt(r.min)}${r.by.length ? " — " + r.by.map(([c, v]) => `${name(c)} ${fmt(Math.round(v))}`).join(", ") : ""}"><span class="tv">${i === days - 1 || r.min === top && r.min ? fmt(r.min) : ""}</span><span class="tstack ${i === days - 1 ? "now" : ""}" style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / max * 100))}%">${r.by.map(([c, v]) => `<i style="flex:${v};background:${subjColor(c)}"></i>`).join("")}</span><span class="tl">${(days - 1 - i) % 2 === 0 ? r.d : ""}</span></button>`).join("")}</div>
+  return `<section class="panel stack"><div class="row between" style="align-items:baseline"><p class="eyebrow">Thời gian học · ${days} ngày gần nhất${all > days ? " · ← lướt xem ngày cũ" : ""}</p><span class="mono">${fmt(today)} hôm nay</span></div>
+    <div class="tchart" role="img" aria-label="Biểu đồ thời gian học mỗi ngày, chia màu theo môn">${rowsAll.map((r, i) => `<button class="tcol" data-act="study-roast" data-k="${r.k}" data-m="${r.min}" title="${r.d}: ${fmt(r.min)}${r.by.length ? " — " + r.by.map(([c, v]) => `${name(c)} ${fmt(Math.round(v))}`).join(", ") : ""}"><span class="tv">${i === all - 1 || r.min === topAll && r.min ? fmt(r.min) : ""}</span><span class="tstack ${i === all - 1 ? "now" : ""}" style="height:${Math.max(r.min ? 4 : 1, Math.round(r.min / maxAll * 100))}%">${r.by.map(([c, v]) => `<i style="flex:${v};background:${subjColor(c)}"></i>`).join("")}</span><span class="tl">${(all - 1 - i) % 2 === 0 ? r.d : ""}</span></button>`).join("")}</div>
     ${legend.length ? `<div class="tlegend">${legend.map(([c, v]) => `<span><i style="background:${subjColor(c)}"></i>${esc(name(c))} <b class="mono">${fmt(Math.round(v))}</b></span>`).join("")}</div>` : ""}
     <p class="debt-roast" id="troast" style="color:var(--muted)">Bấm vào một cột để nghe khịa.</p>
     <p class="note">${act ? `Trung bình ${fmt(Math.round(tot / act))}/ngày có học · tổng ${fmt(tot)}` : "Chưa có dữ liệu. Thời gian tính từ lúc bạn chấm câu/thẻ đầu tiên, nghỉ quá 3 phút thì không cộng."}</p></section>`;
@@ -2339,7 +2343,7 @@ document.addEventListener("keydown", (ev) => {
     else if (S.er.answered && key === "Enter") { ev.preventDefault(); erNext(); }
   }
 });
-function afterRender() { $("#next")?.focus({ preventScroll: true }); }
+function afterRender() { $("#next")?.focus({ preventScroll: true }); document.querySelectorAll(".tchart").forEach((el) => { el.scrollLeft = el.scrollWidth; }); }
 async function loadSavedCase(code) {
   if (!S.db || !code) return;
   S.er = S.er?.code === code ? S.er : { code };
