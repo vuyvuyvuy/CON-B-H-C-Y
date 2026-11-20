@@ -192,6 +192,10 @@ textarea { min-height: 220px; resize: vertical; font: 13px/1.5 var(--font-mono);
 .stem.rich { font-weight: 600; }
 .back { border-top: 1px dashed var(--line); padding-top: 12px; font-size: 16px; }
 .stars { font: 700 11px var(--font-mono); color: var(--warn); letter-spacing: 1px; }
+.pdfpage { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: zoom-in; }
+.pdfwrap.zoom { overflow-x: auto; }
+.pdfwrap.zoom .pdfpage { width: 200%; max-width: none; cursor: zoom-out; }
+.lecture .pdfthumb { width: 100%; max-height: 260px; object-fit: cover; object-position: top; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
 .lecture { background: var(--bg); border-left: 3px solid var(--ecg); border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 14px; white-space: pre-line; display: grid; gap: 6px; }
 .lecture .eyebrow { color: var(--ecg); }
 .reader { white-space: pre-line; font-size: 15px; line-height: 1.65; background: var(--bg); border-radius: 8px; padding: 14px; border: 1px solid var(--line); overflow-wrap: anywhere; }
@@ -333,6 +337,7 @@ const S = {
   cases: {},               // code -> { lessonId -> [ca tình huống soạn sẵn] }
   caseById: {},            // id ca -> ca (kèm code, lesson)
   notesCache: {},          // file -> [trang]
+  notesPdf: {},            // file -> { imgs: [ảnh từng trang PDF gốc], pno: [số trang thật trong PDF] }
   media: {},               // tên hình -> URL trong kho ảnh của artifact (dữ liệu nhúng)
   reader: null,            // trình đọc bài soạn
   graves: {},
@@ -407,7 +412,7 @@ const byYear = (a, b) => ((b.year || 0) - (a.year || 0)) || (a.source || "").loc
 /* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
 async function loadNotes(code, lesson) {
   const file = S.pack[code]?.notes?.[lesson]; if (!file) return null;
-  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => j?.pages || null).catch(() => null);
+  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => { if (j?.imgs) S.notesPdf[file] = { imgs: j.imgs, pno: j.pno }; return j?.pages || null; }).catch(() => null);
   return S.notesCache[file];
 }
 const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
@@ -425,11 +430,22 @@ function passages(pages, q, k = 2) {
   });
   return out.sort((a, b) => b.score - a.score).slice(0, k).filter((x) => x.score > 0.4);
 }
+/* Bài soạn có ảnh PDF gốc: pno[i] là số trang thật của trang chữ thứ i (ảnh imgs[i]). */
+const notesKey = (code, lesson) => S.pack[code]?.notes?.[lesson];
+const pdfOf = (code, lesson) => S.notesPdf[notesKey(code, lesson)] || null;
+const realPage = (code, lesson, i) => pdfOf(code, lesson)?.pno?.[i - 1] || i;
 async function lectureHTML(code, q, k = 2) {
   const pages = await loadNotes(code, q.lesson);
   if (!pages) return "";
+  const pdf = pdfOf(code, q.lesson);
+  // thẻ có sẵn số trang (soạn từ bài soạn PDF) thì dùng luôn, khỏi dò chữ
+  if (pdf && q.page) {
+    const i = (pdf.pno || []).indexOf(+q.page) + 1 || +q.page;
+    return `<div class="lecture"><span class="eyebrow">📄 Bài soạn · trang ${q.page}</span>${pdf.imgs?.[i - 1] ? `<img class="pdfthumb" src="${pdf.imgs[i - 1]}" alt="Trang ${q.page}" loading="lazy" onerror="this.remove()">` : ""}<span><button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${i}">📄 Mở trang ${q.page}</button></span></div>`;
+  }
   const ps = passages(pages, q, k);
   if (!ps.length) return `<div class="lecture"><span class="eyebrow">📖 Bài soạn</span><span class="note">Không tìm thấy đoạn khớp. <button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}">Mở bài soạn</button></span></div>`;
+  if (pdf) return ps.map((p) => { const rp = realPage(code, q.lesson, p.page); return `<div class="lecture"><span class="eyebrow">📄 Bài soạn · trang ${rp}</span>${pdf.imgs?.[p.page - 1] ? `<img class="pdfthumb" src="${pdf.imgs[p.page - 1]}" alt="Trang ${rp}" loading="lazy" onerror="this.remove()">` : ""}<span class="note">${esc(p.text.length > 220 ? p.text.slice(0, 220) + "…" : p.text)}</span><span><button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${p.page}">📄 Mở trang ${rp}</button></span></div>`; }).join("");
   return ps.map((p) => `<div class="lecture"><span class="eyebrow">📖 Bài soạn · trang ${p.page}</span>${esc(p.text.length > 900 ? p.text.slice(0, 900) + "…" : p.text)}<span><button class="btn small ghost" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${p.page}">Mở trang ${p.page}</button></span></div>`).join("");
 }
 async function fillLecture(code, q) {
@@ -1168,15 +1184,18 @@ function viewReader() {
   const qn = norm(R.q || "");
   const hits = qn ? pages.map((t, i) => [i + 1, norm(t).includes(qn)]).filter(([, h]) => h).map(([i]) => i) : [];
   const page = Math.min(Math.max(1, R.page), pages.length || 1);
+  const pdf = S.notesPdf[key]; const img = pdf?.imgs?.[page - 1]; const showImg = img && !R.text;
+  const rp = (i) => pdf?.pno?.[i - 1] || i;
   let text = esc(pages[page - 1] || "");
   if (R.q) text = text.replace(new RegExp(R.q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`);
   return `<div class="row between"><button class="btn small ghost" data-act="open-subject" data-code="${R.code}">← ${esc(s.name)}</button></div>
   <div class="row between"><h1>Bài soạn</h1>
     <select data-act="reader-lesson" style="width:auto;max-width:100%">${lessons.map((l) => `<option value="${l.id}" ${l.id === R.lesson ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></div>
   <form class="row" data-form="reader-search"><input type="text" id="r-q" placeholder="Tìm trong bài, ví dụ: Rosenmüller" value="${esc(R.q || "")}" style="flex:1;min-width:160px"><button class="btn small">Tìm</button></form>
-  ${R.q ? `<p class="note">${hits.length ? `Có ở trang: ${hits.map((h) => `<button class="btn small ghost" data-act="reader-page" data-page="${h}">${h}</button>`).join(" ")}` : "Không thấy trong bài này."}</p>` : ""}
-  <div class="row between"><button class="btn small" data-act="reader-page" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>← Trang trước</button><span class="mono">Trang ${page}/${pages.length}</span><button class="btn small" data-act="reader-page" data-page="${page + 1}" ${page >= pages.length ? "disabled" : ""}>Trang sau →</button></div>
-  <article class="reader">${text}</article>`;
+  ${R.q ? `<p class="note">${hits.length ? `Có ở trang: ${hits.map((h) => `<button class="btn small ghost" data-act="reader-page" data-page="${h}">${rp(h)}</button>`).join(" ")}` : "Không thấy trong bài này."}</p>` : ""}
+  <div class="row between"><button class="btn small" data-act="reader-page" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>← Trang trước</button><span class="mono">Trang ${rp(page)}${pdf?.pno ? ` (PDF)` : `/${pages.length}`}</span><button class="btn small" data-act="reader-page" data-page="${page + 1}" ${page >= pages.length ? "disabled" : ""}>Trang sau →</button></div>
+  ${img ? `<div class="row" style="gap:6px"><button class="btn small ghost" data-act="reader-mode">${showImg ? "Xem dạng chữ" : "📄 Xem trang PDF gốc"}</button>${showImg ? `<span class="note">Chạm ảnh để phóng to</span>` : ""}</div>` : ""}
+  ${showImg ? `<div class="pdfwrap" id="pdfwrap"><img class="pdfpage" src="${img}" alt="Trang ${rp(page)}" data-act="pdf-zoom" onerror="this.parentNode.innerHTML='<p class=note>Không tải được ảnh trang, xem dạng chữ bên dưới.</p>'"></div><details><summary class="note">Chữ của trang này</summary><article class="reader">${text}</article></details>` : `<article class="reader">${text}</article>`}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2243,6 +2262,8 @@ document.addEventListener("click", async (ev) => {
     case "self-grade": answerPractice(null, d.r); break;
     case "open-reader": S.reader = { code: d.code, lesson: d.lesson, page: +d.page || 1, q: "" }; go("reader"); break;
     case "reader-page": S.reader.page = +d.page; render(); break;
+    case "reader-mode": S.reader.text = !S.reader.text; render(); break;
+    case "pdf-zoom": $("#pdfwrap")?.classList.toggle("zoom"); break;
     case "more-q": S.openLimit = (S.openLimit || 40) + 80; render(); break;
     case "next-q": nextQuestion(); break;
     case "explain": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice); break; }
@@ -2404,7 +2425,7 @@ function loadInline() {
       const cards = {}; for (const c of p.cards || []) cards[c.id] = c;
       if (p.cases) ingestCases(p.code, p.cases, cards);
       const notes = {};
-      for (const [lesson, pages] of Object.entries(p.notes || {})) { const key = `inline:${p.code}:${lesson}`; notes[lesson] = key; S.notesCache[key] = pages; }
+      for (const [lesson, pages] of Object.entries(p.notes || {})) { const key = `inline:${p.code}:${lesson}`; notes[lesson] = key; S.notesCache[key] = pages; if (p.pdf?.[lesson]) S.notesPdf[key] = p.pdf[lesson]; }
       S.pack[p.code] = { cards, notes };
       rebuild(p.code);
     }

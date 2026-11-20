@@ -7,9 +7,12 @@ const rd = (f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
 const idx = rd('packs/index.json');
 const data = { media: mediaF && mediaF !== '-' ? JSON.parse(fs.readFileSync(mediaF, 'utf8')) : {}, packs: [] };
 for (const p of idx.packs) {
-  const notes = {};
-  for (const [lesson, f] of Object.entries(p.notes || {})) notes[lesson] = rd(f).pages;
-  data.packs.push({ code: p.code, cards: p.file ? rd(p.file).cards : [], cases: p.cases ? rd(p.cases) : null, notes });
+  const notes = {}, pdf = {};
+  for (const [lesson, f] of Object.entries(p.notes || {})) {
+    const n = rd(f); notes[lesson] = n.pages;
+    if (n.imgs) pdf[lesson] = { imgs: n.imgs, pno: n.pno };   // ảnh trang PDF gốc (URL kho asset)
+  }
+  data.packs.push({ code: p.code, cards: p.file ? rd(p.file).cards : [], cases: p.cases ? rd(p.cases) : null, notes, pdf });
 }
 const json = JSON.stringify(data).replace(/</g, '\\u003c');   // không để "</script>" lọt vào
 const html = fs.readFileSync(page, 'utf8');
