@@ -13,7 +13,7 @@ pdf, code, lesson, title, out = sys.argv[1:6]
 os.makedirs(f'{out}/img', exist_ok=True); os.makedirs(f'{out}/notes', exist_ok=True)
 np_ = int(re.search(r'Pages:\s+(\d+)', subprocess.run(['pdfinfo', pdf], capture_output=True, text=True).stdout).group(1))
 tmp = f'{out}/img/_{code}_{lesson}'
-subprocess.run(['pdftoppm', '-r', '110', '-png', pdf, tmp], check=True)
+subprocess.run(['pdftoppm', '-r', os.environ.get('DPI','110'), '-png', pdf, tmp], check=True)
 pages, imgs = [], []; anki = False   # trang thuộc phần "Thẻ Anki" in trong bài soạn: giữ ảnh, bỏ chữ để thẻ không dò nhầm vào đó
 for p, png in enumerate(sorted(glob.glob(tmp + '-*.png')), 1):
     name = f'{code}_{lesson}_p{p:03d}.webp'
