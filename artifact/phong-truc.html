@@ -392,6 +392,8 @@ const isRel = (q) => q?.rel === true;
 /* Trắc nghiệm lý thuyết tự soạn (id lt_…): nằm ở mục riêng, không lẫn vào Đề cũ. */
 const isLT = (q) => typeof q?.id === "string" && q.id.startsWith("lt_");
 const isCase = (q) => q?.kind === "case";
+// PDF page images ship as published files next to the page (pg/<id>.webp): /_blob loads fail in the iOS app
+const pgSrc = (u) => typeof u === "string" ? u.replace(/^\/_blob\/([0-9a-f]{32})$/, "pg/$1.webp") : u;
 const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.img) ? `<img class="qimg" src="${S.media?.[q.img] || q.img}" alt="Hình minh họa">` : "");
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem) + qImg(q);
 /* Thẻ Anki có câu "bựa" (fun, **đậm** = keyword) thì hiện câu bựa trước, bản gốc gập lại bên dưới (mở sẵn nếu có hình). */
@@ -412,7 +414,7 @@ const byYear = (a, b) => ((b.year || 0) - (a.year || 0)) || (a.source || "").loc
 /* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
 async function loadNotes(code, lesson) {
   const file = S.pack[code]?.notes?.[lesson]; if (!file) return null;
-  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => { if (j?.imgs) S.notesPdf[file] = { imgs: j.imgs, pno: j.pno }; return j?.pages || null; }).catch(() => null);
+  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => { if (j?.imgs) S.notesPdf[file] = { imgs: j.imgs.map(pgSrc), pno: j.pno }; return j?.pages || null; }).catch(() => null);
   return S.notesCache[file];
 }
 const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
@@ -2432,7 +2434,7 @@ function loadInline() {
       const cards = {}; for (const c of p.cards || []) cards[c.id] = c;
       if (p.cases) ingestCases(p.code, p.cases, cards);
       const notes = {};
-      for (const [lesson, pages] of Object.entries(p.notes || {})) { const key = `inline:${p.code}:${lesson}`; notes[lesson] = key; S.notesCache[key] = pages; if (p.pdf?.[lesson]) S.notesPdf[key] = p.pdf[lesson]; }
+      for (const [lesson, pages] of Object.entries(p.notes || {})) { const key = `inline:${p.code}:${lesson}`; notes[lesson] = key; S.notesCache[key] = pages; if (p.pdf?.[lesson]) S.notesPdf[key] = { ...p.pdf[lesson], imgs: p.pdf[lesson].imgs?.map(pgSrc) }; }
       S.pack[p.code] = { cards, notes };
       rebuild(p.code);
     }
