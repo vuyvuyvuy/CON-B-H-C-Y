@@ -1171,6 +1171,12 @@ function qItem(s, q) {
 /* ------------------------------------------------------------------ */
 /* VIEW: Đọc bài soạn                                                  */
 /* ------------------------------------------------------------------ */
+// /_blob page images can fail transiently (mobile data): retry 3× with backoff, then offer a manual retry
+window.pdfErr = (el) => {
+  const n = +(el.dataset.try || 0) + 1; el.dataset.try = n;
+  if (n <= 3) { const base = el.src.split("#")[0]; setTimeout(() => { if (el.isConnected) el.src = base + "#r" + n; }, 700 * n); return; }
+  el.parentNode.innerHTML = '<p class="note">Không tải được ảnh trang (mạng yếu?). <button class="btn small" data-act="pdf-retry">Thử lại</button> hoặc xem dạng chữ bên dưới.</p>';
+};
 function viewReader() {
   const R = S.reader; const s = R && S.subjects[R.code];
   if (!s) { S.tab = "home"; return viewHome(); }
@@ -1195,7 +1201,7 @@ function viewReader() {
   ${R.q ? `<p class="note">${hits.length ? `Có ở trang: ${hits.map((h) => `<button class="btn small ghost" data-act="reader-page" data-page="${h}">${rp(h)}</button>`).join(" ")}` : "Không thấy trong bài này."}</p>` : ""}
   <div class="row between"><button class="btn small" data-act="reader-page" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>← Trang trước</button><span class="mono">Trang ${rp(page)}${pdf?.pno ? ` (PDF)` : `/${pages.length}`}</span><button class="btn small" data-act="reader-page" data-page="${page + 1}" ${page >= pages.length ? "disabled" : ""}>Trang sau →</button></div>
   ${img ? `<div class="row" style="gap:6px"><button class="btn small ghost" data-act="reader-mode">${showImg ? "Xem dạng chữ" : "📄 Xem trang PDF gốc"}</button>${showImg ? `<span class="note">Chạm ảnh để phóng to</span>` : ""}</div>` : ""}
-  ${showImg ? `<div class="pdfwrap" id="pdfwrap"><img class="pdfpage" src="${img}" alt="Trang ${rp(page)}" data-act="pdf-zoom" onerror="this.parentNode.innerHTML='<p class=note>Không tải được ảnh trang, xem dạng chữ bên dưới.</p>'"></div><details><summary class="note">Chữ của trang này</summary><article class="reader">${text}</article></details>` : `<article class="reader">${text}</article>`}`;
+  ${showImg ? `<div class="pdfwrap" id="pdfwrap"><img class="pdfpage" src="${img}" alt="Trang ${rp(page)}" data-act="pdf-zoom" onerror="pdfErr(this)"></div><details><summary class="note">Chữ của trang này</summary><article class="reader">${text}</article></details>` : `<article class="reader">${text}</article>`}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2264,6 +2270,7 @@ document.addEventListener("click", async (ev) => {
     case "reader-page": S.reader.page = +d.page; render(); break;
     case "reader-mode": S.reader.text = !S.reader.text; render(); break;
     case "pdf-zoom": $("#pdfwrap")?.classList.toggle("zoom"); break;
+    case "pdf-retry": render(); break;
     case "more-q": S.openLimit = (S.openLimit || 40) + 80; render(); break;
     case "next-q": nextQuestion(); break;
     case "explain": { const it = S.practice.items[S.practice.i]; explainQuestion(it.code, it.id, S.practice.answered?.choice); break; }
