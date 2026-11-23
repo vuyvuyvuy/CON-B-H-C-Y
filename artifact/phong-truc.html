@@ -392,8 +392,19 @@ const isRel = (q) => q?.rel === true;
 /* Trắc nghiệm lý thuyết tự soạn (id lt_…): nằm ở mục riêng, không lẫn vào Đề cũ. */
 const isLT = (q) => typeof q?.id === "string" && q.id.startsWith("lt_");
 const isCase = (q) => q?.kind === "case";
-// PDF page images ship as published files next to the page (pg/<id>.webp): /_blob loads fail in the iOS app
-const pgSrc = (u) => typeof u === "string" ? u.replace(/^\/_blob\/([0-9a-f]{32})$/, "pg/$1.webp") : u;
+// PDF page images: the iOS/iPadOS app loads neither /_blob nor published files, so each page is a data URI in db "pgimg/<id>"
+const pgCache = {};
+const pgId = (u) => /^\/_blob\/([0-9a-f]{32})$/.exec(u || "")?.[1];
+const pgFill = (id, d) => { pgCache[id] = d; document.querySelectorAll(`img[data-pgid="${id}"]`).forEach((el) => { el.src = d; }); };
+function pgData(id) {
+  if (pgCache[id] === undefined) {
+    const file = "pg/" + id + ".webp"; // fallback when db is unavailable (local file preview)
+    if (!S.db) return file; // db not connected yet: don't cache, retry via db on next render
+    { pgCache[id] = null; S.db.doc("pgimg/" + id).get().then((snap) => pgFill(id, snap.exists && snap.data().d || file)).catch(() => { pgFill(id, file); delete pgCache[id]; }); } // db hiccup: show fallback, refetch on next render ("Thử lại")
+  }
+  return pgCache[id];
+}
+const pgImg = (u, attrs) => { const id = pgId(u); if (!id) return `<img src="${u}" ${attrs}>`; const d = pgData(id); return `<img data-pgid="${id}" ${d ? `src="${d}"` : ""} ${attrs}>`; };
 const qImg = (q) => (typeof q.img === "string" && /^\/_blob\/[0-9a-f]+$/.test(q.img) ? `<img class="qimg" src="${S.media?.[q.img] || q.img}" alt="Hình minh họa">` : "");
 const qFront = (q) => isAnki(q) ? rich(q.front) : esc(q.stem) + qImg(q);
 /* Thẻ Anki có câu "bựa" (fun, **đậm** = keyword) thì hiện câu bựa trước, bản gốc gập lại bên dưới (mở sẵn nếu có hình). */
@@ -414,7 +425,7 @@ const byYear = (a, b) => ((b.year || 0) - (a.year || 0)) || (a.source || "").loc
 /* Bài soạn: chữ từng trang PDF, tải khi cần. Tìm đoạn liên quan bằng độ trùng cụm 2 chữ. */
 async function loadNotes(code, lesson) {
   const file = S.pack[code]?.notes?.[lesson]; if (!file) return null;
-  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => { if (j?.imgs) S.notesPdf[file] = { imgs: j.imgs.map(pgSrc), pno: j.pno }; return j?.pages || null; }).catch(() => null);
+  if (!S.notesCache[file]) S.notesCache[file] = fetch(file).then((r) => r.ok ? r.json() : null).then((j) => { if (j?.imgs) S.notesPdf[file] = { imgs: j.imgs, pno: j.pno }; return j?.pages || null; }).catch(() => null);
   return S.notesCache[file];
 }
 const grams = (t) => { const w = norm(t).split(" ").filter((x) => x.length > 1); const g = new Set(); for (let i = 0; i < w.length; i++) { g.add(w[i]); if (i + 1 < w.length) g.add(w[i] + " " + w[i + 1]); } return g; };
@@ -443,11 +454,11 @@ async function lectureHTML(code, q, k = 2) {
   // thẻ có sẵn số trang (soạn từ bài soạn PDF) thì dùng luôn, khỏi dò chữ
   if (pdf && q.page) {
     const i = (pdf.pno || []).indexOf(+q.page) + 1 || +q.page;
-    return `<div class="lecture"><span class="eyebrow">📄 Bài soạn · trang ${q.page}</span>${pdf.imgs?.[i - 1] ? `<img class="pdfthumb" src="${pdf.imgs[i - 1]}" alt="Trang ${q.page}" loading="lazy" onerror="this.remove()">` : ""}<span><button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${i}">📄 Mở trang ${q.page}</button></span></div>`;
+    return `<div class="lecture"><span class="eyebrow">📄 Bài soạn · trang ${q.page}</span>${pdf.imgs?.[i - 1] ? pgImg(pdf.imgs[i - 1], `class="pdfthumb" alt="Trang ${q.page}" onerror="this.remove()"`) : ""}<span><button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${i}">📄 Mở trang ${q.page}</button></span></div>`;
   }
   const ps = passages(pages, q, k);
   if (!ps.length) return `<div class="lecture"><span class="eyebrow">📖 Bài soạn</span><span class="note">Không tìm thấy đoạn khớp. <button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}">Mở bài soạn</button></span></div>`;
-  if (pdf) return ps.map((p) => { const rp = realPage(code, q.lesson, p.page); return `<div class="lecture"><span class="eyebrow">📄 Bài soạn · trang ${rp}</span>${pdf.imgs?.[p.page - 1] ? `<img class="pdfthumb" src="${pdf.imgs[p.page - 1]}" alt="Trang ${rp}" loading="lazy" onerror="this.remove()">` : ""}<span class="note">${esc(p.text.length > 220 ? p.text.slice(0, 220) + "…" : p.text)}</span><span><button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${p.page}">📄 Mở trang ${rp}</button></span></div>`; }).join("");
+  if (pdf) return ps.map((p) => { const rp = realPage(code, q.lesson, p.page); return `<div class="lecture"><span class="eyebrow">📄 Bài soạn · trang ${rp}</span>${pdf.imgs?.[p.page - 1] ? pgImg(pdf.imgs[p.page - 1], `class="pdfthumb" alt="Trang ${rp}" onerror="this.remove()"`) : ""}<span class="note">${esc(p.text.length > 220 ? p.text.slice(0, 220) + "…" : p.text)}</span><span><button class="btn small" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${p.page}">📄 Mở trang ${rp}</button></span></div>`; }).join("");
   return ps.map((p) => `<div class="lecture"><span class="eyebrow">📖 Bài soạn · trang ${p.page}</span>${esc(p.text.length > 900 ? p.text.slice(0, 900) + "…" : p.text)}<span><button class="btn small ghost" data-act="open-reader" data-code="${code}" data-lesson="${q.lesson}" data-page="${p.page}">Mở trang ${p.page}</button></span></div>`).join("");
 }
 async function fillLecture(code, q) {
@@ -1203,7 +1214,7 @@ function viewReader() {
   ${R.q ? `<p class="note">${hits.length ? `Có ở trang: ${hits.map((h) => `<button class="btn small ghost" data-act="reader-page" data-page="${h}">${rp(h)}</button>`).join(" ")}` : "Không thấy trong bài này."}</p>` : ""}
   <div class="row between"><button class="btn small" data-act="reader-page" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}>← Trang trước</button><span class="mono">Trang ${rp(page)}${pdf?.pno ? ` (PDF)` : `/${pages.length}`}</span><button class="btn small" data-act="reader-page" data-page="${page + 1}" ${page >= pages.length ? "disabled" : ""}>Trang sau →</button></div>
   ${img ? `<div class="row" style="gap:6px"><button class="btn small ghost" data-act="reader-mode">${showImg ? "Xem dạng chữ" : "📄 Xem trang PDF gốc"}</button>${showImg ? `<span class="note">Chạm ảnh để phóng to</span>` : ""}</div>` : ""}
-  ${showImg ? `<div class="pdfwrap" id="pdfwrap"><img class="pdfpage" src="${img}" alt="Trang ${rp(page)}" data-act="pdf-zoom" onerror="pdfErr(this)"></div><details><summary class="note">Chữ của trang này</summary><article class="reader">${text}</article></details>` : `<article class="reader">${text}</article>`}`;
+  ${showImg ? `<div class="pdfwrap" id="pdfwrap">${pgImg(img, `class="pdfpage" alt="Trang ${rp(page)}" data-act="pdf-zoom" onerror="pdfErr(this)"`)}${(pgId(pdf.imgs[page]) && pgData(pgId(pdf.imgs[page])), "")}</div><details><summary class="note">Chữ của trang này</summary><article class="reader">${text}</article></details>` : `<article class="reader">${text}</article>`}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2434,7 +2445,7 @@ function loadInline() {
       const cards = {}; for (const c of p.cards || []) cards[c.id] = c;
       if (p.cases) ingestCases(p.code, p.cases, cards);
       const notes = {};
-      for (const [lesson, pages] of Object.entries(p.notes || {})) { const key = `inline:${p.code}:${lesson}`; notes[lesson] = key; S.notesCache[key] = pages; if (p.pdf?.[lesson]) S.notesPdf[key] = { ...p.pdf[lesson], imgs: p.pdf[lesson].imgs?.map(pgSrc) }; }
+      for (const [lesson, pages] of Object.entries(p.notes || {})) { const key = `inline:${p.code}:${lesson}`; notes[lesson] = key; S.notesCache[key] = pages; if (p.pdf?.[lesson]) S.notesPdf[key] = p.pdf[lesson]; }
       S.pack[p.code] = { cards, notes };
       rebuild(p.code);
     }
