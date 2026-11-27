@@ -114,3 +114,13 @@ Sửa `artifact/phong-truc.html` trong repo (đây là bản gốc, không có p
 
 - `node artifact/tools/live-data.js stat <data.json>`: số thẻ/ca/bài soạn từng môn.
 - `ArtifactData` list `subjects/<CODE>/questions` với `out_dir`: đếm câu mới, xem vài doc có đủ `b`, `lesson`, `source`.
+
+## Khu M2 AMBOSS (tách hẳn khỏi Phòng Trực)
+
+Artifact riêng **M2 Lernplan**: `artifact/m2-amboss.html`, publish tại https://claude.ai/artifact/57MNiEaRFALmsUUzJRL1Ap
+(riêng tư, capability `db`). Kho db riêng: `cfg/plan`, `kap/<id>`, `txt/<id>-<k>`, `mk/<id>`, `days/<YYYYMMDD>`.
+Không đụng Phòng Trực khi sửa khu này, và ngược lại.
+
+Build: `python3 -I artifact/m2/tools/lernplan.py <M2_Lernplan.pdf> artifact/m2-amboss.html <scratch>/m2-out.html`
+rồi `Artifact` publish `url` ở trên (đọc trang trước), không truyền `capabilities` nếu không đổi.
+Id chương `t<Tag>_<số>` phải giữ nguyên (tiến độ đọc nằm trong db theo id). Danh sách chương AMBOSS không commit.
