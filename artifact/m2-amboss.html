@@ -476,9 +476,6 @@ function viewToday() {
         <div><span class="kind">Câu kreuzen</span><b>${td.kq || 0}</b></div>
         <div><span class="kind">Thẻ đã ôn</span><b>${td.rv || 0}</b></div>
       </div>
-      <form class="row" id="kzf"><label class="f" for="kq">Số câu kreuzen hôm nay<input type="number" id="kq" min="0" max="2000" inputmode="numeric" value="${td.kq || ""}" style="width:120px"></label>
-        <label class="f" for="kmin">trong bao nhiêu phút<input type="number" id="kmin" min="0" max="900" inputmode="numeric" value="${td.kmin || ""}" style="width:120px"></label>
-        <button class="btn" type="submit" style="align-self:end">Ghi</button></form>
     </section>
     <section class="card">
       <span class="eyebrow">Cán cân: còn lại bao nhiêu</span>
@@ -500,7 +497,6 @@ function viewToday() {
   for (const b of document.querySelectorAll("[data-un]")) b.onchange = () => { untick(+b.dataset.un); viewToday(); };
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
-  $("#kzf").onsubmit = (e) => { e.preventDefault(); const q = Math.max(0, Math.round(+$("#kq").value || 0)), m = Math.max(0, Math.round(+$("#kmin").value || 0)); putDay({ kq: q, kmin: m }); document.activeElement?.blur(); toast("Đã ghi kreuzen hôm nay"); viewToday(); };
 }
 function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
 function setMin(m) { putCfg({ perDay: m }); document.activeElement?.blur(); viewToday(); }
