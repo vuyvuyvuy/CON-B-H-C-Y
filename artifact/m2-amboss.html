@@ -933,24 +933,19 @@ async function genVoc(c) {
     if (R.id === c.id) { vocBox(c); glossify(); }
   } catch (e) { if (st) st.textContent = aiErr(e); if (btn) btn.disabled = false; }
 }
-let TTS;
-const getTts = () => (TTS ||= window.claude?.use("tts").catch(() => null) ?? Promise.resolve(null));
-async function speakDe(text) { const t = await getTts(); if (t) t.speak(text, { language: "de" }).catch(() => {}); }
-async function vocDrill(c) {
-  const V = R.voc, t0 = Date.now(), tts = await getTts();
-  let queue = V.list.map((w, i) => i), first = new Set(), wrong = new Set(), i = 0, open = false;
+function vocDrill(c) {
+  const V = R.voc, t0 = Date.now();
+  let queue = V.list.map((w, i) => i), wrong = new Set(), i = 0, open = false;
   const bg = sheet(`<div class="row" style="justify-content:space-between"><span class="eyebrow">Từ vựng · ${esc(c.t)}</span><span class="small muted num" id="vdn"></span></div><div class="bar"><i id="vdbar" style="width:0"></i></div><div id="vdc"></div>`);
   const draw = () => {
     const w = V.list[queue[i]];
     $("#vdn", bg).textContent = `${V.list.length - queue.length + i}/${V.list.length}`;
     $("#vdbar", bg).style.width = ((V.list.length - queue.length + i) / V.list.length * 100).toFixed(1) + "%";
-    $("#vdc", bg).innerHTML = `<div class="vcard"><div class="vde">${artHTML(w.de)}${tts ? ` <button class="ib" id="vsay" aria-label="Nghe phát âm">🔊</button>` : ""}</div>
+    $("#vdc", bg).innerHTML = `<div class="vcard"><div class="vde">${artHTML(w.de)}</div>
       ${w.pl ? `<div class="small muted">Pl. ${esc(w.pl)}</div>` : ""}
       ${open ? `<div class="vvi">${esc(w.vi)}</div>${w.ex ? `<div class="vex">„${esc(w.ex)}“</div>` : ""}` : ""}</div>
       ${open ? `<div class="row"><button class="btn" id="vno" style="flex:1">Chưa nhớ</button><button class="btn primary" id="vyes" style="flex:1">Nhớ rồi</button></div>`
         : `<button class="btn primary" id="vshow" style="width:100%">Xem nghĩa</button>`}`;
-    if ($("#vsay", bg)) $("#vsay", bg).onclick = () => speakDe(w.de);
-    if (!open && tts && !first.has(queue[i])) { first.add(queue[i]); speakDe(w.de); }
     if (!open) $("#vshow", bg).onclick = () => { open = true; draw(); };
     else {
       $("#vyes", bg).onclick = () => { open = false; i++; next(); };
