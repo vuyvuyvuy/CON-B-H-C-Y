@@ -80,20 +80,34 @@ Mọi file tải về/giải nén để trong thư mục riêng của scratchpad
    lessons:[{id, name}]}`. Id bài khớp với id dùng trong pack (vd `mat1`, `tkls_b5`).
 2. Đọc `.apkg`: `node artifact/tools/dump-apkg.js <x.apkg> <scratch>/notes.json` (in deck id, tag),
    hình: `node artifact/tools/extract-media.js <x.apkg> <scratch>/media`.
-3. Pack thẻ: `node artifact/tools/build-pack.js <notes.json> <pdfDir> <outDir> <cfg.json>` với
+3. Pack thẻ. Bộ `.apkg` do skill `soan-bai-lam-sang` tạo (1 file/bài, mặt sau `<div class="ans">`, `<span class="note">`,
+   `<span class="pri">`, tag `HAY_THI`/`CO_THE_THI`/`IT_THI`) dùng
+   `node artifact/tools/build-anki-pack.js <cfg.json> <outDir>` với cfg
+   `{code, name, prio3:"HAY_THI", prio1:"IT_THI", lessons:[[id, "Bài N · tên", notes.json]]}` → id thẻ `<lesson>_<NNN>`
+   (thứ tự theo note id; cùng `.apkg` thì cùng id). Cách này dùng cho MAT, TKLS, TK0055, GMHS0058.
+   Bộ Anki kiểu cũ (TMH) dùng `node artifact/tools/build-pack.js <notes.json> <pdfDir> <outDir> <cfg.json>` với
    cfg `{code, source:"Anki · <Môn> › …", lessons:[[id, tên, file pdf, deck id]], prio3:"regex tag", prio1:"regex tag"}`.
    Id thẻ = `"a" + note id` của Anki, nên build lại từ cùng `.apkg` thì giữ nguyên id.
    (Các pack MAT/TKLS/TK0055 hiện tại dùng id kiểu `mat1_001`; khi build lại môn đã có phải giữ đúng id cũ —
    so với `data.json` trước khi thay.)
 4. Câu bựa + mẹo: mỗi thẻ có `fun` (câu dễ thuộc, `**đậm**` = keyword) và `meo` (mẹo nhớ). Viết file
    `fun/<lesson>.txt` dạng `N| câu`, kiểm tra `node artifact/tools/check-fun.js <pack> <lesson> <fun.txt>`
-   (không được rơi số hay keyword đỏ), gắn bằng `add-fun.js`. `meo` gắn tương tự vào trường `meo`.
-5. Ca tình huống mỗi bài: file `{lesson, cases:[{title, setting, qs:[{stem, opts:[đúng, sai, sai, sai], why, covers:[số thẻ]}]}]}`,
-   kiểm tra `check-cases.js` (phủ hết thẻ ★★★/★★), build `build-cases.js <pack> <outDir> <files…>`.
+   (không được rơi số hay keyword đỏ), gắn bằng `add-fun.js`. `meo` viết theo cụm thẻ liền nhau, mỗi cụm một
+   "cảnh" đánh số (vd `🎬 Ca mổ ③/⑫ – …`), file `meo/<lesson>.txt` dạng `N-M| câu`, gắn bằng
+   `FIELD=meo node artifact/tools/add-fun.js <pack> <lesson> <meo.txt>`. Mọi thẻ phải có cả `fun` lẫn `meo`.
+5. Ca tình huống: mỗi bài 1 ca (setting ~40–70 chữ), 4–5 câu, file
+   `{lesson, cases:[{title, setting, qs:[{stem, opts:[đúng, sai, sai, sai], why, covers:[số thẻ]}]}]}`.
+   `check-cases.js` phải hết LỖI (4 lựa chọn, đáp án đúng không dài hơn 1,35× lựa chọn sai dài nhất); dòng
+   "CHƯA PHỦ" chỉ để tham khảo. Build `build-cases.js <pack> <outDir> <files…>` (tự trộn đáp án, cố định theo id).
+   Sau khi build, thêm `notes: {lesson: "notes/<CODE>__<lesson>.json"}` vào mục môn trong `<outDir>/packs/index.json`
+   (build-anki-pack không tự ghi).
 6. Bài soạn có ảnh trang: `DPI=110 python3 artifact/tools/pdf-notes.py <bai.pdf> <CODE> <lesson> "<tên>" <outDir>`
-   → tải ảnh `img/*.webp` lên asset (`Artifact` publish `asset: true`, `file_paths`) → map tên→`/_blob/<id>` →
+   → tải ảnh `img/*.webp` lên asset (`Artifact` publish `asset: true`, `file_paths` ≤ 25 file/lần; file phải nằm trong
+   thư mục làm việc, nên chép tạm vào `/home/user/CON-B-H-C-Y/.up/` rồi xóa) → map tên→`/_blob/<id>` →
    `pdf-notes.py --urls <notes.json> <map.json>`; với mỗi ảnh ghi db `pgimg/<id>` `{d: "data:image/webp;base64,…"}`
-   và đưa file vào `files` của lần publish dưới tên `pg/<id>.webp`.
+   (batch ≤ ~900 KB; **mỗi doc ≤ 256 KiB** — ảnh webp > ~185 KB phải nén lại chất lượng thấp hơn trước khi ghi)
+   và đưa file vào `files` của lần publish dưới tên `pg/<id>.webp` (dùng `root` = thư mục build,
+   `files: [{"path":"pg/<id>.webp"}, …]`).
 7. Hình thẻ: `media-map.json` `{ "tên.jpg": "data:image/…;base64,…" }` (data URI, vì app di động không tải `/_blob`).
 8. Gộp và nhúng:
    ```
