@@ -1140,6 +1140,15 @@ function queue() {
   fresh.sort((a, b) => a[1].at - b[1].at);
   return { rev, fresh: fresh.filter(([, c]) => (c.t === "vocab" ? nv-- > 0 : nw-- > 0)) };
 }
+// số thẻ đã nhập nhưng chưa mở (chương chưa đọc xong) — đếm từ kap.nc, không cần tải thẻ
+function lockedCount() {
+  let n = 0;
+  for (const [k, v] of Object.entries(S.kap)) {
+    if (!v.nc) continue; const b = base(k);
+    if (BY[b] ? kap(b).st !== 2 : /^_d\d+$/.test(b) ? !PLAN[+b.slice(2) - 1]?.ch.every((c) => kap(c.id).st === 2) : b.startsWith("_apkg") && !cfg().extra) n += v.nc;
+  }
+  return n;
+}
 const dueCount = () => { const q = queue(); return q.rev.length + q.fresh.length; };
 function nextCard() {
   const now = Date.now(), q = queue();
@@ -1155,6 +1164,7 @@ function viewReview() {
   $("#app").innerHTML = `<div class="wrap">
     <h1 style="font-size:26px">Ôn thẻ</h1>
     <div class="stats card"><div><span class="kind">Đến hạn</span><b>${q.rev.length}</b></div><div><span class="kind">Mới hôm nay</span><b>${q.fresh.length}</b></div><div><span class="kind">Đã ôn hôm nay</span><b>${td.rv || 0}</b></div></div>
+    ${(() => { const L = lockedCount(); return L ? `<p class="note small">Đang có <b>${L}</b> thẻ chờ mở khoá: thẻ của chương nào sẽ vào hàng ôn khi Vy bấm "Đọc xong chương" ở chương đó (thẻ chung của Tag mở khi xong cả Tag).</p>` : ""; })()}
     <section class="card" id="rv"></section>
     ${drafts.length ? `<section class="card"><span class="eyebrow">Chờ duyệt</span><ul class="mlist">${drafts.map(([ch, k]) => `<li><a class="btn" style="display:block;text-align:left" href="#duyet-${hashId(ch)}">${esc(chName(ch))} · <b>${k.nd}</b> thẻ</a></li>`).join("")}</ul></section>` : ""}
     <section class="card"><span class="eyebrow">Thêm thẻ</span>
