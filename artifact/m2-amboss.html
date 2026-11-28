@@ -190,7 +190,7 @@ body.focus .rhead { display: none; }
 "use strict";
 /* ------------------------------------------------------------------ */
 /* Dữ liệu: lộ trình nhúng sẵn (chỉ đọc); trạng thái nằm trong kho db   */
-/*   cfg/plan          {start, end, rest}                               */
+/*   cfg/plan          {start, rest, perDay, target?, kqTotal}          */
 /*   kap/<id>          {st 0|1|2, pct, pos, ms, words, nb, doneAt}       */
 /*   txt/<id>-<k>      {ch, k, blocks:[html]}  nội dung chương, cắt ≤200KB */
 /*   mk/<id>           {list:[{id,b,s,e,c,note,txt}]}  đánh dấu          */
@@ -207,7 +207,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 
 let DB = null, online = false;
-const S = { kap: {}, days: {}, cfg: null, off: false, minutes: +(store.get("m2.min") || 60) };
+const S = { kap: {}, days: {}, cfg: null, off: false };
 
 /* ---------- ngày ---------- */
 const pad = (n) => String(n).padStart(2, "0");
@@ -218,17 +218,20 @@ const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const WD = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
 const fmtD = (d) => `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
-/* ngày cuối sao cho đủ `n` ngày học (6 ngày/tuần) tính từ start */
-function endFor(start, rest, n = PLAN.length) { let d = new Date(start), k = 0; for (;;) { if (d.getDay() !== rest && ++k >= n) return d; d = addDays(d, 1); } }
 function cfg() {
   const c = S.cfg || {};
-  const start = c.start ? parseISO(c.start) : today0();
-  const rest = Number.isInteger(c.rest) ? c.rest : 0;
-  const end = c.end ? parseISO(c.end) : endFor(start, rest);
-  // giả định ban đầu, Vy sửa trong Cài đặt: ~50 câu kreuzen/Lerntag, học ~4 giờ/ngày
-  return { start, rest, end, set: !!S.cfg, kqTotal: c.kqTotal ?? 50 * PLAN.length, perDay: c.perDay ?? 240 };
+  return {
+    start: c.start ? parseISO(c.start) : today0(),
+    rest: Number.isInteger(c.rest) ? c.rest : 0,
+    perDay: c.perDay || 60,                       // phút học mỗi ngày: con số duy nhất quyết định nhịp
+    target: c.target ? parseISO(c.target) : null, // hạn muốn xong (tuỳ chọn), chỉ để so sánh
+    kqTotal: c.kqTotal ?? 50 * PLAN.length,       // giả định ~50 câu/Lerntage AMBOSS, sửa trong Cài đặt
+    set: !!S.cfg,
+  };
 }
 function studyDays(from, to, rest) { let n = 0; for (let d = new Date(from); d <= to; d = addDays(d, 1)) if (d.getDay() !== rest) n++; return n; }
+/* ngày học thứ n (1 = ngày học đầu tiên từ `from`, tính cả `from`), bỏ ngày nghỉ */
+function nthStudyDay(from, n, rest) { let d = new Date(from); for (;;) { if (d.getDay() !== rest && --n <= 0) return d; d = addDays(d, 1); } }
 
 /* ---------- ghi db: mỗi doc một lượt ghi, gộp các lần đổi liên tiếp ---------- */
 const W = {};
@@ -259,9 +262,9 @@ function avgChapterMin() {
 }
 const estMin = (id) => { const k = kap(id); const m = k.words ? k.words * rate() : avgChapterMin(); return Math.min(120, Math.max(10, m)); };
 
-/* ---------- cán cân: còn bao nhiêu việc, cần bao nhiêu phút/ngày ---------- */
+/* ---------- cán cân: còn bao nhiêu việc, học M phút/ngày thì bao giờ xong ---------- */
 function workload() {
-  const c = cfg(), t0 = today0(), tk = key(t0), tmr = addDays(t0, 1);
+  const c = cfg(), t0 = today0(), today = S.days[key(t0)] || {};
   const left = CH.filter((x) => kap(x.id).st !== 2);
   const readMin = left.reduce((a, x) => a + estMin(x.id) * (1 - (kap(x.id).pct || 0)), 0);
   const D = Object.values(S.days);
@@ -269,49 +272,42 @@ function workload() {
   const perQ = kqDone >= 50 && kMin > 0 ? kMin / kqDone : 2;      // shortcut: 2 phút/câu cho tới khi có ≥50 câu đã ghi giờ
   const kqLeft = Math.max(0, c.kqTotal - kqDone), kzMin = kqLeft * perQ;
   const total = readMin + kzMin;
-  const daysAfter = Math.max(1, studyDays(tmr, c.end, c.rest));
-  // nhịp thật: trung bình phút học 7 ngày học gần nhất (không tính hôm nay); ngày bỏ học tính là 0
-  const past = []; for (let d = addDays(t0, -1); past.length < 7 && d >= c.start; d = addDays(d, -1)) if (d.getDay() !== c.rest) past.push(S.days[key(d)] || {});
-  const pace = past.length ? past.reduce((a, d) => a + (d.min || 0) + (d.kmin || 0), 0) / past.length : c.perDay;
-  let finish = null;
-  if (pace > 0) { let need = Math.ceil(total / pace), d = new Date(t0); while (need > 0) { d = addDays(d, 1); if (d.getDay() !== c.rest) need--; } finish = d; }
-  const today = S.days[tk] || {};
-  return { left: left.length, readMin, kqLeft, kzMin, perQ, total, daysAfter, need: total / daysAfter, pace, paceReal: past.length > 0, finish,
-    r0: today.r0, need0: today.r0 != null ? today.r0 / daysAfter : null, today };
+  const share = total ? readMin / total : 1;   // chia phút mỗi ngày theo tỉ lệ việc còn lại → đọc và kreuzen xong cùng lúc
+  // từ hôm nay; phần hôm nay đã làm không tính lại
+  const doneToday = (today.min || 0) + (today.kmin || 0);
+  const finishAt = (rem) => nthStudyDay(t0, Math.max(1, Math.ceil((rem + doneToday) / c.perDay)), c.rest);
+  const finish = finishAt(total), finish0 = today.r0 != null ? finishAt(today.r0 - doneToday) : null;
+  const needForTarget = c.target && c.target >= t0 ? (total + doneToday) / Math.max(1, studyDays(t0, c.target, c.rest)) : null;
+  return { c, left: left.length, readMin, kqLeft, kzMin, perQ, total, share, finish, finish0, needForTarget, today,
+    chPerDay: c.perDay * share / (readMin / Math.max(1, left.length) || 30), qPerDay: Math.round(c.perDay * (1 - share)) / perQ };
 }
 const hm = (m) => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)} giờ${m % 60 ? " " + (m % 60) + "′" : ""}` : `${m}′`; };
+const monthsTxt = (a, b) => { const d = Math.round((b - a) / DAY); return d < 60 ? `${d} ngày` : `${d} ngày (~${(d / 30.4).toFixed(1)} tháng)`; };
 
 /* ---------- kế hoạch hôm nay ---------- */
-function todayPlan(minutes, due = 0) {
-  const { rest, end } = cfg();
-  const t0 = today0(), dk = key(t0);
-  const restDay = t0.getDay() === rest;
-  const left = CH.filter((c) => kap(c.id).st !== 2);
-  const doneToday = (S.days[dk]?.ch || []).length;
-  const daysLeft = Math.max(1, studyDays(t0, end, rest));
-  // chia đều phần còn lại cho các ngày học còn lại; bỏ một hôm thì phần thiếu tự rải ra các ngày sau
-  const quota = restDay ? 0 : Math.max(0, Math.ceil((left.length + doneToday) / daysLeft) - doneToday);
-  let rem = minutes; const items = [];
+function todayPlan(due = 0) {
+  const w = workload(), c = w.c, t0 = today0(), td = w.today;
+  const restDay = t0.getDay() === c.rest;
+  let rem = Math.max(0, Math.round(c.perDay - (td.min || 0) - (td.kmin || 0))); const items = [];
   if (due) { const m = Math.min(rem, Math.ceil(due * 0.2)); items.push({ kind: "Ôn thẻ", m, label: `${due} thẻ đến hạn` }); rem -= m; }
   if (restDay) {
     if (rem > 0) items.push({ kind: "Kreuzen", m: rem, label: "Làm lại câu sai", sub: "AMBOSS: Session mit falsch beantworteten Fragen" });
-    return { items, quota, daysLeft, left: left.length, restDay, overdue: end < t0 };
+    return { items, restDay, w };
   }
-  let finish = 0;
-  const reading = left.filter((c) => kap(c.id).st === 1);
-  const fresh = left.filter((c) => kap(c.id).st === 0);
-  for (const c of [...reading, ...fresh]) {
-    if (rem < 10) break;
-    const isNew = kap(c.id).st === 0;
-    if (isNew && finish >= quota) break;
-    const need = Math.max(5, Math.ceil(estMin(c.id) * (1 - (kap(c.id).pct || 0))));
-    const m = Math.min(rem, need);
-    items.push({ kind: isNew ? "Chương mới" : "Đọc tiếp", m, id: c.id, label: c.t, sub: `Tag ${c.tag} · ${c.sub}${m < need ? ` · làm ${m}/${need} phút` : ""}` });
-    rem -= m; if (m >= need) finish++;
+  let read = Math.min(rem, Math.max(0, Math.round(c.perDay * w.share - (td.min || 0))));
+  rem -= read;
+  const left = CH.filter((x) => kap(x.id).st !== 2);
+  for (const x of [...left.filter((y) => kap(y.id).st === 1), ...left.filter((y) => kap(y.id).st === 0)]) {
+    if (read < 5) break;
+    const need = Math.max(5, Math.ceil(estMin(x.id) * (1 - (kap(x.id).pct || 0))));
+    const m = Math.min(read, need);
+    items.push({ kind: kap(x.id).st === 0 ? "Chương mới" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
+    read -= m;
   }
-  const tag = (reading[0] || fresh[0])?.tag;
-  if (rem >= 5) items.push({ kind: "Kreuzen", m: rem, label: tag ? `Fragensitzung Tag ${tag}` : "Kreuzen", sub: "Trong AMBOSS (đã cài sẵn cho từng Tag)" });
-  return { items, quota, daysLeft, left: left.length, restDay, overdue: end < t0 };
+  rem += read;
+  const tag = left[0]?.tag;
+  if (rem >= 5) items.push({ kind: "Kreuzen", m: rem, label: `≈ ${Math.max(1, Math.round(rem / w.perQ))} câu${tag ? ` · chủ đề Tag ${tag}` : ""}`, sub: "Trong AMBOSS" });
+  return { items, restDay, w };
 }
 
 /* ---------- định tuyến theo hash ---------- */
@@ -335,27 +331,25 @@ const readHref = (id) => "#read-" + id.replace("_", "-");
 
 /* ---------- Hôm nay ---------- */
 function viewToday() {
-  const c = cfg(); const p = todayPlan(S.minutes);
-  const done = CH.length - p.left;
-  const w = workload(), td = w.today;
+  const p = todayPlan(), w = p.w, c = w.c, td = w.today;
+  const done = CH.length - w.left;
   const opts = [30, 60, 90, 120, 180];
+  const shift = w.finish0 ? Math.round((w.finish - w.finish0) / DAY) : 0;
   $("#app").innerHTML = `<div class="wrap">
     <header style="display:grid;gap:4px">
       <span class="eyebrow">${WD[new Date().getDay()]}, ${fmtD(new Date())}${p.restDay ? " · ngày ôn" : ""}</span>
       <h1 style="font-size:26px">${p.restDay ? "Hôm nay chỉ ôn" : "Hôm nay học gì"}</h1>
     </header>
-    ${!c.set ? `<p class="note small">Đang dùng mặc định: bắt đầu hôm nay, nghỉ Chủ nhật, xong phần đọc ${fmtD(c.end)}. <a href="#cai-dat">Đặt ngày của Vy</a>.</p>` : ""}
     ${S.off ? `<p class="note small">Chưa kết nối được kho dữ liệu, tiến độ chưa được lưu.</p>` : ""}
     <section class="card">
-      <span class="eyebrow">Vy rảnh bao lâu?</span>
-      <div class="mins">${opts.map((m) => `<button data-m="${m}" aria-pressed="${S.minutes === m}">${m} phút</button>`).join("")}
-        <input id="mcustom" type="number" min="10" max="600" step="5" inputmode="numeric" aria-label="Số phút khác" placeholder="khác" value="${opts.includes(S.minutes) ? "" : S.minutes}"></div>
+      <span class="eyebrow">Mỗi ngày học</span>
+      <div class="mins">${opts.map((m) => `<button data-m="${m}" aria-pressed="${c.perDay === m}">${m} phút</button>`).join("")}
+        <input id="mcustom" type="number" min="15" max="900" step="5" inputmode="numeric" aria-label="Số phút khác" placeholder="khác" value="${opts.includes(c.perDay) ? "" : c.perDay}"></div>
+      <p class="small">Với ${hm(c.perDay)}/ngày, nghỉ ${WD[c.rest]}: mỗi ngày học <b>≈ ${w.chPerDay.toFixed(1)} chương</b> (${hm(c.perDay * w.share)}) + <b>≈ ${Math.round(w.qPerDay)} câu kreuzen</b> (${hm(c.perDay * (1 - w.share))}) → <b>xong ${fmtD(w.finish)}</b>, còn ${monthsTxt(today0(), w.finish)}.</p>
       <ol class="agenda">${p.items.map((i) => `<li>
         <span class="t">${i.m}′</span>
-        <span class="what">${i.id ? `<a href="${readHref(i.id)}">` : ""}<span class="kind">${esc(i.kind)}</span><b>${esc(i.label)}</b>${i.sub ? `<span class="small muted">${esc(i.sub)}</span>` : ""}${i.id ? "</a>" : ""}</span>
-        ${i.id ? `<a class="btn small" href="${readHref(i.id)}">Đọc</a>` : ""}
-      </li>`).join("") || `<li><span></span><span class="muted">Không còn gì cho hôm nay.</span><span></span></li>`}</ol>
-      <p class="small muted">Ôn thẻ có từ giai đoạn 2. Ước lượng ${Math.round(estMin(CH.find((x) => kap(x.id).st !== 2)?.id || CH[0].id))} phút/chương, tự chỉnh theo tốc độ đọc thật của Vy.</p>
+        <span class="what">${i.id ? `<a href="${readHref(i.id)}">` : ""}<span class="kind">${esc(i.kind)}</span><b>${esc(i.label)}</b>${i.sub ? `<span class="small muted">${esc(i.sub)}</span>` : ""}${i.id ? "</a>" : ""}</span><span></span>
+      </li>`).join("") || `<li><span></span><span class="muted">Đủ ${hm(c.perDay)} hôm nay rồi. Học thêm thì ngày xong sẽ sớm hơn.</span><span></span></li>`}</ol>
     </section>
     <section class="card">
       <span class="eyebrow">Hôm nay đã làm</span>
@@ -377,30 +371,35 @@ function viewToday() {
       </div>
       <div class="bar ok"><i style="width:${(done / CH.length * 100).toFixed(1)}%"></i></div>
       <ul class="small" style="margin:0;padding-left:1.1em;display:grid;gap:4px">
-        <li>Tổng còn <b>${hm(w.total)}</b>${w.r0 != null ? `; hôm nay đã bớt <b>${hm(Math.max(0, w.r0 - w.total))}</b>${w.total > w.r0 + 1 ? ` (tăng ${hm(w.total - w.r0)} vì ước lượng thay đổi)` : ""}` : ""}.</li>
-        <li>Từ mai cần <b>${hm(w.need)}/ngày</b> trong ${w.daysAfter} ngày học tới ${fmtD(c.end)}${w.need0 != null && Math.abs(w.need0 - w.need) >= 1 ? ` (sáng nay: ${hm(w.need0)}, ${w.need < w.need0 ? "giảm" : "tăng"} ${hm(Math.abs(w.need0 - w.need))})` : ""}.</li>
-        <li>${w.paceReal ? "Nhịp 7 ngày học gần đây" : "Nhịp giả định (Cài đặt)"}: ${hm(w.pace)}/ngày → ${w.finish ? `xong khoảng <b>${fmtD(w.finish)}</b>, ${(() => { const dd = Math.round((w.finish - c.end) / DAY); return dd > 0 ? `trễ ${dd} ngày` : dd < 0 ? `sớm ${-dd} ngày` : "đúng hạn"; })()}` : "chưa tính được"}.</li>
-        <li><b>${w.pace < w.need ? `Cần tăng khoảng ${hm(w.need - w.pace)}/ngày` : `Có thể giảm khoảng ${hm(w.pace - w.need)}/ngày`}</b> để xong đúng ${fmtD(c.end)}.</li>
+        <li>Tổng còn <b>${hm(w.total)}</b>${td.r0 != null ? `; hôm nay đã bớt <b>${hm(Math.max(0, td.r0 - w.total))}</b>` : ""}.</li>
+        ${w.finish0 ? `<li>Ngày xong: <b>${fmtD(w.finish)}</b>${shift ? ` (sáng nay ${fmtD(w.finish0)}, ${shift < 0 ? `sớm hơn ${-shift}` : `trễ hơn ${shift}`} ngày)` : " (như sáng nay)"}.</li>` : ""}
+        ${w.needForTarget != null ? `<li>Muốn xong trước <b>${fmtD(c.target)}</b> cần <b>${hm(w.needForTarget)}/ngày</b> (${w.needForTarget > c.perDay ? `tăng ${hm(w.needForTarget - c.perDay)}` : `dư ${hm(c.perDay - w.needForTarget)}`}).</li>` : `<li class="muted">Đặt hạn thi trong <a href="#cai-dat">Cài đặt</a> để biết cần bao nhiêu phút/ngày cho kịp.</li>`}
       </ul>
-      <p class="small muted">Đọc ước ${Math.round(estMin(CH.find((x) => kap(x.id).st !== 2)?.id || CH[0].id))}′/chương, kreuzen ${w.perQ.toFixed(1)}′/câu; cả hai tự chỉnh theo số Vy ghi thật. Mục tiêu ${c.kqTotal} câu, nghỉ ${WD[c.rest]}.${p.overdue ? ` Đã qua ngày xong (${fmtD(c.end)}): đổi ngày trong Cài đặt.` : ""}</p>
+      <p class="small muted">Ước ${Math.round(w.readMin / Math.max(1, w.left))}′/chương, ${w.perQ.toFixed(1)}′/câu, mục tiêu ${c.kqTotal} câu; tự chỉnh theo số Vy ghi thật.</p>
     </section>
   </div>`;
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
-  $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 10 && v <= 600) setMin(v); };
+  $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
   $("#kzf").onsubmit = (e) => { e.preventDefault(); const q = Math.max(0, Math.round(+$("#kq").value || 0)), m = Math.max(0, Math.round(+$("#kmin").value || 0)); putDay({ kq: q, kmin: m }); document.activeElement?.blur(); toast("Đã ghi kreuzen hôm nay"); viewToday(); };
 }
-function setMin(m) { S.minutes = m; store.set("m2.min", m); viewToday(); }
+function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
+function setMin(m) { putCfg({ perDay: m }); document.activeElement?.blur(); viewToday(); }
 
 /* ---------- Lộ trình ---------- */
 function viewPlan() {
   const cur = CH.find((c) => kap(c.id).st !== 2)?.tag;
+  // ngày dự kiến xong từng Tag, theo số phút/ngày hiện tại
+  const w = workload(), perRead = Math.max(1, w.c.perDay * w.share), dueTag = {}; let acc = (w.today.min || 0);
+  for (const x of CH) { if (kap(x.id).st !== 2) acc += estMin(x.id) * (1 - (kap(x.id).pct || 0)); dueTag[x.tag] = acc; }
+  const tagDate = (t) => fmtD(nthStudyDay(today0(), Math.max(1, Math.ceil(dueTag[t] / perRead)), w.c.rest));
   const groups = []; for (const d of PLAN) { const g = groups.at(-1); if (g && g.fach === d.fach) g.days.push(d); else groups.push({ fach: d.fach, days: [d] }); }
   const q = (store.get("m2.q") || "");
   $("#app").innerHTML = `<div class="wrap">
-    <h1 style="font-size:26px">Lộ trình 100 Tage</h1>
+    <h1 style="font-size:26px">Lộ trình</h1>
+    <p class="small muted">${CH.length} chương AMBOSS chia theo 85 Lerntage; ngày dự kiến tính theo ${hm(workload().c.perDay)}/ngày Vy chọn ở Hôm nay.</p>
     <input id="q" type="search" placeholder="Tìm chương…" value="${esc(q)}" aria-label="Tìm chương">
     <div id="plist" style="display:grid;gap:10px"></div>
-    <p class="small muted">Tag 86–100 là Wiederholung và Generalprobe trong AMBOSS, không có chương mới.</p>
+    <p class="small muted">Tag 86–100 của AMBOSS là Wiederholungsexamen và Generalprobe (chỉ kreuzen), đã nằm trong mục tiêu số câu kreuzen.</p>
   </div>`;
   const draw = (q) => {
     const ql = q.trim().toLowerCase();
@@ -409,7 +408,7 @@ function viewPlan() {
       const days = g.days.map((d) => {
         const list = d.ch.filter((c) => !ql || c.t.toLowerCase().includes(ql)); if (!list.length) return "";
         const dd = d.ch.filter((c) => kap(c.id).st === 2).length;
-        return `<div class="tag${d.tag === cur ? " cur" : ""}" id="tag-${d.tag}"><h3>Tag ${d.tag} <span class="muted">${esc(d.sub)} · ${dd}/${d.ch.length}</span></h3>
+        return `<div class="tag${d.tag === cur ? " cur" : ""}" id="tag-${d.tag}"><h3>Tag ${d.tag} <span class="muted">${esc(d.sub)} · ${dd}/${d.ch.length}${dd < d.ch.length ? ` · dự kiến xong ${tagDate(d.tag)}` : ""}</span></h3>
           <ul class="chs">${list.map((c) => { const k = kap(c.id); return `<li><a href="${readHref(c.id)}"><span class="dot s${k.st}" style="--p:${Math.round((k.pct || 0) * 100)}%"></span><span class="tt">${esc(c.t)}${c.a ? `<span class="aud" title="Có bản AMBOSS Audio">audio</span>` : ""}</span><span class="pct">${k.st === 2 ? "xong" : k.st === 1 ? Math.round(k.pct * 100) + "%" : ""}</span></a></li>`; }).join("")}</ul></div>`;
       }).join("");
       if (!days) return "";
@@ -423,28 +422,18 @@ function viewPlan() {
 
 /* ---------- Cài đặt ---------- */
 function viewSettings() {
-  const c = cfg(); const th = store.get("m2.theme") || "system";
+  const c = cfg();
   $("#app").innerHTML = `<div class="wrap">
     <h1 style="font-size:26px">Cài đặt</h1>
     <form class="card" id="cf">
-      <label class="f" for="cstart">Ngày bắt đầu<input type="date" id="cstart" value="${iso(c.start)}" required></label>
       <label class="f" for="crest">Ngày chỉ ôn trong tuần<select id="crest">${WD.map((w, i) => `<option value="${i}" ${i === c.rest ? "selected" : ""}>${w}</option>`).join("")}</select></label>
-      <label class="f" for="cend">Ngày đọc xong chương cuối (Tag 85)<input type="date" id="cend" value="${iso(c.end)}" required></label>
+      <label class="f" for="ctarget">Hạn muốn xong (ngày thi, tuỳ chọn)<input type="date" id="ctarget" value="${c.target ? iso(c.target) : ""}"></label>
       <label class="f" for="ckq">Mục tiêu tổng số câu kreuzen<input type="number" id="ckq" min="0" max="20000" step="50" value="${c.kqTotal}" required></label>
-      <label class="f" for="cpd">Thường học được mỗi ngày (phút), dùng khi chưa có số thật<input type="number" id="cpd" min="30" max="900" step="15" value="${c.perDay}" required></label>
-      <p class="small muted" id="cinfo"></p>
-      <div class="row"><button class="btn primary" type="submit" ${online ? "" : "disabled"}>Lưu</button><button class="btn" type="button" id="cauto">Tính ngày xong theo 6 ngày/tuần</button></div>
+      <p class="small muted">Số phút học mỗi ngày chỉnh ở tab Hôm nay. Cỡ chữ và sáng/tối chỉnh bằng nút Aa trong trang đọc.</p>
+      <div class="row"><button class="btn primary" type="submit" ${online ? "" : "disabled"}>Lưu</button></div>
     </form>
-    <section class="card">
-      <label class="f" for="ctheme">Giao diện<select id="ctheme">${[["system", "Theo máy"], ["light", "Sáng"], ["dark", "Tối"]].map(([v, l]) => `<option value="${v}" ${v === th ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-      <p class="small muted">Cỡ chữ và chế độ tập trung chỉnh ngay trong trang đọc.</p>
-    </section>
   </div>`;
-  const info = () => { const s = parseISO($("#cstart").value), e = parseISO($("#cend").value), r = +$("#crest").value; const n = studyDays(s, e, r); $("#cinfo").textContent = `${n} ngày học cho ${PLAN.length} Lerntage (${CH.length} chương) → khoảng ${(CH.length / Math.max(1, n)).toFixed(1)} chương/ngày.`; };
-  for (const id of ["#cstart", "#cend", "#crest"]) $(id).oninput = info; info();
-  $("#cauto").onclick = () => { $("#cend").value = iso(endFor(parseISO($("#cstart").value), +$("#crest").value)); info(); };
-  $("#cf").onsubmit = (e) => { e.preventDefault(); S.cfg = { start: $("#cstart").value, end: $("#cend").value, rest: +$("#crest").value, kqTotal: +$("#ckq").value, perDay: +$("#cpd").value }; save("cfg/plan", S.cfg); toast("Đã lưu lịch"); };
-  $("#ctheme").onchange = (e) => { store.set("m2.theme", e.target.value); applyTheme(); };
+  $("#cf").onsubmit = (e) => { e.preventDefault(); const t = $("#ctarget").value; putCfg({ rest: +$("#crest").value, kqTotal: +$("#ckq").value, target: t || undefined }); if (!t) delete S.cfg.target; save("cfg/plan", S.cfg); toast("Đã lưu"); };
 }
 function applyTheme() { const t = store.get("m2.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 

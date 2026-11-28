@@ -118,7 +118,7 @@ Sửa `artifact/phong-truc.html` trong repo (đây là bản gốc, không có p
 ## Khu M2 AMBOSS (tách hẳn khỏi Phòng Trực)
 
 Artifact riêng **M2 Lernplan**: `artifact/m2-amboss.html`, publish tại https://claude.ai/artifact/57MNiEaRFALmsUUzJRL1Ap
-(riêng tư, capabilities `db` + `sample`). Kho db riêng: `cfg/plan`, `kap/<id>`, `txt/<id>-<k>`, `easy/<id>`, `mk/<id>`,
+(riêng tư, capabilities `db` + `sample`). Kho db riêng: `cfg/plan` {start, rest, perDay, target?, kqTotal}, `kap/<id>`, `txt/<id>-<k>`, `easy/<id>`, `mk/<id>`,
 `days/<YYYYMMDD>`. Prompt bài dễ hiểu: `EASY_PROMPT` trong trang.
 Không đụng Phòng Trực khi sửa khu này, và ngược lại.
 
