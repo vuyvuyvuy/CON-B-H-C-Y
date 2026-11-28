@@ -113,6 +113,11 @@ ul.chs a:hover .tt { color: var(--accent); }
 .rhead .ttl b { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ib { border: 0; background: transparent; min-width: 40px; height: 40px; border-radius: 8px; padding: 0 8px; color: var(--fg); }
 .ib:hover { background: var(--line); }
+.seg { max-width: 860px; margin: 0 auto; display: flex; gap: 4px; padding: 0 max(12px, env(safe-area-inset-right, 0px)) 6px max(12px, env(safe-area-inset-left, 0px)); }
+.seg button { flex: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; min-height: 36px; font-size: 13px; color: var(--muted); }
+.seg button[aria-selected=true] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+article.doc.easy b { color: var(--accent); font-weight: 600; }
+.ai-note { font-family: var(--font-ui); border-left: 3px solid var(--line); padding-left: 10px; }
 .rprog { height: 3px; background: var(--line); }
 .rprog i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
 article.doc { max-width: 68ch; margin: 0 auto; font: var(--fs)/1.68 var(--font-read); padding: 24px max(18px, env(safe-area-inset-right, 0px)) 40px max(18px, env(safe-area-inset-left, 0px)); overflow-wrap: break-word; -webkit-text-size-adjust: 100%; }
@@ -189,7 +194,8 @@ body.focus .rhead { display: none; }
 /*   kap/<id>          {st 0|1|2, pct, pos, ms, words, nb, doneAt}       */
 /*   txt/<id>-<k>      {ch, k, blocks:[html]}  nội dung chương, cắt ≤200KB */
 /*   mk/<id>           {list:[{id,b,s,e,c,note,txt}]}  đánh dấu          */
-/*   days/<YYYYMMDD>   {min, ch:[id], kz}                                */
+/*   easy/<id>         {blocks, src:"amboss"|"ai", at}  bài dễ hiểu Claude soạn */
+/*   days/<YYYYMMDD>   {min, ch:[id], kq, kmin, r0}  r0 = khối lượng còn lúc mở app sáng nay (phút) */
 /* Kho này tách hẳn khỏi Phòng Trực (Artifact khác, kho khác).          */
 /* ------------------------------------------------------------------ */
 const PLAN = JSON.parse(document.getElementById("m2-plan").textContent) || [];
@@ -219,7 +225,8 @@ function cfg() {
   const start = c.start ? parseISO(c.start) : today0();
   const rest = Number.isInteger(c.rest) ? c.rest : 0;
   const end = c.end ? parseISO(c.end) : endFor(start, rest);
-  return { start, rest, end, set: !!S.cfg };
+  // giả định ban đầu, Vy sửa trong Cài đặt: ~50 câu kreuzen/Lerntag, học ~4 giờ/ngày
+  return { start, rest, end, set: !!S.cfg, kqTotal: c.kqTotal ?? 50 * PLAN.length, perDay: c.perDay ?? 240 };
 }
 function studyDays(from, to, rest) { let n = 0; for (let d = new Date(from); d <= to; d = addDays(d, 1)) if (d.getDay() !== rest) n++; return n; }
 
@@ -252,6 +259,28 @@ function avgChapterMin() {
 }
 const estMin = (id) => { const k = kap(id); const m = k.words ? k.words * rate() : avgChapterMin(); return Math.min(120, Math.max(10, m)); };
 
+/* ---------- cán cân: còn bao nhiêu việc, cần bao nhiêu phút/ngày ---------- */
+function workload() {
+  const c = cfg(), t0 = today0(), tk = key(t0), tmr = addDays(t0, 1);
+  const left = CH.filter((x) => kap(x.id).st !== 2);
+  const readMin = left.reduce((a, x) => a + estMin(x.id) * (1 - (kap(x.id).pct || 0)), 0);
+  const D = Object.values(S.days);
+  const kqDone = D.reduce((a, d) => a + (d.kq || 0), 0), kMin = D.reduce((a, d) => a + (d.kmin || 0), 0);
+  const perQ = kqDone >= 50 && kMin > 0 ? kMin / kqDone : 2;      // shortcut: 2 phút/câu cho tới khi có ≥50 câu đã ghi giờ
+  const kqLeft = Math.max(0, c.kqTotal - kqDone), kzMin = kqLeft * perQ;
+  const total = readMin + kzMin;
+  const daysAfter = Math.max(1, studyDays(tmr, c.end, c.rest));
+  // nhịp thật: trung bình phút học 7 ngày học gần nhất (không tính hôm nay); ngày bỏ học tính là 0
+  const past = []; for (let d = addDays(t0, -1); past.length < 7 && d >= c.start; d = addDays(d, -1)) if (d.getDay() !== c.rest) past.push(S.days[key(d)] || {});
+  const pace = past.length ? past.reduce((a, d) => a + (d.min || 0) + (d.kmin || 0), 0) / past.length : c.perDay;
+  let finish = null;
+  if (pace > 0) { let need = Math.ceil(total / pace), d = new Date(t0); while (need > 0) { d = addDays(d, 1); if (d.getDay() !== c.rest) need--; } finish = d; }
+  const today = S.days[tk] || {};
+  return { left: left.length, readMin, kqLeft, kzMin, perQ, total, daysAfter, need: total / daysAfter, pace, paceReal: past.length > 0, finish,
+    r0: today.r0, need0: today.r0 != null ? today.r0 / daysAfter : null, today };
+}
+const hm = (m) => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)} giờ${m % 60 ? " " + (m % 60) + "′" : ""}` : `${m}′`; };
+
 /* ---------- kế hoạch hôm nay ---------- */
 function todayPlan(minutes, due = 0) {
   const { rest, end } = cfg();
@@ -281,7 +310,7 @@ function todayPlan(minutes, due = 0) {
     rem -= m; if (m >= need) finish++;
   }
   const tag = (reading[0] || fresh[0])?.tag;
-  if (rem >= 5) items.push({ kind: "Kreuzen", m: rem, label: tag ? `Fragensitzung Tag ${tag}` : "Kreuzen", sub: "Trong AMBOSS (đã cài sẵn cho từng Tag)", kz: true });
+  if (rem >= 5) items.push({ kind: "Kreuzen", m: rem, label: tag ? `Fragensitzung Tag ${tag}` : "Kreuzen", sub: "Trong AMBOSS (đã cài sẵn cho từng Tag)" });
   return { items, quota, daysLeft, left: left.length, restDay, overdue: end < t0 };
 }
 
@@ -308,7 +337,7 @@ const readHref = (id) => "#read-" + id.replace("_", "-");
 function viewToday() {
   const c = cfg(); const p = todayPlan(S.minutes);
   const done = CH.length - p.left;
-  const dk = key(today0()); const kz = !!S.days[dk]?.kz;
+  const w = workload(), td = w.today;
   const opts = [30, 60, 90, 120, 180];
   $("#app").innerHTML = `<div class="wrap">
     <header style="display:grid;gap:4px">
@@ -324,23 +353,41 @@ function viewToday() {
       <ol class="agenda">${p.items.map((i) => `<li>
         <span class="t">${i.m}′</span>
         <span class="what">${i.id ? `<a href="${readHref(i.id)}">` : ""}<span class="kind">${esc(i.kind)}</span><b>${esc(i.label)}</b>${i.sub ? `<span class="small muted">${esc(i.sub)}</span>` : ""}${i.id ? "</a>" : ""}</span>
-        ${i.kz ? `<label class="small row"><input type="checkbox" id="kz" ${kz ? "checked" : ""}> xong</label>` : i.id ? `<a class="btn small" href="${readHref(i.id)}">Đọc</a>` : ""}
+        ${i.id ? `<a class="btn small" href="${readHref(i.id)}">Đọc</a>` : ""}
       </li>`).join("") || `<li><span></span><span class="muted">Không còn gì cho hôm nay.</span><span></span></li>`}</ol>
       <p class="small muted">Ôn thẻ có từ giai đoạn 2. Ước lượng ${Math.round(estMin(CH.find((x) => kap(x.id).st !== 2)?.id || CH[0].id))} phút/chương, tự chỉnh theo tốc độ đọc thật của Vy.</p>
     </section>
     <section class="card">
+      <span class="eyebrow">Hôm nay đã làm</span>
       <div class="stats">
-        <div><span class="kind">Đã đọc</span><b>${done}<span class="muted small">/${CH.length}</span></b></div>
-        <div><span class="kind">Mục tiêu/ngày</span><b>${p.restDay ? "—" : p.quota}</b></div>
-        <div><span class="kind">Ngày học còn</span><b>${p.daysLeft}</b></div>
+        <div><span class="kind">Chương xong</span><b>${(td.ch || []).length}</b></div>
+        <div><span class="kind">Phút đọc</span><b>${Math.round(td.min || 0)}</b></div>
+        <div><span class="kind">Câu kreuzen</span><b>${td.kq || 0}</b></div>
+      </div>
+      <form class="row" id="kzf"><label class="f" for="kq">Số câu kreuzen hôm nay<input type="number" id="kq" min="0" max="2000" inputmode="numeric" value="${td.kq || ""}" style="width:120px"></label>
+        <label class="f" for="kmin">trong bao nhiêu phút<input type="number" id="kmin" min="0" max="900" inputmode="numeric" value="${td.kmin || ""}" style="width:120px"></label>
+        <button class="btn" type="submit" style="align-self:end">Ghi</button></form>
+    </section>
+    <section class="card">
+      <span class="eyebrow">Cán cân: còn lại bao nhiêu</span>
+      <div class="stats">
+        <div><span class="kind">Chương</span><b>${w.left}</b><span class="small muted">≈ ${hm(w.readMin)} đọc</span></div>
+        <div><span class="kind">Câu kreuzen</span><b>${w.kqLeft}</b><span class="small muted">≈ ${hm(w.kzMin)}</span></div>
+        <div><span class="kind">Thẻ Anki</span><b>—</b><span class="small muted">từ GĐ2</span></div>
       </div>
       <div class="bar ok"><i style="width:${(done / CH.length * 100).toFixed(1)}%"></i></div>
-      <p class="small muted">${p.overdue ? `Đã qua ngày xong phần đọc (${fmtD(c.end)}): đổi ngày trong Cài đặt để chia lại.` : `Chia đều ${p.left} chương còn lại tới ${fmtD(c.end)}, nghỉ ${WD[c.rest]}. Bỏ một hôm thì app tự rải phần thiếu ra các ngày sau.`}</p>
+      <ul class="small" style="margin:0;padding-left:1.1em;display:grid;gap:4px">
+        <li>Tổng còn <b>${hm(w.total)}</b>${w.r0 != null ? `; hôm nay đã bớt <b>${hm(Math.max(0, w.r0 - w.total))}</b>${w.total > w.r0 + 1 ? ` (tăng ${hm(w.total - w.r0)} vì ước lượng thay đổi)` : ""}` : ""}.</li>
+        <li>Từ mai cần <b>${hm(w.need)}/ngày</b> trong ${w.daysAfter} ngày học tới ${fmtD(c.end)}${w.need0 != null && Math.abs(w.need0 - w.need) >= 1 ? ` (sáng nay: ${hm(w.need0)}, ${w.need < w.need0 ? "giảm" : "tăng"} ${hm(Math.abs(w.need0 - w.need))})` : ""}.</li>
+        <li>${w.paceReal ? "Nhịp 7 ngày học gần đây" : "Nhịp giả định (Cài đặt)"}: ${hm(w.pace)}/ngày → ${w.finish ? `xong khoảng <b>${fmtD(w.finish)}</b>, ${(() => { const dd = Math.round((w.finish - c.end) / DAY); return dd > 0 ? `trễ ${dd} ngày` : dd < 0 ? `sớm ${-dd} ngày` : "đúng hạn"; })()}` : "chưa tính được"}.</li>
+        <li><b>${w.pace < w.need ? `Cần tăng khoảng ${hm(w.need - w.pace)}/ngày` : `Có thể giảm khoảng ${hm(w.pace - w.need)}/ngày`}</b> để xong đúng ${fmtD(c.end)}.</li>
+      </ul>
+      <p class="small muted">Đọc ước ${Math.round(estMin(CH.find((x) => kap(x.id).st !== 2)?.id || CH[0].id))}′/chương, kreuzen ${w.perQ.toFixed(1)}′/câu; cả hai tự chỉnh theo số Vy ghi thật. Mục tiêu ${c.kqTotal} câu, nghỉ ${WD[c.rest]}.${p.overdue ? ` Đã qua ngày xong (${fmtD(c.end)}): đổi ngày trong Cài đặt.` : ""}</p>
     </section>
   </div>`;
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 10 && v <= 600) setMin(v); };
-  const k = $("#kz"); if (k) k.onchange = () => putDay({ kz: k.checked });
+  $("#kzf").onsubmit = (e) => { e.preventDefault(); const q = Math.max(0, Math.round(+$("#kq").value || 0)), m = Math.max(0, Math.round(+$("#kmin").value || 0)); putDay({ kq: q, kmin: m }); document.activeElement?.blur(); toast("Đã ghi kreuzen hôm nay"); viewToday(); };
 }
 function setMin(m) { S.minutes = m; store.set("m2.min", m); viewToday(); }
 
@@ -383,6 +430,8 @@ function viewSettings() {
       <label class="f" for="cstart">Ngày bắt đầu<input type="date" id="cstart" value="${iso(c.start)}" required></label>
       <label class="f" for="crest">Ngày chỉ ôn trong tuần<select id="crest">${WD.map((w, i) => `<option value="${i}" ${i === c.rest ? "selected" : ""}>${w}</option>`).join("")}</select></label>
       <label class="f" for="cend">Ngày đọc xong chương cuối (Tag 85)<input type="date" id="cend" value="${iso(c.end)}" required></label>
+      <label class="f" for="ckq">Mục tiêu tổng số câu kreuzen<input type="number" id="ckq" min="0" max="20000" step="50" value="${c.kqTotal}" required></label>
+      <label class="f" for="cpd">Thường học được mỗi ngày (phút), dùng khi chưa có số thật<input type="number" id="cpd" min="30" max="900" step="15" value="${c.perDay}" required></label>
       <p class="small muted" id="cinfo"></p>
       <div class="row"><button class="btn primary" type="submit" ${online ? "" : "disabled"}>Lưu</button><button class="btn" type="button" id="cauto">Tính ngày xong theo 6 ngày/tuần</button></div>
     </form>
@@ -394,7 +443,7 @@ function viewSettings() {
   const info = () => { const s = parseISO($("#cstart").value), e = parseISO($("#cend").value), r = +$("#crest").value; const n = studyDays(s, e, r); $("#cinfo").textContent = `${n} ngày học cho ${PLAN.length} Lerntage (${CH.length} chương) → khoảng ${(CH.length / Math.max(1, n)).toFixed(1)} chương/ngày.`; };
   for (const id of ["#cstart", "#cend", "#crest"]) $(id).oninput = info; info();
   $("#cauto").onclick = () => { $("#cend").value = iso(endFor(parseISO($("#cstart").value), +$("#crest").value)); info(); };
-  $("#cf").onsubmit = (e) => { e.preventDefault(); S.cfg = { start: $("#cstart").value, end: $("#cend").value, rest: +$("#crest").value }; save("cfg/plan", S.cfg); toast("Đã lưu lịch"); };
+  $("#cf").onsubmit = (e) => { e.preventDefault(); S.cfg = { start: $("#cstart").value, end: $("#cend").value, rest: +$("#crest").value, kqTotal: +$("#ckq").value, perDay: +$("#cpd").value }; save("cfg/plan", S.cfg); toast("Đã lưu lịch"); };
   $("#ctheme").onchange = (e) => { store.set("m2.theme", e.target.value); applyTheme(); };
 }
 function applyTheme() { const t = store.get("m2.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
@@ -518,11 +567,11 @@ async function saveText(id, blocks) {
 }
 
 /* ---------- Trình đọc ---------- */
-var R = { id: null, blocks: [], marks: [], fs: +(store.get("m2.fs") || 19) };
+var R = { id: null, blocks: [], easy: [], view: store.get("m2.view") === "a" ? "a" : "e", marks: [], fs: +(store.get("m2.fs") || 19) };
 async function openReader(id) {
   const c = BY[id];
   if (!c) { location.hash = "#plan"; return; }
-  R.id = id; R.blocks = []; R.marks = [];
+  R.id = id; R.blocks = []; R.easy = []; R.marks = [];
   const next = CH[c.i + 1];
   $("#app").innerHTML = `
     <div class="rhead"><div class="in">
@@ -531,8 +580,8 @@ async function openReader(id) {
       <button class="ib" id="aa" aria-label="Cỡ chữ và giao diện">Aa</button>
       <button class="ib" id="mks" aria-label="Danh sách đánh dấu">✎</button>
       <button class="ib" id="fcs" aria-label="Chế độ tập trung">⛶</button>
-      <button class="ib" id="more" aria-label="Thay nội dung chương">⋯</button>
-    </div><div class="rprog"><i id="rp"></i></div></div>
+      <button class="ib" id="more" aria-label="Soạn lại / thay nội dung">⋯</button>
+    </div><div class="seg" role="tablist" aria-label="Bản đọc"><button role="tab" data-v="e">Dễ hiểu (Claude soạn)</button><button role="tab" data-v="a">AMBOSS</button></div><div class="rprog"><i id="rp"></i></div></div>
     <div id="rbody"><p class="wrap muted">Đang tải chương…</p></div>
     <button class="btn" id="unfocus" hidden>Thoát tập trung</button>`;
   document.documentElement.style.setProperty("--fs", R.fs + "px");
@@ -547,27 +596,36 @@ async function openReader(id) {
   $("#fcs").onclick = () => { document.body.classList.add("focus"); $("#unfocus").hidden = false; };
   $("#unfocus").onclick = () => { document.body.classList.remove("focus"); $("#unfocus").hidden = true; };
   $("#mks").onclick = marksSheet;
-  $("#more").onclick = () => showImport(c, true);
+  $("#more").onclick = () => R.view === "a" ? showImport(c, true) : showEasy(c, true);
+  for (const b of document.querySelectorAll(".seg button")) b.onclick = () => { if (R.view === b.dataset.v) return; R.view = b.dataset.v; store.set("m2.view", R.view); if (stopTrack) { stopTrack(); stopTrack = null; } showView(c, next); };
   if (!DB) { $("#rbody").innerHTML = `<p class="wrap muted">Chưa kết nối được kho dữ liệu nên chưa mở được nội dung chương.</p>`; return; }
   try {
-    const [blocks, mk] = await Promise.all([loadText(id), DB.doc("mk/" + id).get()]);
+    const [blocks, mk, ez] = await Promise.all([loadText(id), DB.doc("mk/" + id).get(), DB.doc("easy/" + id).get()]);
     if (R.id !== id) return;
-    R.blocks = blocks; R.marks = mk.exists ? (mk.data().list || []) : [];
+    R.blocks = blocks; R.marks = mk.exists ? (mk.data().list || []) : []; R.easy = ez.exists ? (ez.data().blocks || []) : []; R.easySrc = ez.exists ? ez.data().src : null;
   } catch (e) { $("#rbody").innerHTML = `<p class="wrap muted">Không tải được chương: ${esc(e.message || e.code)}</p>`; return; }
-  if (!R.blocks.length) return showImport(c, false);
+  showView(c, next);
+}
+function showView(c, next) {
+  for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-selected", b.dataset.v === R.view);
+  scrollTo(0, 0);
+  if (!viewBlocks().length) return R.view === "e" ? showEasy(c, false) : showImport(c, false);
   renderDoc(c, next);
 }
+const viewBlocks = () => (R.view === "e" ? R.easy : R.blocks);
+const posKey = () => (R.view === "e" ? "epos" : "pos");
 function setFs(v) { R.fs = Math.min(28, Math.max(14, v)); store.set("m2.fs", R.fs); document.documentElement.style.setProperty("--fs", R.fs + "px"); }
 
 function renderDoc(c, next) {
   const k = kap(c.id);
-  $("#rbody").innerHTML = `<article class="doc" id="doc">${R.blocks.map((b, i) => `<div class="blk" data-b="${i}">${/^<table/i.test(b) ? `<div class="tbl">${b}</div>` : b}</div>`).join("")}</article>
+  const blocks = viewBlocks();
+  $("#rbody").innerHTML = `<article class="doc${R.view === "e" ? " easy" : ""}" id="doc">${R.view === "e" ? `<p class="small muted ai-note">Bài do Claude soạn ${R.easySrc === "ai" ? "<b>chưa dựa trên bài AMBOSS</b> (chưa dán)" : "từ bài AMBOSS đã dán"}; số liệu quan trọng nên đối chiếu bản AMBOSS.</p>` : ""}${blocks.map((b, i) => `<div class="blk" data-b="${i}">${/^<table/i.test(b) ? `<div class="tbl">${b}</div>` : b}</div>`).join("")}</article>
     <div class="done-box" id="donebox">${k.st === 2
       ? `<span class="burst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span><b>Đã đọc xong chương này</b>`
       : `<button class="btn primary" id="finish">Đọc xong chương</button><span class="small muted">Thẻ kiến thức của chương sẽ mở từ giai đoạn 4.</span>`}
       ${next ? `<a class="btn" href="${readHref(next.id)}">Chương sau: ${esc(next.t)}</a>` : ""}</div>`;
   const doc = $("#doc");
-  for (const m of R.marks) paintMark(m);
+  for (const m of R.marks) if ((m.v || "a") === R.view) paintMark(m);
   doc.addEventListener("click", (e) => {
     const mk = e.target.closest("mark.hl"); if (mk && getSelection().isCollapsed) return markSheet(R.marks.find((m) => m.id === mk.dataset.m));
     const miss = e.target.closest("figure[data-miss]"); if (miss) return replaceImg(+miss.closest(".blk").dataset.b);
@@ -575,14 +633,16 @@ function renderDoc(c, next) {
   if ($("#finish")) $("#finish").onclick = () => finishChapter(c, next);
   if (k.st === 0) putKap(c.id, { st: 1 });
   // về đúng đoạn đang đọc dở
-  const target = doc.querySelector(`.blk[data-b="${Math.min(k.pos || 0, R.blocks.length - 1)}"]`);
-  if (k.pos > 0 && target) requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+  const pk = k[posKey()] || 0;
+  const target = doc.querySelector(`.blk[data-b="${Math.min(pk, blocks.length - 1)}"]`);
+  if (pk > 0 && target) requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
   trackReading(c.id);
 }
 
 function trackReading(id) {
   if (stopTrack) stopTrack();
-  let pos = kap(id).pos || 0, pct = kap(id).pct || 0, ms = 0, last = Date.now(), tick = Date.now(), sel = null;
+  const pk = posKey();
+  let pos = kap(id)[pk] || 0, pct = kap(id).pct || 0, ms = 0, last = Date.now(), tick = Date.now(), sel = null;
   const blks = [...document.querySelectorAll("#doc .blk")];
   const prog = () => { $("#rp").style.width = (pct * 100).toFixed(1) + "%"; };
   const onScroll = () => {
@@ -596,7 +656,7 @@ function trackReading(id) {
   const flush = () => {
     clearTimeout(to);
     const add = ms; ms = 0;
-    const k = kap(id); putKap(id, { pos, pct: k.st === 2 ? 1 : pct, ms: (k.ms || 0) + add });
+    const k = kap(id); putKap(id, { [pk]: pos, pct: k.st === 2 ? 1 : pct, ms: (k.ms || 0) + add });
     if (add) { const d = S.days[key(today0())] || {}; putDay({ min: Math.round(((d.min || 0) * MIN + add) / MIN * 10) / 10 }); }
   };
   // chỉ tính giờ khi trang đang hiện và có thao tác trong 2 phút gần nhất
@@ -656,7 +716,7 @@ function selToolbar() {
   tb.onpointerdown = (e) => e.preventDefault();      // giữ vùng bôi đen khi bấm nút
   tb.onclick = (e) => {
     const c = e.target.dataset.c; if (!c) return;
-    const m = { id: Date.now().toString(36), b: x.b, s: x.s, e: x.e, c: c === "note" ? "again" : c, note: "", txt: x.txt.slice(0, 400) };
+    const m = { id: Date.now().toString(36), v: R.view, b: x.b, s: x.s, e: x.e, c: c === "note" ? "again" : c, note: "", txt: x.txt.slice(0, 400) };
     R.marks.push(m); paintMark(m); saveMarks(); getSelection().removeAllRanges(); tb.remove();
     if (c === "note") markSheet(m);
   };
@@ -680,8 +740,87 @@ function markSheet(m) {
   if (!m.note) $("#mnote", bg).focus();
 }
 function marksSheet() {
-  const bg = sheet(`<h2 style="font-size:18px">Đánh dấu trong chương</h2>${R.marks.length ? `<ul class="mlist">${[...R.marks].sort((a, b) => a.b - b.b || a.s - b.s).map((m) => `<li><button data-m="${m.id}"><span class="kind">${m.c === "hard" ? "Khó" : "Đọc lại"}</span><q style="background:var(--${m.c})">${esc(m.txt)}</q>${m.note ? `<span class="small muted">${esc(m.note)}</span>` : ""}</button></li>`).join("")}</ul>` : `<p class="muted">Chưa có. Bôi đen một đoạn trong bài để đánh dấu "Khó" hoặc "Đọc lại".</p>`}`);
+  const bg = sheet(`<h2 style="font-size:18px">Đánh dấu trong chương</h2>${R.marks.some((m) => (m.v || "a") === R.view) ? `<ul class="mlist">${R.marks.filter((m) => (m.v || "a") === R.view).sort((a, b) => a.b - b.b || a.s - b.s).map((m) => `<li><button data-m="${m.id}"><span class="kind">${m.c === "hard" ? "Khó" : "Đọc lại"}</span><q style="background:var(--${m.c})">${esc(m.txt)}</q>${m.note ? `<span class="small muted">${esc(m.note)}</span>` : ""}</button></li>`).join("")}</ul>` : `<p class="muted">Chưa có. Bôi đen một đoạn trong bài để đánh dấu "Khó" hoặc "Đọc lại".</p>`}`);
   for (const b of bg.querySelectorAll("[data-m]")) b.onclick = () => { bg.remove(); $(`mark[data-m="${b.dataset.m}"]`)?.scrollIntoView({ block: "center" }); };
+}
+
+/* ---------- bài giảng dễ hiểu (Claude soạn qua capability `sample`) ---------- */
+/* Prompt để ở đây cho dễ sửa. Nguồn chính là bài AMBOSS Vy đã dán; chưa dán thì Claude dùng kiến thức chuẩn và trang ghi rõ. */
+const EASY_PROMPT = (c, text) => `Bạn là gia sư y khoa rất giỏi giải thích. Người đọc: sinh viên y người Việt ôn thi M2 (Zweites Staatsexamen, Đức), đọc tiếng Đức còn chậm.
+Viết bài giảng cho chương AMBOSS "${c.t}" (${c.fach} › ${c.sub}) bằng tiếng Việt, dễ tới mức học sinh lớp 5 cũng hiểu, nhưng đúng và đủ ý cho kỳ thi M2.
+
+Quy tắc:
+- Câu ngắn, từ thường. Ý khó thì kèm một ví von đời thường.
+- Thuật ngữ thi giữ tiếng Đức, in đậm, kèm nghĩa trong ngoặc: **Leitsymptom** (triệu chứng dẫn đường). Danh từ ghi kèm giống: **die Lungenembolie**.
+- Bố cục (bỏ mục không hợp với chương, ví dụ chương về phương pháp khám hay luật):
+## Tóm tắt một câu
+## Chuyện gì xảy ra trong cơ thể
+## Nhận ra thế nào (Leitsymptome)
+## Chẩn đoán (Diagnostik, Goldstandard)
+## Điều trị (Therapie der 1. Wahl)
+## Biến chứng hay gặp
+## Bẫy hay ra thi
+## Từ khoá Đức – Việt (bảng | Deutsch | Tiếng Việt |, 8–15 dòng)
+- Chỉ giữ ý quan trọng cho thi; bỏ lịch sử, dịch tễ chi tiết, liều thuốc ít gặp, danh sách dài.
+- Không bịa số liệu. Chỗ không chắc ghi "(kiểm tra lại trong AMBOSS)".
+- Dài 600–1200 từ. Chỉ dùng Markdown: ##, -, 1., **đậm**, bảng |. Không chào hỏi, không lời kết.
+${text ? `\nNguồn chính là nội dung chương AMBOSS dưới đây; bám theo nó, không thêm ý mâu thuẫn:\n<chuong>\n${text}\n</chuong>` : `\nChưa có nội dung AMBOSS: dùng kiến thức chuẩn hiện hành ở Đức (Leitlinien, AMBOSS/IMPP).`}`;
+
+/* Markdown (con) → khối HTML. Chữ của Claude luôn được escape trước. */
+function mdBlocks(src) {
+  const inl = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+  const L = src.replace(/\r/g, "").split("\n"), out = []; let i = 0;
+  const LI = /^\s*([-*•]|\d+[.)])\s+/, ROW = /^\s*\|/;
+  while (i < L.length) {
+    const l = L[i]; let m;
+    if (!l.trim() || /^\s*-{3,}\s*$/.test(l)) { i++; continue; }
+    if ((m = l.match(/^(#{1,4})\s+(.*)/))) { const n = Math.min(4, m[1].length + 1); out.push(`<h${n}>${inl(m[2])}</h${n}>`); i++; continue; }
+    if (ROW.test(l)) {
+      const rows = []; while (i < L.length && ROW.test(L[i])) rows.push(L[i++]);
+      const cells = (r) => r.trim().replace(/^\||\|$/g, "").split("|").map((x) => x.trim());
+      const body = rows.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r));
+      out.push(`<table>${body.map((r, j) => `<tr>${cells(r).map((x) => (j ? `<td>${inl(x)}</td>` : `<th>${inl(x)}</th>`)).join("")}</tr>`).join("")}</table>`); continue;
+    }
+    if (LI.test(l)) { const ord = /^\s*\d/.test(l), items = []; while (i < L.length && LI.test(L[i])) items.push(L[i++].replace(LI, "")); const t = ord ? "ol" : "ul"; out.push(`<${t}>${items.map((x) => `<li>${inl(x)}</li>`).join("")}</${t}>`); continue; }
+    const p = []; while (i < L.length && L[i].trim() && !/^(#{1,4}\s)/.test(L[i]) && !ROW.test(L[i]) && !LI.test(L[i])) p.push(L[i++].replace(/^>\s?/, "")); out.push(`<p>${inl(p.join(" "))}</p>`);
+  }
+  return out;
+}
+let SAMPLE;
+const getSample = () => (SAMPLE ||= window.claude?.use("sample").catch(() => null) ?? Promise.resolve(null));
+function showEasy(c, replacing) {
+  const has = R.blocks.length > 0;
+  $("#rbody").innerHTML = `<div class="wrap">
+    <div style="display:grid;gap:4px"><span class="eyebrow">Tag ${c.tag} · chương ${c.n}</span><h2 style="font-size:22px">${replacing ? "Soạn lại bài dễ hiểu" : "Bài giảng dễ hiểu"}</h2></div>
+    <p class="small muted">Claude viết lại chương “${esc(c.t)}” bằng tiếng Việt thật dễ hiểu, giữ thuật ngữ thi tiếng Đức (kèm der/die/das).
+      ${has ? "Dựa trên bài AMBOSS Vy đã dán." : "Chưa dán bài AMBOSS nên Claude dùng kiến thức chuẩn; dán bài AMBOSS trước (tab AMBOSS) thì bài sẽ sát nội dung thi hơn."} Mất khoảng 1–2 phút.</p>
+    <div class="row"><button class="btn primary" id="egen">${replacing ? "Soạn lại" : "Soạn bài"}</button>${replacing ? `<button class="btn" id="ecancel">Huỷ</button>` : ""}<span class="small muted" id="estat"></span></div>
+    <div class="preview" id="eprev" hidden><article class="doc easy" id="eprevdoc"></article></div>
+  </div>`;
+  if (replacing) $("#ecancel").onclick = () => showView(c, CH[c.i + 1]);
+  $("#egen").onclick = async () => {
+    const btn = $("#egen"); btn.disabled = true;
+    const sample = await getSample();
+    if (!sample) { $("#estat").textContent = "Trang chưa được phép hỏi Claude. Mở menu Permissions của trang để cho phép rồi thử lại."; btn.disabled = false; return; }
+    const text = has ? R.blocks.join("\n").replace(/<figure[\s\S]*?<\/figure>/g, "").replace(/<\/(p|h\d|li|tr)>/g, "\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").slice(0, 60000) : "";
+    $("#estat").textContent = "Claude đang soạn…"; $("#eprev").hidden = false;
+    let raf = 0;
+    try {
+      const r = await sample(EASY_PROMPT(c, text), { modelTier: "complex", onText: ({ text }) => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { $("#eprevdoc").innerHTML = mdBlocks(text).join(""); }); } });
+      cancelAnimationFrame(raf);
+      const blocks = mdBlocks(r.text);
+      if (blocks.length < 3) throw new Error("Bài trả về quá ngắn, thử lại");
+      const src = has ? "amboss" : "ai";
+      await DB.doc("easy/" + c.id).set({ blocks, src, at: Date.now() });
+      R.easy = blocks; R.easySrc = src; R.view = "e";
+      if (replacing) putKap(c.id, { epos: 0 });
+      showView(c, CH[c.i + 1]); toast(r.truncated ? "Đã lưu (bài bị cắt ngắn, có thể soạn lại)" : "Đã lưu bài dễ hiểu");
+    } catch (e) {
+      cancelAnimationFrame(raf);
+      $("#estat").textContent = e.code === "rate_limited" ? "Claude đang bận, đợi một lúc rồi thử lại." : e.code === "not_granted" ? "Chưa được phép hỏi Claude." : "Chưa soạn được: " + (e.message || e.code);
+      btn.disabled = false;
+    }
+  };
 }
 
 /* ---------- nhập nội dung chương ---------- */
@@ -727,13 +866,13 @@ function showImport(c, replacing) {
     e.target.value = "";
   };
   $("#iclear").onclick = () => { pending = []; upd(); };
-  if (replacing) $("#icancel").onclick = () => openReader(c.id);
+  if (replacing) $("#icancel").onclick = () => showView(c, CH[c.i + 1]);
   $("#isave").onclick = async () => {
     $("#isave").disabled = true; $("#isave").textContent = "Đang lưu…";
     try {
       const n = await saveText(c.id, pending);
       putKap(c.id, { nb: pending.length, words: wordsOf(pending), nchunk: n, pos: 0, pct: replacing ? kap(c.id).pct : 0, st: Math.max(1, kap(c.id).st) });
-      R.blocks = pending; renderDoc(c, CH[c.i + 1]); scrollTo(0, 0); toast("Đã lưu chương");
+      R.blocks = pending; R.view = "a"; showView(c, CH[c.i + 1]); toast("Đã lưu chương");
     } catch (e) { toast("Chưa lưu được: " + (e.message || e.code)); $("#isave").disabled = false; $("#isave").textContent = "Lưu chương"; }
   };
 }
@@ -762,14 +901,21 @@ route();
   const timeout = setTimeout(() => { if (!online) { S.off = true; rerender(); } }, 10e3);
   DB = await window.claude?.use("db").catch(() => null) ?? null;
   if (!DB) { clearTimeout(timeout); S.off = true; rerender(); return; }
-  let first = true;
-  const ready = () => { if (!online) { online = true; S.off = false; clearTimeout(timeout); } rerender(); };
+  let first = true; const got = new Set();
+  const ready = (what) => {
+    if (!online) { online = true; S.off = false; clearTimeout(timeout); }
+    got.add(what);
+    // ghi mốc "sáng nay còn bao nhiêu" một lần mỗi ngày, khi đã có đủ dữ liệu
+    const tk = key(today0());
+    if (got.size === 3 && S.days[tk]?.r0 == null && S.r0For !== tk) { S.r0For = tk; putDay({ r0: Math.round(workload().total) }); }
+    rerender();
+  };
   const fail = (e) => { clearTimeout(timeout); toast("Kho dữ liệu lỗi: " + (e.message || e.code)); };
   DB.collection("kap").limit(1000).onSnapshot((snap) => {
     for (const d of snap.docs) if (d.id !== R.id) S.kap[d.id] = d.data();   // chương đang mở: bản trong trang là mới nhất
-    if (!snap.metadata.fromCache || first) { first = false; ready(); }
+    if (!snap.metadata.fromCache || first) { first = false; ready("kap"); }
   }, fail);
-  DB.doc("cfg/plan").onSnapshot((d) => { S.cfg = d.exists ? d.data() : null; ready(); }, fail);
-  DB.collection("days").limit(1000).onSnapshot((snap) => { for (const d of snap.docs) S.days[d.id] = d.data(); ready(); }, fail);
+  DB.doc("cfg/plan").onSnapshot((d) => { S.cfg = d.exists ? d.data() : null; ready("cfg"); }, fail);
+  DB.collection("days").limit(1000).onSnapshot((snap) => { for (const d of snap.docs) S.days[d.id] = d.data(); ready("days"); }, fail);
 })();
 </script>
