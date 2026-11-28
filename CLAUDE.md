@@ -127,7 +127,7 @@ Kho db riêng:
 - Nhập Ankiphil: gắn Tag theo tag `$Lernpläne::100-Tage::NNN`, chọn chương trong Tag theo tên (xem `bestInDay`)
 
 Prompt: quy tắc soạn thẻ kiến thức ở `artifact/m2/prompts/the-kien-thuc.md` (nhúng lúc build); bài dễ hiểu `EASY_PROMPT` trong trang.
-SRS là bản chép SM-2 của Phòng Trực. Thẻ kiến thức/apkg chỉ vào hàng ôn khi chương "Đọc xong".
+SRS: FSRS-5 tham số mặc định (`schedule` trong trang; `cfg.ret` mức nhớ mong muốn), bước học 1′/10′; nhật ký ôn ở `rl/<YYYYMMDD>` {l:[[id, nút, ngày cách, giờ, ms]]} để sau tối ưu tham số. Thẻ "!Hammer" ra trước. Thẻ kiến thức/apkg chỉ vào hàng ôn khi chương "Đọc xong".
 
 Build: `python3 -I artifact/m2/tools/lernplan.py <M2_Lernplan.pdf> artifact/m2-amboss.html <scratch>/m2-out.html`
 rồi `Artifact` publish `url` ở trên (đọc trang trước), không truyền `capabilities` nếu không đổi.

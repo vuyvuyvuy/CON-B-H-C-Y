@@ -339,7 +339,8 @@ function cfg() {
     target: c.target ? parseISO(c.target) : null, // hạn muốn xong (tuỳ chọn), chỉ để so sánh
     kqTotal: c.kqTotal ?? 50 * PLAN.length,       // giả định ~50 câu/Lerntage AMBOSS, sửa trong Cài đặt
     cpc: c.cpc ?? 20,
-    extra: !!c.extra,                             // ôn cả thẻ Anki ngoài lộ trình 100 ngày                             // thẻ Anki mỗi chương (10–20 kiến thức + vài thẻ từ vựng)
+    extra: !!c.extra,                             // ôn cả thẻ Anki ngoài lộ trình 100 ngày
+    ret: c.ret ?? 0.9,                            // FSRS: mức nhớ mong muốn khi đến hạn ôn
     set: !!S.cfg,
   };
 }
@@ -541,7 +542,7 @@ function viewToday() {
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
 }
-function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, extra: c.extra, imgv: S.cfg?.imgv, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
+function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, extra: c.extra, ret: c.ret, imgv: S.cfg?.imgv, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
 function setMin(m) { putCfg({ perDay: m }); document.activeElement?.blur(); viewToday(); }
 
 /* ---------- Lộ trình ---------- */
@@ -588,12 +589,13 @@ function viewSettings() {
       <label class="f" for="crest">Ngày chỉ ôn trong tuần<select id="crest">${WD.map((w, i) => `<option value="${i}" ${i === c.rest ? "selected" : ""}>${w}</option>`).join("")}</select></label>
       <label class="f" for="ctarget">Hạn muốn xong (ngày thi, tuỳ chọn)<input type="date" id="ctarget" value="${c.target ? iso(c.target) : ""}"></label>
       <label class="f" for="ckq">Mục tiêu tổng số câu kreuzen<input type="number" id="ckq" min="0" max="20000" step="50" value="${c.kqTotal}" required></label>
+      <label class="f" for="cret">Mức nhớ mong muốn (FSRS): cao hơn = ôn nhiều hơn, nhớ chắc hơn<select id="cret">${[0.85, 0.88, 0.9, 0.92, 0.95].map((r) => `<option value="${r}" ${r === c.ret ? "selected" : ""}>${Math.round(r * 100)}%${r === 0.9 ? " (khuyên dùng)" : r === 0.85 ? " (khi quá tải)" : r === 0.95 ? " (sát ngày thi)" : ""}</option>`).join("")}</select></label>
       <label class="f" for="ccpc">Thẻ thêm mỗi chương, ngoài Ankiphil (từ vựng Bước 1 + thẻ Claude bổ sung)<input type="number" id="ccpc" min="0" max="60" value="${c.cpc}" required></label>
       <p class="small muted">Số phút học mỗi ngày chỉnh ở tab Hôm nay. Cỡ chữ và sáng/tối chỉnh bằng nút Aa trong trang đọc.</p>
       <div class="row"><button class="btn primary" type="submit" ${online ? "" : "disabled"}>Lưu</button></div>
     </form>
   </div>`;
-  $("#cf").onsubmit = (e) => { e.preventDefault(); const t = $("#ctarget").value; putCfg({ rest: +$("#crest").value, kqTotal: +$("#ckq").value, cpc: +$("#ccpc").value, target: t || undefined }); if (!t) delete S.cfg.target; save("cfg/plan", S.cfg); toast("Đã lưu"); };
+  $("#cf").onsubmit = (e) => { e.preventDefault(); const t = $("#ctarget").value; putCfg({ rest: +$("#crest").value, kqTotal: +$("#ckq").value, cpc: +$("#ccpc").value, ret: +$("#cret").value, target: t || undefined }); if (!t) delete S.cfg.target; save("cfg/plan", S.cfg); toast("Đã lưu"); };
 }
 function applyTheme() { const t = store.get("m2.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 
@@ -956,11 +958,11 @@ function vocDrill(c) {
   };
   const next = () => { if (i < queue.length) return draw(); finish(); };
   const finish = () => {
-    // kết quả phiên học quyết định lịch SRS: nhớ ngay lần đầu → ôn lại sau 3 ngày (đỡ dồn ~20 từ/chương);
+    // kết quả phiên học quyết định lịch FSRS: nhớ ngay lần đầu = "Được" (~3 ngày);
     // "chưa nhớ" → đang học lại, gặp lại sau ~10 phút ở tab Ôn thẻ (rồi theo SM-2 như mọi thẻ)
     const now = Date.now(), sched = (k) => wrong.has(k)
-      ? { ...newCard(now), state: "learning", step: 1, reps: 1, last: now, due: now + 10 * MIN }
-      : { ...newCard(now), state: "review", ivl: 3, reps: 1, last: now, due: now + 3 * DAY };
+      ? { ...newCard(now), state: "learning", step: 1, reps: 1, last: now, due: now + 10 * MIN, s: FW[0], d: fsrsD0(1) }
+      : { ...newCard(now), state: "review", ivl: fsrsIvl(FW[2]), reps: 1, last: now, due: now + fsrsIvl(FW[2]) * DAY, s: FW[2], d: fsrsD0(3) };
     const add = V.list.map((w, k) => [w, k]);
     let nAdd = 0;
     if (DB) getCards(c.id).then(() => {
@@ -1237,28 +1239,42 @@ function replaceImg(b) {
 }
 
 /* ------------------------------------------------------------------ */
-/* SRS: SM-2 kiểu Anki, chép từ Phòng Trực (chép chứ không dùng chung để không đụng Phòng Trực) */
+/* SRS: FSRS-5 (thuật toán mặc định của Anki ≥23.10), tham số mặc định. Bước học (1′, 10′) như Anki.
+   Thẻ cũ lập lịch bằng SM-2 (chưa có s/d) được chuyển êm ở lần ôn đầu: s ≈ khoảng cách cũ.
+   Mỗi lượt ôn ghi vào rl/<YYYYMMDD> để sau này tối ưu tham số theo trí nhớ của Vy. */
 /* ------------------------------------------------------------------ */
-const SRS = { learn: [1, 10], relearn: [10], grad: 1, easyIvl: 4, ease: 2.5, minEase: 1.3, easyBonus: 1.3, hard: 1.2, lapse: 0.2, maxIvl: 365 };
-const newCard = (now = Date.now()) => ({ state: "new", due: now, ivl: 0, ease: SRS.ease, reps: 0, lapses: 0, step: 0, last: null });
+const SRS = { learn: [1, 10], relearn: [10], maxIvl: 3650 };
+const FW = [0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621];
+const F_DECAY = -0.5, F_FACTOR = 19 / 81, GRADE = { again: 1, hard: 2, good: 3, easy: 4 };
+const clampD = (d) => Math.min(10, Math.max(1, d));
+const fsrsD0 = (g) => clampD(FW[4] - Math.exp(FW[5] * (g - 1)) + 1);
+const fsrsR = (t, s) => Math.pow(1 + F_FACTOR * t / s, F_DECAY);
+const fsrsIvl = (s) => { const r = cfg().ret; return Math.min(SRS.maxIvl, Math.max(1, Math.round(s / F_FACTOR * (Math.pow(r, 1 / F_DECAY) - 1)))); };
+function fsrsNext(s, d, g, t) {   // → [s mới, d mới]; t = số ngày từ lần ôn trước
+  const dn = clampD(FW[7] * fsrsD0(4) + (1 - FW[7]) * (d + -FW[6] * (g - 3) * (10 - d) / 9));
+  if (t < 1) return [Math.max(0.01, s * Math.exp(FW[17] * (g - 3 + FW[18]))), dn];   // ôn trong cùng ngày
+  const r = fsrsR(t, s);
+  if (g === 1) return [Math.max(0.01, Math.min(s, FW[11] * Math.pow(d, -FW[12]) * (Math.pow(s + 1, FW[13]) - 1) * Math.exp(FW[14] * (1 - r)))), dn];
+  return [s * (1 + Math.exp(FW[8]) * (11 - d) * Math.pow(s, -FW[9]) * (Math.exp(FW[10] * (1 - r)) - 1) * (g === 2 ? FW[15] : 1) * (g === 4 ? FW[16] : 1)), dn];
+}
+const newCard = (now = Date.now()) => ({ state: "new", due: now, ivl: 0, reps: 0, lapses: 0, step: 0, last: null });
 function schedule(prev, rating, now = Date.now()) {
-  const c = { ...prev, reps: prev.reps + 1, last: now };
+  const g = GRADE[rating], c = { ...prev, reps: (prev.reps || 0) + 1, last: now };
+  // s, d: thẻ mới → giá trị khởi đầu; thẻ cũ SM-2 → s ≈ khoảng cách cũ, d trung bình
+  if (prev.s == null) { if (prev.state === "new" || !prev.ivl) { c.s = FW[g - 1]; c.d = fsrsD0(g); } else [c.s, c.d] = fsrsNext(Math.max(1, prev.ivl), 5, g, prev.last ? (now - prev.last) / DAY : prev.ivl); }
+  else [c.s, c.d] = fsrsNext(prev.s, prev.d, g, prev.last ? (now - prev.last) / DAY : 0);
   const learning = prev.state === "new" || prev.state === "learning" || prev.state === "relearning";
   if (learning) {
     const steps = prev.state === "relearning" ? SRS.relearn : SRS.learn;
-    if (rating === "again") { c.state = prev.state === "relearning" ? "relearning" : "learning"; c.step = 0; c.due = now + steps[0] * MIN; return c; }
-    if (rating === "easy") { c.state = "review"; c.step = 0; c.ivl = prev.state === "relearning" ? Math.max(1, prev.ivl) : SRS.easyIvl; c.due = now + c.ivl * DAY; return c; }
-    const nx = prev.step + (rating === "good" ? 1 : 0);
-    if (nx < steps.length) { c.state = prev.state === "new" ? "learning" : prev.state; c.step = nx; c.due = now + steps[nx] * MIN; return c; }
-    c.state = "review"; c.step = 0; c.ivl = prev.state === "relearning" ? Math.max(1, prev.ivl) : SRS.grad; c.due = now + c.ivl * DAY; return c;
+    if (g === 1) { c.state = prev.state === "relearning" ? "relearning" : "learning"; c.step = 0; c.due = now + steps[0] * MIN; return c; }
+    const nx = (prev.step || 0) + (g === 3 ? 1 : 0);
+    if (g !== 4 && nx < steps.length) { c.state = prev.state === "new" ? "learning" : prev.state; c.step = nx; c.due = now + steps[nx] * MIN; return c; }
+    c.state = "review"; c.step = 0; c.ivl = fsrsIvl(c.s); c.due = now + c.ivl * DAY; return c;
   }
-  if (rating === "again") { c.state = "relearning"; c.lapses = prev.lapses + 1; c.ease = Math.max(SRS.minEase, prev.ease - 0.2); c.ivl = Math.max(1, prev.ivl * SRS.lapse); c.step = 0; c.due = now + SRS.relearn[0] * MIN; return c; }
-  const over = Math.max(0, (now - prev.due) / DAY);
-  let ivl;
-  if (rating === "hard") { c.ease = Math.max(SRS.minEase, prev.ease - 0.15); ivl = prev.ivl * SRS.hard; }
-  else if (rating === "good") ivl = (prev.ivl + over / 2) * prev.ease;
-  else { c.ease = prev.ease + 0.15; ivl = (prev.ivl + over) * prev.ease * SRS.easyBonus; }
-  c.ivl = Math.min(SRS.maxIvl, Math.max(prev.ivl + 1, Math.round(ivl)));
+  if (g === 1) { c.state = "relearning"; c.lapses = (prev.lapses || 0) + 1; c.step = 0; c.due = now + SRS.relearn[0] * MIN; return c; }
+  const ivl = fsrsIvl(c.s);
+  // giữ thứ tự Khó ≤ Được ≤ Dễ như Anki
+  c.ivl = g === 2 ? ivl : g === 4 ? Math.max(ivl, fsrsIvl(fsrsNext(prev.s ?? Math.max(1, prev.ivl), prev.d ?? 5, 3, prev.last ? (now - prev.last) / DAY : 0)[0]) + 1) : ivl;
   c.due = now + c.ivl * DAY;
   return c;
 }
@@ -1320,6 +1336,7 @@ function cardHTML(card, back) {
 }
 
 /* hàng ôn hôm nay: thẻ ôn/đang học đến hạn trong ngày + thẻ mới trong giới hạn ngày */
+const RL = {};   // nhật ký ôn trong phiên, theo ngày (rl/<YYYYMMDD>); shortcut: mở app trên 2 máy cùng ngày thì máy sau ghi đè nhật ký ngày đó
 let REVMODE = store.get("m2.revmode") === "vocab" ? "vocab" : "all";   // tab Ôn thẻ: tất cả / chỉ từ vựng
 function queue(mode = "all") {
   const td = S.days[key(today0())] || {}, eod = addDays(today0(), 1).getTime();
@@ -1330,7 +1347,9 @@ function queue(mode = "all") {
     if (c.c.state === "new") fresh.push([ch, c]); else if (c.c.due <= eod) rev.push([ch, c]);
   }
   rev.sort((a, b) => a[1].c.due - b[1].c.due);
-  fresh.sort((a, b) => a[1].at - b[1].at);
+  // thẻ Ankiphil "!Hammer" (hay ra thi) học trước, rồi theo thứ tự thêm vào
+  const hammer = (c) => (c.tags || []).some((t) => /!Hammer/i.test(t)) ? 0 : 1;
+  fresh.sort((a, b) => hammer(a[1]) - hammer(b[1]) || a[1].at - b[1].at);
   // thẻ của chương vừa đọc xong hôm nay học luôn (nhớ lâu nhất khi học ngay sau khi đọc), không bị giới hạn 30 thẻ mới/ngày
   const fresh2 = new Set(td.ch || []);
   return { rev, fresh: fresh.filter(([ch, c]) => fresh2.has(base(ch)) || (c.t === "vocab" ? nv-- > 0 : nw-- > 0)) };
@@ -1412,6 +1431,9 @@ function showNextCard() {
   const rate = (r) => {
     const list = S.cards[ch], wasNew = card.c.state === "new";
     putCards(ch, list.map((x) => (x.id === card.id ? { ...x, c: schedule(x.c, r) } : x)));
+    // nhật ký ôn (để sau này tối ưu tham số FSRS theo Vy): [id thẻ, nút 1–4, số ngày từ lần trước, giờ, ms suy nghĩ]
+    const rk = key(today0()); RL[rk] ||= []; RL[rk].push([card.id, GRADE[r], card.c.last ? Math.round((Date.now() - card.c.last) / 36e5) / 24 : -1, Date.now(), Math.min(Date.now() - t0, 120e3)]);
+    save("rl/" + rk, { l: RL[rk] });
     const td = S.days[key(today0())] || {};
     putDay({ rv: (td.rv || 0) + 1, rvms: (td.rvms || 0) + Math.min(Date.now() - t0, 120e3), ...(wasNew ? (card.t === "vocab" ? { nv: (td.nv || 0) + 1 } : { nw: (td.nw || 0) + 1 }) : {}) });
     viewReview();
@@ -1899,7 +1921,7 @@ async function buildApkg(cards) {
     const ords = cloze ? [...new Set([...card.f.matchAll(/\{\{c(\d+)::/g)].map((m) => +m[1] - 1))] : [0];
     const r = card.c?.state === "review" ? card.c : null;   // giữ tiến độ thẻ đang ôn; thẻ mới/đang học xuất là mới
     for (const ord of ords) db.run("insert into cards values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-      [nid * 10 + ord, nid, deckOf(card.ch), ord, Math.floor(now / 1000), -1, r ? 2 : 0, r ? 2 : 0, r ? Math.round((r.due - crt * 1000) / DAY) : i, r ? r.ivl : 0, r ? Math.round(r.ease * 1000) : 0, r ? r.reps : 0, r ? r.lapses : 0, 0, 0, 0, 0, ""]);
+      [nid * 10 + ord, nid, deckOf(card.ch), ord, Math.floor(now / 1000), -1, r ? 2 : 0, r ? 2 : 0, r ? Math.round((r.due - crt * 1000) / DAY) : i, r ? r.ivl : 0, r ? Math.round((r.ease || 2.5) * 1000) : 0, r ? r.reps : 0, r ? r.lapses : 0, 0, 0, 0, 0, ""]);
   }
   db.run("insert into col values (1,?,?,?,11,0,0,0,?,?,?,?,?)", [crt, now, now, JSON.stringify(conf), JSON.stringify(models), JSON.stringify(decks), JSON.stringify(dconf), "{}"]);
   const bytes = db.export(); db.close();
