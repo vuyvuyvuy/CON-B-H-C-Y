@@ -280,6 +280,10 @@ ul.fachs .bar { grid-column: 1 / -1; }
 #toast.cheer { background: var(--ok); }
 
 /* đồng hồ học + thẻ nhẹ */
+.card.running { background: var(--peach-soft); border-color: transparent; }
+.card.running .eyebrow, .card.running [data-live] { color: var(--peach); }
+.rtime { align-self: center; flex: none; font-size: 12px; font-weight: 700; color: var(--peach); background: var(--peach-soft); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.rtime:empty { display: none; }
 .card.soft { background: var(--accent-soft); border-color: transparent; box-shadow: none; }
 .acts { display: flex; flex-wrap: wrap; gap: 6px; }
 .acts .btn { min-height: 36px; padding: 6px 12px; font-size: 14px; }
@@ -522,6 +526,9 @@ function viewToday() {
       ${st ? `<span class="chip">Chuỗi ${st} ngày học</span>` : ""}
     </header>
     ${S.off ? `<p class="note small">Chưa kết nối được kho dữ liệu, tiến độ chưa được lưu.</p>` : ""}
+    ${(() => { const t = TM.get(); return t ? `<section class="card running"><span class="eyebrow">Đang bấm giờ</span>
+      <div class="row" style="justify-content:space-between"><b style="font-size:18px">${esc(ACTS.find((a) => a.k === t.a)?.l || "")}</b><b class="num" style="font-size:28px" data-live="t">${mmss(Date.now() - t.t0)}</b></div>
+      <div class="row"><button class="btn primary" id="tstop">Dừng & lưu</button><span class="small muted">Rời app làm việc khác cũng được, đồng hồ vẫn chạy.</span></div></section>` : ""; })()}
     ${!c.target && online ? `<form class="card soft" id="tgf"><span class="eyebrow">Vy thi M2 ngày nào?</span><div class="row"><input type="date" id="tgd" required aria-label="Ngày thi"><button class="btn primary" type="submit">Lưu</button></div><span class="small muted">Có ngày thi thì Cán cân mới báo được có kịp không.</span></form>` : ""}
     ${!TM.get() && !S.askedNow ? `<section class="card soft" id="nowq"><span class="eyebrow">Bây giờ Vy định làm gì?</span><div class="acts">
       <a class="btn" href="#plan">Đọc trong app</a><a class="btn" href="#on">Ôn thẻ</a>${ACTS.map((a) => `<button class="btn" data-now="${a.k}">${a.l}</button>`).join("")}</div>
@@ -545,7 +552,7 @@ function viewToday() {
       <span class="eyebrow">Hôm nay đã làm</span>
       <div class="stats">
         <div><span class="kind">Chương xong</span><b>${(td.ch || []).length}</b></div>
-        <div><span class="kind">Phút đọc</span><b>${Math.round(td.min || 0)}</b></div>
+        <div><span class="kind">Phút học</span><b>${Math.round(dayMin(td))}</b>${TM.get() ? `<span class="small muted">+ <span data-live="tm">${Math.floor((Date.now() - TM.get().t0) / MIN)}</span>′ đang chạy</span>` : ""}</div>
         <div><span class="kind">Câu kreuzen</span><b>${td.kq || 0}</b></div>
         <div><span class="kind">Thẻ đã ôn</span><b>${td.rv || 0}</b></div>
       </div>
@@ -568,6 +575,7 @@ function viewToday() {
   </div>`;
   if ($("#tgf")) $("#tgf").onsubmit = (e) => { e.preventDefault(); const v = $("#tgd").value; if (v) { putCfg({ target: v }); toast("Đã lưu ngày thi"); viewToday(); } };
   if ($("#nowq")) { for (const a of document.querySelectorAll("#nowq a")) a.addEventListener("click", () => { S.askedNow = true; }); for (const b of document.querySelectorAll("[data-now]")) b.onclick = () => { S.askedNow = true; startTimer(b.dataset.now); viewToday(); }; }
+  if ($("#tstop")) $("#tstop").onclick = timerSheet;
   for (const b of document.querySelectorAll("[data-tk]")) b.onchange = () => { tick(p.items[+b.dataset.tk]); viewToday(); };
   for (const b of document.querySelectorAll("[data-un]")) b.onchange = () => { untick(+b.dataset.un); viewToday(); };
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
@@ -764,7 +772,7 @@ async function openReader(id) {
       <button class="ib" id="mks" aria-label="Danh sách đánh dấu">✎</button>
       <button class="ib" id="chatb" aria-label="Hỏi Claude về chương này">Hỏi</button>
       <button class="ib" id="more" aria-label="Soạn lại / thay nội dung">⋯</button>
-    </div><div class="seg" role="tablist" aria-label="Bản đọc"><button role="tab" data-v="e">Dễ hiểu (Claude soạn)</button><button role="tab" data-v="a">AMBOSS</button></div><div class="rprog"><i id="rp"></i></div></div>
+    </div><div class="seg" role="tablist" aria-label="Bản đọc"><button role="tab" data-v="e">Dễ hiểu (Claude soạn)</button><button role="tab" data-v="a">AMBOSS</button><span class="rtime num" id="rtime" title="Thời gian đọc lần này (dừng khi Vy không thao tác 2 phút)"></span></div><div class="rprog"><i id="rp"></i></div></div>
     <div id="vocbox" class="vocwrap"></div>
     <div id="rbody"><p class="wrap muted">Đang tải chương…</p></div>
     <button class="btn" id="unfocus" hidden>Thoát tập trung</button>
@@ -848,7 +856,10 @@ function renderDoc(c, next) {
 function trackReading(id) {
   if (stopTrack) stopTrack();
   const pk = posKey();
-  let pos = (R.pos = kap(id)[pk] || 0), pct = kap(id).pct || 0, ms = 0, last = Date.now(), tick = Date.now(), sel = null;
+  let pos = (R.pos = kap(id)[pk] || 0), pct = kap(id).pct || 0, ms = 0, sess = 0, last = Date.now(), tick = Date.now(), sel = null;
+  // thời gian đọc của lần mở chương này, hiện trên đầu trang (chỉ tính lúc trang đang mở và có thao tác trong 2 phút)
+  const active = () => document.visibilityState === "visible" && Date.now() - last < 2 * MIN;
+  R.sessShow = () => ({ ms: sess + (active() ? Date.now() - tick : 0), idle: !active() });
   const blks = [...document.querySelectorAll("#doc .blk")];
   const prog = () => { $("#rp").style.width = (pct * 100).toFixed(1) + "%"; };
   const onScroll = () => {
@@ -867,7 +878,7 @@ function trackReading(id) {
     if (add) { const d = S.days[key(today0())] || {}; putDay({ min: Math.round(((d.min || 0) * MIN + add) / MIN * 10) / 10 }); }
   };
   // chỉ tính giờ khi trang đang hiện và có thao tác trong 2 phút gần nhất
-  const timer = setInterval(() => { const now = Date.now(); if (document.visibilityState === "visible" && now - last < 2 * MIN) ms += now - tick; tick = now; if (ms > MIN) flush(); }, 10e3);
+  const timer = setInterval(() => { const now = Date.now(); if (active()) { ms += now - tick; sess += now - tick; } tick = now; if (ms > MIN) flush(); }, 10e3);
   const poke = () => { last = Date.now(); };
   const vis = () => { if (document.visibilityState === "hidden") flush(); };
   const onSel = () => { clearTimeout(sel); sel = setTimeout(selToolbar, 250); };
@@ -2062,7 +2073,11 @@ function timerSheet() {
     if (location.hash === "" || location.hash === "#today") viewToday();
   };
 }
-setInterval(() => { if (TM.get()) drawTimer(); }, 1000);
+setInterval(() => {
+  const t = TM.get();
+  if (t) { drawTimer(); for (const el of document.querySelectorAll('[data-live="t"]')) el.textContent = mmss(Date.now() - t.t0); for (const el of document.querySelectorAll('[data-live="tm"]')) el.textContent = Math.floor((Date.now() - t.t0) / MIN); }
+  const rt = $("#rtime"); if (rt && R.sessShow && R.id) { const s = R.sessShow(); rt.textContent = `Đã đọc ${mmss(s.ms)}${s.idle ? " · tạm dừng" : ""}`; }
+}, 1000);
 // quay lại app khi đồng hồ đang chạy → hỏi lưu
 let hiddenAt = 0;
 document.addEventListener("visibilitychange", () => {
