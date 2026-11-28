@@ -226,6 +226,7 @@ function cfg() {
     perDay: c.perDay || 60,                       // phút học mỗi ngày: con số duy nhất quyết định nhịp
     target: c.target ? parseISO(c.target) : null, // hạn muốn xong (tuỳ chọn), chỉ để so sánh
     kqTotal: c.kqTotal ?? 50 * PLAN.length,       // giả định ~50 câu/Lerntage AMBOSS, sửa trong Cài đặt
+    cpc: c.cpc ?? 20,                             // thẻ Anki mỗi chương (10–20 kiến thức + vài thẻ từ vựng)
     set: !!S.cfg,
   };
 }
@@ -271,15 +272,18 @@ function workload() {
   const kqDone = D.reduce((a, d) => a + (d.kq || 0), 0), kMin = D.reduce((a, d) => a + (d.kmin || 0), 0);
   const perQ = kqDone >= 50 && kMin > 0 ? kMin / kqDone : 2;      // shortcut: 2 phút/câu cho tới khi có ≥50 câu đã ghi giờ
   const kqLeft = Math.max(0, c.kqTotal - kqDone), kzMin = kqLeft * perQ;
-  const total = readMin + kzMin;
-  const share = total ? readMin / total : 1;   // chia phút mỗi ngày theo tỉ lệ việc còn lại → đọc và kreuzen xong cùng lúc
+  // shortcut: mỗi thẻ tốn ~1 phút ôn cộng dồn suốt đời thẻ (học lần đầu + ~6 lần ôn); GĐ2 sẽ đo thời gian ôn thật
+  const ankiCards = left.length * c.cpc, ankiMin = ankiCards * 1;
+  const total = readMin + kzMin + ankiMin;
+  // chia phút mỗi ngày theo tỉ lệ việc còn lại → đọc, kreuzen, Anki xong cùng lúc
+  const share = total ? readMin / total : 1, shareA = total ? ankiMin / total : 0;
   // từ hôm nay; phần hôm nay đã làm không tính lại
   const doneToday = (today.min || 0) + (today.kmin || 0);
   const finishAt = (rem) => nthStudyDay(t0, Math.max(1, Math.ceil((rem + doneToday) / c.perDay)), c.rest);
   const finish = finishAt(total), finish0 = today.r0 != null ? finishAt(today.r0 - doneToday) : null;
   const needForTarget = c.target && c.target >= t0 ? (total + doneToday) / Math.max(1, studyDays(t0, c.target, c.rest)) : null;
-  return { c, left: left.length, readMin, kqLeft, kzMin, perQ, total, share, finish, finish0, needForTarget, today,
-    chPerDay: c.perDay * share / (readMin / Math.max(1, left.length) || 30), qPerDay: Math.round(c.perDay * (1 - share)) / perQ };
+  return { c, left: left.length, readMin, kqLeft, kzMin, ankiCards, ankiMin, shareA, perQ, total, share, finish, finish0, needForTarget, today,
+    chPerDay: c.perDay * share / (readMin / Math.max(1, left.length) || 30), qPerDay: Math.round(c.perDay * (1 - share - shareA)) / perQ };
 }
 const hm = (m) => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)} giờ${m % 60 ? " " + (m % 60) + "′" : ""}` : `${m}′`; };
 const monthsTxt = (a, b) => { const d = Math.round((b - a) / DAY); return d < 60 ? `${d} ngày` : `${d} ngày (~${(d / 30.4).toFixed(1)} tháng)`; };
@@ -294,7 +298,8 @@ function todayPlan(due = 0) {
     if (rem > 0) items.push({ kind: "Kreuzen", m: rem, label: "Làm lại câu sai", sub: "AMBOSS: Session mit falsch beantworteten Fragen" });
     return { items, restDay, w };
   }
-  let read = Math.min(rem, Math.max(0, Math.round(c.perDay * w.share - (td.min || 0))));
+  // chưa có thẻ (trước GĐ2) thì phần giờ ôn thẻ dồn sang đọc
+  let read = Math.min(rem, Math.max(0, Math.round(c.perDay * (w.share + (due ? 0 : w.shareA)) - (td.min || 0))));
   rem -= read;
   const left = CH.filter((x) => kap(x.id).st !== 2);
   for (const x of [...left.filter((y) => kap(y.id).st === 1), ...left.filter((y) => kap(y.id).st === 0)]) {
@@ -345,7 +350,8 @@ function viewToday() {
       <span class="eyebrow">Mỗi ngày học</span>
       <div class="mins">${opts.map((m) => `<button data-m="${m}" aria-pressed="${c.perDay === m}">${m} phút</button>`).join("")}
         <input id="mcustom" type="number" min="15" max="900" step="5" inputmode="numeric" aria-label="Số phút khác" placeholder="khác" value="${opts.includes(c.perDay) ? "" : c.perDay}"></div>
-      <p class="small">Với ${hm(c.perDay)}/ngày, nghỉ ${WD[c.rest]}: mỗi ngày học <b>≈ ${w.chPerDay.toFixed(1)} chương</b> (${hm(c.perDay * w.share)}) + <b>≈ ${Math.round(w.qPerDay)} câu kreuzen</b> (${hm(c.perDay * (1 - w.share))}) → <b>xong ${fmtD(w.finish)}</b>, còn ${monthsTxt(today0(), w.finish)}.</p>
+      <p class="small">Với ${hm(c.perDay)}/ngày, nghỉ ${WD[c.rest]}: mỗi ngày <b>≈ ${w.chPerDay.toFixed(1)} chương</b> (${hm(c.perDay * w.share)}) + <b>≈ ${Math.round(w.qPerDay)} câu kreuzen</b> (${hm(c.perDay * (1 - w.share - w.shareA))}) + <b>ôn Anki ${hm(c.perDay * w.shareA)}</b> → <b>xong ${fmtD(w.finish)}</b>, còn ${monthsTxt(today0(), w.finish)}.</p>
+      <p class="small muted">Chưa có thẻ Anki (từ giai đoạn 2) nên tạm thời giờ ôn thẻ dồn sang đọc.</p>
       <ol class="agenda">${p.items.map((i) => `<li>
         <span class="t">${i.m}′</span>
         <span class="what">${i.id ? `<a href="${readHref(i.id)}">` : ""}<span class="kind">${esc(i.kind)}</span><b>${esc(i.label)}</b>${i.sub ? `<span class="small muted">${esc(i.sub)}</span>` : ""}${i.id ? "</a>" : ""}</span><span></span>
@@ -367,7 +373,7 @@ function viewToday() {
       <div class="stats">
         <div><span class="kind">Chương</span><b>${w.left}</b><span class="small muted">≈ ${hm(w.readMin)} đọc</span></div>
         <div><span class="kind">Câu kreuzen</span><b>${w.kqLeft}</b><span class="small muted">≈ ${hm(w.kzMin)}</span></div>
-        <div><span class="kind">Thẻ Anki</span><b>—</b><span class="small muted">từ GĐ2</span></div>
+        <div><span class="kind">Thẻ Anki</span><b>≈ ${w.ankiCards}</b><span class="small muted">≈ ${hm(w.ankiMin)} ôn</span></div>
       </div>
       <div class="bar ok"><i style="width:${(done / CH.length * 100).toFixed(1)}%"></i></div>
       <ul class="small" style="margin:0;padding-left:1.1em;display:grid;gap:4px">
@@ -375,14 +381,14 @@ function viewToday() {
         ${w.finish0 ? `<li>Ngày xong: <b>${fmtD(w.finish)}</b>${shift ? ` (sáng nay ${fmtD(w.finish0)}, ${shift < 0 ? `sớm hơn ${-shift}` : `trễ hơn ${shift}`} ngày)` : " (như sáng nay)"}.</li>` : ""}
         ${w.needForTarget != null ? `<li>Muốn xong trước <b>${fmtD(c.target)}</b> cần <b>${hm(w.needForTarget)}/ngày</b> (${w.needForTarget > c.perDay ? `tăng ${hm(w.needForTarget - c.perDay)}` : `dư ${hm(c.perDay - w.needForTarget)}`}).</li>` : `<li class="muted">Đặt hạn thi trong <a href="#cai-dat">Cài đặt</a> để biết cần bao nhiêu phút/ngày cho kịp.</li>`}
       </ul>
-      <p class="small muted">Ước ${Math.round(w.readMin / Math.max(1, w.left))}′/chương, ${w.perQ.toFixed(1)}′/câu, mục tiêu ${c.kqTotal} câu; tự chỉnh theo số Vy ghi thật.</p>
+      <p class="small muted">Ước ${Math.round(w.readMin / Math.max(1, w.left))}′ đọc/chương, ${w.perQ.toFixed(1)}′/câu kreuzen, mục tiêu ${c.kqTotal} câu, ${c.cpc} thẻ/chương × ~1′ ôn/thẻ; tự chỉnh theo số Vy ghi thật.</p>
     </section>
   </div>`;
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
   $("#kzf").onsubmit = (e) => { e.preventDefault(); const q = Math.max(0, Math.round(+$("#kq").value || 0)), m = Math.max(0, Math.round(+$("#kmin").value || 0)); putDay({ kq: q, kmin: m }); document.activeElement?.blur(); toast("Đã ghi kreuzen hôm nay"); viewToday(); };
 }
-function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
+function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
 function setMin(m) { putCfg({ perDay: m }); document.activeElement?.blur(); viewToday(); }
 
 /* ---------- Lộ trình ---------- */
@@ -429,11 +435,12 @@ function viewSettings() {
       <label class="f" for="crest">Ngày chỉ ôn trong tuần<select id="crest">${WD.map((w, i) => `<option value="${i}" ${i === c.rest ? "selected" : ""}>${w}</option>`).join("")}</select></label>
       <label class="f" for="ctarget">Hạn muốn xong (ngày thi, tuỳ chọn)<input type="date" id="ctarget" value="${c.target ? iso(c.target) : ""}"></label>
       <label class="f" for="ckq">Mục tiêu tổng số câu kreuzen<input type="number" id="ckq" min="0" max="20000" step="50" value="${c.kqTotal}" required></label>
+      <label class="f" for="ccpc">Số thẻ Anki mỗi chương (kiến thức + từ vựng)<input type="number" id="ccpc" min="0" max="60" value="${c.cpc}" required></label>
       <p class="small muted">Số phút học mỗi ngày chỉnh ở tab Hôm nay. Cỡ chữ và sáng/tối chỉnh bằng nút Aa trong trang đọc.</p>
       <div class="row"><button class="btn primary" type="submit" ${online ? "" : "disabled"}>Lưu</button></div>
     </form>
   </div>`;
-  $("#cf").onsubmit = (e) => { e.preventDefault(); const t = $("#ctarget").value; putCfg({ rest: +$("#crest").value, kqTotal: +$("#ckq").value, target: t || undefined }); if (!t) delete S.cfg.target; save("cfg/plan", S.cfg); toast("Đã lưu"); };
+  $("#cf").onsubmit = (e) => { e.preventDefault(); const t = $("#ctarget").value; putCfg({ rest: +$("#crest").value, kqTotal: +$("#ckq").value, cpc: +$("#ccpc").value, target: t || undefined }); if (!t) delete S.cfg.target; save("cfg/plan", S.cfg); toast("Đã lưu"); };
 }
 function applyTheme() { const t = store.get("m2.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 
