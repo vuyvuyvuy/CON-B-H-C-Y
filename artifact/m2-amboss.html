@@ -240,6 +240,11 @@ article.doc { touch-action: manipulation; }
 #gtip { position: fixed; z-index: 45; max-width: min(320px, calc(100vw - 16px)); background: var(--fg); color: var(--bg); padding: 8px 12px; border-radius: 10px; font-size: 15px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
 #gtip [class^="art-"] { filter: brightness(1.6); }
 
+.ttab { border-collapse: collapse; width: 100%; font-size: 14px; }
+.ttab th, .ttab td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.ttab th { color: var(--muted); font-weight: 700; font-size: 12px; }
+.tbl { overflow-x: auto; }
+
 /* Cây bộ thẻ */
 .deckhead, details.deck > summary { display: grid; grid-template-columns: 1fr 56px 64px; gap: 8px; align-items: center; }
 .deckhead .kind { text-align: right; }
@@ -403,11 +408,13 @@ function rate() {
   for (const k of Object.values(S.kap)) if (k.st === 2 && k.words > 300 && k.ms > 5 * MIN) { ms += k.ms; w += k.words; n++; }
   return n >= 2 ? ms / MIN / w : 1 / 110;     // phút / từ
 }
-function avgChapterMin() {
-  const done = Object.values(S.kap).filter((k) => k.st === 2 && k.ms > 5 * MIN);
-  return done.length >= 2 ? done.reduce((a, k) => a + k.ms, 0) / done.length / MIN : 30;
+// phút thật trung bình mỗi chương: ưu tiên chương cùng Fach (≥2 chương), không thì mọi chương, chưa có thì 30′
+function avgChapterMin(fach) {
+  const done = CH.filter((x) => kap(x.id).st === 2 && kap(x.id).ms > 5 * MIN), same = done.filter((x) => x.fach === fach);
+  const use = same.length >= 2 ? same : done;
+  return use.length >= 2 ? use.reduce((a, x) => a + kap(x.id).ms, 0) / use.length / MIN : 30;
 }
-const estMin = (id) => { const k = kap(id); const m = k.words ? k.words * rate() : avgChapterMin(); return Math.min(120, Math.max(10, m)); };
+const estMin = (id) => { const k = kap(id); const m = k.words ? k.words * rate() : avgChapterMin(BY[id]?.fach); return Math.min(120, Math.max(10, m)); };
 
 /* ---------- cán cân: còn bao nhiêu việc, học M phút/ngày thì bao giờ xong ---------- */
 function workload() {
@@ -527,7 +534,7 @@ function viewToday() {
     </header>
     ${S.off ? `<p class="note small">Chưa kết nối được kho dữ liệu, tiến độ chưa được lưu.</p>` : ""}
     ${(() => { const t = TM.get(); return t ? `<section class="card running"><span class="eyebrow">Đang bấm giờ</span>
-      <div class="row" style="justify-content:space-between"><b style="font-size:18px">${esc(ACTS.find((a) => a.k === t.a)?.l || "")}</b><b class="num" style="font-size:28px" data-live="t">${mmss(Date.now() - t.t0)}</b></div>
+      <div class="row" style="justify-content:space-between"><b style="font-size:18px">${esc(ACTS.find((a) => a.k === t.a)?.l || "")}${t.ch && BY[t.ch] ? `<br><span class="small muted">${esc(BY[t.ch].t)}</span>` : ""}</b><b class="num" style="font-size:28px" data-live="t">${mmss(Date.now() - t.t0)}</b></div>
       <div class="row"><button class="btn primary" id="tstop">Dừng & lưu</button><span class="small muted">Rời app làm việc khác cũng được, đồng hồ vẫn chạy.</span></div></section>` : ""; })()}
     ${!c.target && online ? `<form class="card soft" id="tgf"><span class="eyebrow">Vy thi M2 ngày nào?</span><div class="row"><input type="date" id="tgd" required aria-label="Ngày thi"><button class="btn primary" type="submit">Lưu</button></div><span class="small muted">Có ngày thi thì Cán cân mới báo được có kịp không.</span></form>` : ""}
     ${!TM.get() && !S.askedNow ? `<section class="card soft" id="nowq"><span class="eyebrow">Bây giờ Vy định làm gì?</span><div class="acts">
@@ -2021,6 +2028,16 @@ function viewStats() {
     </section>
     <section class="card">${barChart("Phút học mỗi ngày (đọc + kreuzen + Anki)", days.map((v) => ({ d: v.d, y: Math.round(dayMin(v.x)) })), (y) => `${Math.round(y)}′`, 60)}</section>
     <section class="card">${barChart("Thẻ ôn mỗi ngày", days.map((v) => ({ d: v.d, y: v.x.rv || 0 })), (y) => `${Math.round(y)}`, 20)}</section>
+    <section class="card"><span class="eyebrow">Thời gian thật của Vy</span>
+      ${(() => { const done = CH.filter((x) => kap(x.id).st === 2 && kap(x.id).ms > 5 * MIN), kq = D.reduce((a, d) => a + (d.kq || 0), 0), km = D.reduce((a, d) => a + (d.kmin || 0), 0), rv = D.reduce((a, d) => a + (d.rv || 0), 0);
+        const rows = groups.map((g) => { const ds = done.filter((x) => x.fach === g.fach); return ds.length ? `<tr><td>${esc(g.fach)}</td><td class="num">${ds.length}</td><td class="num">${Math.round(ds.reduce((a, x) => a + kap(x.id).ms, 0) / ds.length / MIN)}′</td><td class="num">${Math.round(avgChapterMin(g.fach))}′</td></tr>` : ""; }).join("");
+        return `<div class="stats4">
+          <div><span class="kind">Đọc / chương</span><b>${done.length ? Math.round(done.reduce((a, x) => a + kap(x.id).ms, 0) / done.length / MIN) + "′" : "—"}</b><span class="small muted">${done.length ? `${done.length} chương đo được` : "chưa đủ dữ liệu, đang đoán 30′"}</span></div>
+          <div><span class="kind">Tốc độ đọc</span><b>${rate() !== 1 / 110 ? Math.round(1 / rate()) : "—"}</b><span class="small muted">từ/phút${rate() === 1 / 110 ? " (đang đoán 110)" : ""}</span></div>
+          <div><span class="kind">Mỗi thẻ ôn</span><b>${Math.round(secPerReview())}″</b><span class="small muted">${rv >= 100 ? `${rv} lượt ôn` : "đang đoán 10″"}</span></div>
+          <div><span class="kind">Mỗi câu kreuzen</span><b>${kq >= 50 && km ? (km / kq).toFixed(1) + "′" : "—"}</b><span class="small muted">${kq ? `${kq} câu đã ghi` : "bấm giờ kreuzen + ghi số câu"}</span></div></div>
+          ${rows ? `<div class="tbl"><table class="ttab"><thead><tr><th>Fach</th><th>Chương xong</th><th>Phút thật/chương</th><th>App đang ước</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="small muted">Đọc xong vài chương (trong app hoặc bấm giờ "Đọc bài trên AMBOSS" có chọn chương) là bảng theo Fach hiện ra; ước lượng ở Hôm nay và Cán cân tự chỉnh theo.</p>`}`; })()}
+    </section>
     <section class="card"><span class="eyebrow">Theo Fach</span>
       <ul class="fachs">${groups.map((g) => { const dn = g.ch.filter((x) => kap(x.id).st === 2).length, p = dn / g.ch.length * 100; return `<li><span>${esc(g.fach)}</span><span class="num small muted">${dn}/${g.ch.length} · ${Math.round(p)}%</span><div class="bar ok"><i style="width:${p.toFixed(1)}%"></i></div></li>`; }).join("")}</ul>
     </section>
@@ -2047,7 +2064,20 @@ function drawTimer() {
   el.innerHTML = t ? `<span class="dot"></span>${esc(ACTS.find((a) => a.k === t.a)?.l.split(" ")[0] || "")} · <span class="num">${mmss(Date.now() - t.t0)}</span>` : `${ICON_CLOCK}<span>Bấm giờ</span>`;
   el.setAttribute("aria-label", t ? "Đồng hồ đang chạy, bấm để dừng" : "Bắt đầu bấm giờ");
 }
-function startTimer(a) { TM.set({ a, t0: Date.now() }); drawTimer(); toast("Bắt đầu tính giờ"); }
+function startTimer(a, ch) {
+  if (a === "rd" && !ch) return pickChapter((id) => startTimer(a, id));
+  TM.set({ a, t0: Date.now(), ...(ch ? { ch } : {}) }); drawTimer(); toast("Bắt đầu tính giờ"); if (location.hash === "" || location.hash === "#today") viewToday();
+}
+/* đọc trên AMBOSS: chọn chương để phút đọc được tính vào đúng chương (app học tốc độ đọc thật của Vy) */
+function pickChapter(go) {
+  const left = CH.filter((x) => kap(x.id).st !== 2), opts = [...left.filter((x) => kap(x.id).st === 1), ...left.filter((x) => kap(x.id).st === 0)].slice(0, 8);
+  const bg = sheet(`<h2 style="font-size:20px">Vy đọc chương nào?</h2><div class="mlist">${opts.map((x) => `<button class="btn" data-c="${x.id}" style="text-align:left;justify-content:flex-start"><span><b>${esc(x.t)}</b><br><span class="small muted">Tag ${x.tag} · ${esc(x.sub)}</span></span></button>`).join("")}</div>
+    <label class="f" for="pcq">Chương khác<input id="pcq" list="pclist" placeholder="gõ tên chương…"><datalist id="pclist">${CH.map((c) => `<option value="${esc(c.t)} · Tag ${c.tag}">`).join("")}</datalist></label>
+    <div class="row"><button class="btn primary" id="pcgo">Bắt đầu</button><button class="btn" id="pcnone">Không theo chương nào</button></div>`);
+  for (const b of bg.querySelectorAll("[data-c]")) b.onclick = () => { bg.remove(); go(b.dataset.c); };
+  $("#pcgo", bg).onclick = () => { const v = $("#pcq", bg).value, id = CH.find((c) => `${c.t} · Tag ${c.tag}` === v)?.id; bg.remove(); go(id || opts[0]?.id || "x"); };
+  $("#pcnone", bg).onclick = () => { bg.remove(); go("x"); };
+}
 function timerSheet() {
   const t = TM.get();
   if (!t) {
@@ -2057,10 +2087,11 @@ function timerSheet() {
     for (const b of bg.querySelectorAll("[data-a]")) b.onclick = () => { bg.remove(); startTimer(b.dataset.a); };
     return;
   }
-  const act = ACTS.find((a) => a.k === t.a) || ACTS[3], mins = Math.max(1, Math.round((Date.now() - t.t0) / MIN));
-  const bg = sheet(`<h2 style="font-size:20px">${esc(act.l)}</h2>
+  const act = ACTS.find((a) => a.k === t.a) || ACTS[3], actL = act.l + (t.ch && BY[t.ch] ? ` · ${BY[t.ch].t}` : ""), mins = Math.max(1, Math.round((Date.now() - t.t0) / MIN));
+  const bg = sheet(`<h2 style="font-size:20px">${esc(actL)}</h2>
     <p class="small muted">Bắt đầu lúc ${new Date(t.t0).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}. Quên tắt thì sửa lại số phút cho đúng.</p>
     <div class="row"><label class="f" for="tmin">Số phút<input type="number" id="tmin" min="1" max="600" value="${mins}" inputmode="numeric" style="width:110px"></label>
+      ${t.ch && BY[t.ch] ? `<label class="row small" style="align-self:end"><input type="checkbox" id="tdone"> Đọc xong “${esc(BY[t.ch].t)}”</label>` : ""}
       ${t.a === "kz" ? `<label class="f" for="tq">Số câu đã làm<input type="number" id="tq" min="0" max="500" placeholder="vd 40" inputmode="numeric" style="width:110px"></label>` : ""}</div>
     <div class="row"><button class="btn primary" id="tsave">Lưu & dừng</button><button class="btn" id="tgo">Vẫn đang làm</button><button class="btn" id="tdrop">Bỏ, không lưu</button></div>`);
   $("#tgo", bg).onclick = () => bg.remove();
@@ -2068,7 +2099,9 @@ function timerSheet() {
   $("#tsave", bg).onclick = () => {
     const m = Math.max(0, Math.min(600, Math.round(+$("#tmin", bg).value || 0))), q = Math.max(0, Math.round(+($("#tq", bg)?.value || 0)));
     const d = S.days[key(today0())] || {};
-    putDay({ [act.f]: Math.round(((d[act.f] || 0) + m) * 10) / 10, ...(t.a === "kz" && q ? { kq: (d.kq || 0) + q } : {}) });
+    const fin = t.ch && BY[t.ch] && $("#tdone", bg)?.checked;
+    putDay({ [act.f]: Math.round(((d[act.f] || 0) + m) * 10) / 10, ...(t.a === "kz" && q ? { kq: (d.kq || 0) + q } : {}), ...(fin && !(d.ch || []).includes(t.ch) ? { ch: [...(d.ch || []), t.ch] } : {}) });
+    if (t.ch && BY[t.ch]) { const k = kap(t.ch); putKap(t.ch, { ms: (k.ms || 0) + m * MIN, st: fin ? 2 : Math.max(1, k.st || 0), ...(fin ? { pct: 1, doneAt: Date.now() } : {}) }); }
     TM.set(null); drawTimer(); bg.remove(); toast(`Đã lưu ${m} phút: ${act.l}`, true);
     if (location.hash === "" || location.hash === "#today") viewToday();
   };
