@@ -1,12 +1,12 @@
 """Tách M2-Lernplan AMBOSS (PDF) thành JSON và nhúng vào trang M2 AMBOSS.
 
-  python3 -I lernplan.py <Lernplan.pdf> <m2-amboss.html> <out.html>   # nhúng vào bản publish
+  python3 -I lernplan.py <Lernplan.pdf> <m2-amboss.html> <out.html>   # nhúng lộ trình + prompts/the-kien-thuc.md vào bản publish
   python3 -I lernplan.py <Lernplan.pdf> - <plan.json>                  # chỉ xuất JSON
 
 Danh sách chương là tài liệu AMBOSS: chỉ nằm trong bản publish riêng tư, không commit.
 Id chương = t<Tag>_<số> nên tách lại từ cùng PDF thì id giữ nguyên (tiến độ đọc trong db không mất).
 """
-import json, re, subprocess, sys
+import json, os, re, subprocess, sys
 
 ZW = "​"  # pdftotext để dấu cách rộng 0 sau số Tag/số chương: dấu hiệu tin cậy hơn layout
 
@@ -66,5 +66,11 @@ if __name__ == "__main__":
         html = open(tpl).read()
         tag = '<script id="m2-plan" type="application/json">null</script>'
         assert html.count(tag) == 1, "thiếu chỗ nhúng m2-plan"
-        open(out, "w").write(html.replace(tag, tag.replace("null", js)))
+        html = html.replace(tag, tag.replace("null", js))
+        # quy tắc soạn thẻ kiến thức: file riêng cho dễ sửa, nhúng vào trang lúc build
+        rules = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "prompts", "the-kien-thuc.md")
+        rtag = '<script id="m2-rules" type="application/json">""</script>'
+        assert html.count(rtag) == 1, "thiếu chỗ nhúng m2-rules"
+        html = html.replace(rtag, rtag.replace('""', json.dumps(open(rules).read(), ensure_ascii=False).replace("<", "\\u003c")))
+        open(out, "w").write(html)
     print(f"{len(plan)} Tag, {total} Kapitel → {out}")

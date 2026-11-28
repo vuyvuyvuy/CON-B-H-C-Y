@@ -118,9 +118,15 @@ Sửa `artifact/phong-truc.html` trong repo (đây là bản gốc, không có p
 ## Khu M2 AMBOSS (tách hẳn khỏi Phòng Trực)
 
 Artifact riêng **M2 Lernplan**: `artifact/m2-amboss.html`, publish tại https://claude.ai/artifact/57MNiEaRFALmsUUzJRL1Ap
-(riêng tư, capabilities `db` + `sample`). Kho db riêng: `cfg/plan` {start, rest, perDay, target?, kqTotal, cpc}, `kap/<id>`, `txt/<id>-<k>`, `easy/<id>`, `mk/<id>`,
-`days/<YYYYMMDD>`. Prompt bài dễ hiểu: `EASY_PROMPT` trong trang.
-Không đụng Phòng Trực khi sửa khu này, và ngược lại.
+(riêng tư, capabilities `db` + `sample` + `downloads`). Không đụng Phòng Trực khi sửa khu này, và ngược lại.
+
+Kho db riêng:
+- `cfg/plan` {start, rest, perDay, target?, kqTotal, cpc}; `days/<YYYYMMDD>` {min, kq, kmin, amin, rv, rvms, nv, nw, ch, tk, r0}
+- `kap/<id>` tiến độ chương (+ `nc`/`nd` số thẻ đang ôn/chờ duyệt); `txt/<id>-<k>` bài AMBOSS Vy dán; `easy/<id>` bài dễ hiểu; `mk/<id>` đánh dấu
+- `cards/<ch>` {ch, due, list} thẻ Anki theo chương (`_fall`, `_apkg-<n>` là ngăn chưa gắn chương); `dict/<từ>`; `chat/<id>`
+
+Prompt: quy tắc soạn thẻ kiến thức ở `artifact/m2/prompts/the-kien-thuc.md` (nhúng lúc build); bài dễ hiểu `EASY_PROMPT` trong trang.
+SRS là bản chép SM-2 của Phòng Trực. Thẻ kiến thức/apkg chỉ vào hàng ôn khi chương "Đọc xong".
 
 Build: `python3 -I artifact/m2/tools/lernplan.py <M2_Lernplan.pdf> artifact/m2-amboss.html <scratch>/m2-out.html`
 rồi `Artifact` publish `url` ở trên (đọc trang trước), không truyền `capabilities` nếu không đổi.

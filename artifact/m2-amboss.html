@@ -75,6 +75,10 @@ body.reading { padding-bottom: 0; }
 .mins input { width: 90px; }
 ol.agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 ol.agenda li { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 12px; border-radius: 10px; background: var(--bg); }
+ol.agenda li.done { opacity: .6; }
+ol.agenda li.done b { text-decoration: line-through; }
+label.tick { display: grid; place-items: center; width: 44px; height: 44px; cursor: pointer; }
+label.tick input { width: 22px; height: 22px; accent-color: var(--ok); cursor: pointer; }
 ol.agenda .t { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); text-align: right; }
 ol.agenda .what { min-width: 0; }
 ol.agenda .what b { font-weight: 500; display: block; }
@@ -166,6 +170,69 @@ body.focus .rhead { display: none; }
 .preview { max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
 .preview article.doc { padding-top: 12px; font-size: 16px; }
 
+/* Ôn thẻ */
+.chip { justify-self: start; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.cardface { font: 20px/1.6 var(--font-read); padding: 12px 4px; min-height: 120px; overflow-wrap: break-word; }
+.cardface .cz { color: var(--accent); font-weight: 700; }
+.cardface .cx { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 16px; color: var(--muted); }
+.rate { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.rate .btn { display: grid; gap: 0; border-radius: 10px; padding: 6px 4px; }
+.rate .btn:first-child b { color: #c0392b; }
+.draft { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.draft textarea { width: 100%; font-family: var(--font-read); font-size: 15px; }
+.warn { color: #b26a00; }
+.art-der { color: #2f6fd0; } .art-die { color: #c0392b; } .art-das { color: #2f7d4f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .art-der { color: #7fb0ff; } :root:not([data-theme="light"]) .art-die { color: #ff8a80; } :root:not([data-theme="light"]) .art-das { color: #6cc893; } :root:not([data-theme="light"]) .warn { color: #ffb74d; } }
+:root[data-theme="dark"] .art-der { color: #7fb0ff; } :root[data-theme="dark"] .art-die { color: #ff8a80; } :root[data-theme="dark"] .art-das { color: #6cc893; } :root[data-theme="dark"] .warn { color: #ffb74d; }
+article.doc { touch-action: manipulation; }
+.blk.flash { animation: flash 2.4s ease-out; border-radius: 6px; }
+@keyframes flash { 0%, 40% { background: var(--again); } 100% { background: transparent; } }
+
+/* Chat bên cạnh bài đọc: cột phải trên màn rộng, tấm trượt dưới đáy trên điện thoại */
+#chat { position: fixed; z-index: 45; left: 0; right: 0; bottom: 0; height: 72vh; background: var(--panel); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.18);
+  display: flex; flex-direction: column; padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+#chat[hidden] { display: none; }
+@media (min-width: 1000px) {
+  #chat { left: auto; top: 0; height: auto; width: 380px; border-radius: 0; border-top: 0; border-left: 1px solid var(--line); box-shadow: none; padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+  body.chat-open #rbody, body.chat-open .rhead { margin-right: 380px; }
+}
+.chead { display: flex; gap: 8px; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+#clog { flex: 1; overflow-y: auto; display: grid; align-content: start; gap: 10px; padding: 10px 0; }
+.msg { max-width: 92%; padding: 8px 12px; border-radius: 12px; font-size: 15px; }
+.msg.u { justify-self: end; background: var(--accent); color: var(--bg); white-space: pre-wrap; }
+.msg.a { justify-self: start; background: var(--bg); display: grid; gap: 6px; }
+.msg.a .doc { font: 15px/1.55 var(--font-ui); }
+.msg.a .doc p, .msg.a .doc ul, .msg.a .doc ol { margin: 0 0 .5em; } .msg.a .doc h3, .msg.a .doc h4 { font-size: 15px; margin: .6em 0 .3em; }
+.msg.a .doc b { color: var(--accent); }
+.msg .btn.small { justify-self: start; min-height: 32px; padding: 4px 10px; font-size: 12px; }
+#cctx { display: grid; gap: 2px; padding: 6px 8px; background: var(--accent-soft); border-radius: 8px; margin-bottom: 6px; }
+#cctx:empty { display: none; }
+#cctx q { font-family: var(--font-read); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cform { display: flex; gap: 6px; align-items: end; }
+#cform textarea { flex: 1; min-width: 0; resize: none; }
+
+/* Tiến độ */
+.stats4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (min-width: 640px) { .stats4 { grid-template-columns: repeat(4, 1fr); } }
+.stats4 div { display: grid; gap: 2px; align-content: start; }
+.stats4 b { font-size: 24px; font-variant-numeric: tabular-nums; font-weight: 600; }
+figure.chart { margin: 0; display: grid; gap: 6px; }
+figure.chart figcaption { font-size: 13px; color: var(--muted); }
+figure.chart figcaption b { color: var(--fg); font-weight: 600; }
+figure.chart svg { width: 100%; height: auto; overflow: visible; }
+figure.chart .ax { stroke: var(--line); stroke-width: 1; }
+figure.chart .grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
+figure.chart .lbl { fill: var(--muted); font-size: 9px; font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
+figure.chart .fill { fill: var(--accent); }
+figure.chart .hit { fill: transparent; }
+figure.chart .bar:hover .fill { opacity: .75; }
+figure.chart .bar:hover .hit { fill: var(--accent-soft); opacity: .5; }
+ul.fachs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+ul.fachs li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+ul.fachs .bar { grid-column: 1 / -1; }
+@media (max-width: 480px) { nav.tabs a { font-size: 12px; padding: 8px 2px; } }
+#toast.cheer { background: var(--ok); }
+
 #toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; max-width: calc(100% - 32px); font-size: 14px; }
 .burst { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--ok); color: var(--bg); }
 .burst svg { width: 28px; height: 28px; }
@@ -179,6 +246,8 @@ body.focus .rhead { display: none; }
 <nav class="tabs" id="tabs">
   <a href="#today" data-v="today">Hôm nay</a>
   <a href="#plan" data-v="plan">Lộ trình</a>
+  <a href="#on" data-v="on">Ôn thẻ</a>
+  <a href="#tien-do" data-v="tien-do">Tiến độ</a>
   <a href="#cai-dat" data-v="cai-dat">Cài đặt</a>
 </nav>
 <main id="app"><div class="wrap"><p class="muted">Đang mở lộ trình…</p></div></main>
@@ -186,6 +255,7 @@ body.focus .rhead { display: none; }
 <input type="file" id="imgpick" accept="image/*" hidden>
 
 <script id="m2-plan" type="application/json">null</script>
+<script id="m2-rules" type="application/json">""</script>
 <script>
 "use strict";
 /* ------------------------------------------------------------------ */
@@ -195,7 +265,9 @@ body.focus .rhead { display: none; }
 /*   txt/<id>-<k>      {ch, k, blocks:[html]}  nội dung chương, cắt ≤200KB */
 /*   mk/<id>           {list:[{id,b,s,e,c,note,txt}]}  đánh dấu          */
 /*   easy/<id>         {blocks, src:"amboss"|"ai", at}  bài dễ hiểu Claude soạn */
-/*   days/<YYYYMMDD>   {min, ch:[id], kq, kmin, r0}  r0 = khối lượng còn lúc mở app sáng nay (phút) */
+/*   days/<YYYYMMDD>   {min, ch:[id], kq, kmin, r0, rv, rvms, nv, nw}  r0 = khối lượng còn lúc mở app sáng nay (phút) */
+/*   cards/<ch>        {ch, due, list:[thẻ]}  thẻ Anki theo chương (xem phần SRS)  */
+/*   dict/<từ>         nghĩa từ đã tra;  chat/<id> {msgs}  lịch sử chat theo chương */
 /* Kho này tách hẳn khỏi Phòng Trực (Artifact khác, kho khác).          */
 /* ------------------------------------------------------------------ */
 const PLAN = JSON.parse(document.getElementById("m2-plan").textContent) || [];
@@ -207,7 +279,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 
 let DB = null, online = false;
-const S = { kap: {}, days: {}, cfg: null, off: false };
+const S = { kap: {}, days: {}, cfg: null, off: false, cards: {}, dueChs: new Set(), dict: {} };
 
 /* ---------- ngày ---------- */
 const pad = (n) => String(n).padStart(2, "0");
@@ -248,7 +320,11 @@ async function pump(path) {
 }
 const kap = (id) => S.kap[id] || { st: 0, pct: 0, pos: 0, ms: 0, words: 0, nb: 0 };
 function putKap(id, patch) { S.kap[id] = { ...kap(id), ...patch }; save("kap/" + id, S.kap[id]); }
-function putDay(patch, d = today0()) { const k = key(d); S.days[k] = { min: 0, ch: [], ...S.days[k], ...patch }; save("days/" + k, S.days[k]); }
+function putDay(patch, d = today0()) {
+  const k = key(d), was = active(S.days[k] || {});
+  S.days[k] = { min: 0, ch: [], ...S.days[k], ...patch }; save("days/" + k, S.days[k]);
+  if (!was && active(S.days[k]) && k === key(today0())) { const n = streak(); if (n > 1) setTimeout(() => toast(`Giữ được chuỗi ${n} ngày học`, true), 600); }
+}
 
 /* ---------- ước lượng thời gian đọc ---------- */
 /* shortcut: mặc định 110 từ/phút (đọc tiếng Đức chậm); sau ≥2 chương đọc thật thì dùng tốc độ của Vy */
@@ -272,17 +348,19 @@ function workload() {
   const kqDone = D.reduce((a, d) => a + (d.kq || 0), 0), kMin = D.reduce((a, d) => a + (d.kmin || 0), 0);
   const perQ = kqDone >= 50 && kMin > 0 ? kMin / kqDone : 2;      // shortcut: 2 phút/câu cho tới khi có ≥50 câu đã ghi giờ
   const kqLeft = Math.max(0, c.kqTotal - kqDone), kzMin = kqLeft * perQ;
-  // shortcut: mỗi thẻ tốn ~1 phút ôn cộng dồn suốt đời thẻ (học lần đầu + ~6 lần ôn); GĐ2 sẽ đo thời gian ôn thật
-  const ankiCards = left.length * c.cpc, ankiMin = ankiCards * 1;
+  // shortcut: mỗi thẻ cần ~6 lượt ôn cả đời thẻ; thẻ đang có coi như đã đi nửa đường. Giây/lượt đo từ lượt ôn thật (mặc định 10 giây)
+  const perCard = secPerReview() * 6 / 60, haveCards = Object.values(S.kap).reduce((a, k) => a + (k.nc || 0), 0);
+  // phút ôn Anki Vy tick (ôn ngoài app) được trừ thẳng vào phần Anki còn lại
+  const ankiCards = left.length * c.cpc + haveCards, ankiMin = Math.max(0, (left.length * c.cpc + haveCards * 0.5) * perCard - D.reduce((a, d) => a + (d.amin || 0), 0));
   const total = readMin + kzMin + ankiMin;
   // chia phút mỗi ngày theo tỉ lệ việc còn lại → đọc, kreuzen, Anki xong cùng lúc
   const share = total ? readMin / total : 1, shareA = total ? ankiMin / total : 0;
   // từ hôm nay; phần hôm nay đã làm không tính lại
-  const doneToday = (today.min || 0) + (today.kmin || 0);
+  const doneToday = dayMin(today);
   const finishAt = (rem) => nthStudyDay(t0, Math.max(1, Math.ceil((rem + doneToday) / c.perDay)), c.rest);
   const finish = finishAt(total), finish0 = today.r0 != null ? finishAt(today.r0 - doneToday) : null;
   const needForTarget = c.target && c.target >= t0 ? (total + doneToday) / Math.max(1, studyDays(t0, c.target, c.rest)) : null;
-  return { c, left: left.length, readMin, kqLeft, kzMin, ankiCards, ankiMin, shareA, perQ, total, share, finish, finish0, needForTarget, today,
+  return { c, left: left.length, readMin, kqLeft, kzMin, ankiCards, ankiMin, shareA, perCard, perQ, total, share, finish, finish0, needForTarget, today,
     chPerDay: c.perDay * share / (readMin / Math.max(1, left.length) || 30), qPerDay: Math.round(c.perDay * (1 - share - shareA)) / perQ };
 }
 const hm = (m) => { m = Math.round(m); return m >= 60 ? `${Math.floor(m / 60)} giờ${m % 60 ? " " + (m % 60) + "′" : ""}` : `${m}′`; };
@@ -292,11 +370,11 @@ const monthsTxt = (a, b) => { const d = Math.round((b - a) / DAY); return d < 60
 function todayPlan(due = 0) {
   const w = workload(), c = w.c, t0 = today0(), td = w.today;
   const restDay = t0.getDay() === c.rest;
-  let rem = Math.max(0, Math.round(c.perDay - (td.min || 0) - (td.kmin || 0))); const items = [];
-  if (due) { const m = Math.min(rem, Math.ceil(due * 0.2)); items.push({ kind: "Ôn thẻ", m, label: `${due} thẻ đến hạn` }); rem -= m; }
+  let rem = Math.max(0, Math.round(c.perDay - dayMin(td))); const items = [];
+  if (due && rem > 0) { const m = Math.min(rem, Math.max(1, Math.ceil(due * secPerReview() * 1.5 / 60))); items.push({ kind: "Ôn thẻ", m, label: `${due} thẻ đến hạn`, href: "#on", tk: "anki" }); rem -= m; }
   if (restDay) {
-    if (rem > 0) items.push({ kind: "Kreuzen", m: rem, label: "Làm lại câu sai", sub: "AMBOSS: Session mit falsch beantworteten Fragen" });
-    return { items, restDay, w };
+    if (rem > 0) items.push({ kind: "Kreuzen", m: rem, label: "Làm lại câu sai", sub: "AMBOSS: Session mit falsch beantworteten Fragen", tk: "kz", q: Math.max(1, Math.round(rem / w.perQ)) });
+    return { items, restDay, w, due };
   }
   // chưa có thẻ (trước GĐ2) thì phần giờ ôn thẻ dồn sang đọc
   let read = Math.min(rem, Math.max(0, Math.round(c.perDay * (w.share + (due ? 0 : w.shareA)) - (td.min || 0))));
@@ -306,13 +384,33 @@ function todayPlan(due = 0) {
     if (read < 5) break;
     const need = Math.max(5, Math.ceil(estMin(x.id) * (1 - (kap(x.id).pct || 0))));
     const m = Math.min(read, need);
-    items.push({ kind: kap(x.id).st === 0 ? "Chương mới" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
+    items.push({ tk: "ch:" + x.id, need, kind: kap(x.id).st === 0 ? "Chương mới" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
     read -= m;
   }
   rem += read;
   const tag = left[0]?.tag;
-  if (rem >= 5) items.push({ kind: "Kreuzen", m: rem, label: `≈ ${Math.max(1, Math.round(rem / w.perQ))} câu${tag ? ` · chủ đề Tag ${tag}` : ""}`, sub: "Trong AMBOSS" });
-  return { items, restDay, w };
+  if (rem >= 5) items.push({ kind: "Kreuzen", m: rem, tk: "kz", q: Math.max(1, Math.round(rem / w.perQ)), label: `≈ ${Math.max(1, Math.round(rem / w.perQ))} câu${tag ? ` · chủ đề Tag ${tag}` : ""}`, sub: "Trong AMBOSS" });
+  return { items, restDay, w, due };
+}
+
+/* ---------- tick ngay trên danh sách Hôm nay: ghi thời gian tương đương, cán cân tự tính lại ---------- */
+const dayMin = (d) => (d.min || 0) + (d.kmin || 0) + (d.amin || 0);
+function tick(it) {
+  const td = S.days[key(today0())] || {}, rec = { k: it.tk, m: it.m, kind: it.kind, label: it.label };
+  if (it.tk.startsWith("ch:")) {
+    const k = kap(it.id), full = it.m >= it.need;
+    rec.prev = { st: k.st, pct: k.pct || 0, ms: k.ms || 0 }; rec.id = it.id; rec.full = full;
+    putKap(it.id, full ? { st: 2, pct: 1, ms: (k.ms || 0) + it.m * MIN, doneAt: Date.now() }
+      : { st: 1, pct: Math.min(0.95, (k.pct || 0) + it.m / estMin(it.id)), ms: (k.ms || 0) + it.m * MIN });
+    putDay({ min: (td.min || 0) + it.m, ...(full ? { ch: [...(td.ch || []), it.id] } : {}), tk: [...(td.tk || []), rec] });
+  } else if (it.tk === "kz") { rec.q = it.q; putDay({ kq: (td.kq || 0) + it.q, kmin: (td.kmin || 0) + it.m, tk: [...(td.tk || []), rec] }); }
+  else putDay({ amin: (td.amin || 0) + it.m, tk: [...(td.tk || []), rec] });
+}
+function untick(i) {
+  const td = S.days[key(today0())] || {}, rec = td.tk[i], tk = td.tk.filter((_, j) => j !== i);
+  if (rec.k.startsWith("ch:")) { putKap(rec.id, { ...rec.prev, doneAt: null }); putDay({ min: Math.max(0, (td.min || 0) - rec.m), ch: (td.ch || []).filter((x) => !(rec.full && x === rec.id)), tk }); }
+  else if (rec.k === "kz") putDay({ kq: Math.max(0, (td.kq || 0) - rec.q), kmin: Math.max(0, (td.kmin || 0) - rec.m), tk });
+  else putDay({ amin: Math.max(0, (td.amin || 0) - rec.m), tk });
 }
 
 /* ---------- định tuyến theo hash ---------- */
@@ -320,23 +418,31 @@ let stopTrack = null;
 function route() {
   const h = location.hash.slice(1) || "today";
   if (stopTrack) { stopTrack(); stopTrack = null; }
-  R.id = null;
+  if (revKeys) { removeEventListener("keydown", revKeys); revKeys = null; }
+  R.id = null; chatClose();
   if (!CH.length) { $("#app").innerHTML = `<p class="wrap">Trang chưa có lộ trình: build bằng artifact/m2/tools/lernplan.py.</p>`; return; }
   document.body.classList.toggle("reading", h.startsWith("read-"));
   document.body.classList.remove("focus");
-  for (const a of document.querySelectorAll("#tabs a")) if (a.dataset.v === h) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  for (const a of document.querySelectorAll("#tabs a")) if (a.dataset.v === h || (a.dataset.v === "on" && h.startsWith("duyet-"))) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   if (h.startsWith("read-")) return openReader(h.slice(5).replace("-", "_"));
   if (h === "plan") return viewPlan();
+  if (h === "on") return viewReview();
+  if (h === "tien-do") return viewStats();
+  if (h.startsWith("duyet-")) return viewDrafts(unhash(h.slice(6)));
   if (h === "cai-dat") return viewSettings();
   return viewToday();
 }
 // dữ liệu mới về thì vẽ lại, trừ khi đang đọc hoặc đang gõ vào một ô
-const rerender = () => { if (!document.body.classList.contains("reading") && !document.activeElement?.closest?.("#app input, #app select, #app textarea")) route(); };
+const rerender = () => {
+  if (document.body.classList.contains("reading") || document.activeElement?.closest?.("#app input, #app select, #app textarea")) return;
+  if (location.hash.startsWith("#duyet-") || (location.hash === "#on" && !$("#show"))) return;   // đang lật thẻ / duyệt thẻ thì không vẽ lại
+  route();
+};
 const readHref = (id) => "#read-" + id.replace("_", "-");
 
 /* ---------- Hôm nay ---------- */
 function viewToday() {
-  const p = todayPlan(), w = p.w, c = w.c, td = w.today;
+  const p = todayPlan(dueCount()), w = p.w, c = w.c, td = w.today, st = streak();
   const done = CH.length - w.left;
   const opts = [30, 60, 90, 120, 180];
   const shift = w.finish0 ? Math.round((w.finish - w.finish0) / DAY) : 0;
@@ -344,6 +450,7 @@ function viewToday() {
     <header style="display:grid;gap:4px">
       <span class="eyebrow">${WD[new Date().getDay()]}, ${fmtD(new Date())}${p.restDay ? " · ngày ôn" : ""}</span>
       <h1 style="font-size:26px">${p.restDay ? "Hôm nay chỉ ôn" : "Hôm nay học gì"}</h1>
+      ${st ? `<span class="chip">Chuỗi ${st} ngày học</span>` : ""}
     </header>
     ${S.off ? `<p class="note small">Chưa kết nối được kho dữ liệu, tiến độ chưa được lưu.</p>` : ""}
     <section class="card">
@@ -351,11 +458,15 @@ function viewToday() {
       <div class="mins">${opts.map((m) => `<button data-m="${m}" aria-pressed="${c.perDay === m}">${m} phút</button>`).join("")}
         <input id="mcustom" type="number" min="15" max="900" step="5" inputmode="numeric" aria-label="Số phút khác" placeholder="khác" value="${opts.includes(c.perDay) ? "" : c.perDay}"></div>
       <p class="small">Với ${hm(c.perDay)}/ngày, nghỉ ${WD[c.rest]}: mỗi ngày <b>≈ ${w.chPerDay.toFixed(1)} chương</b> (${hm(c.perDay * w.share)}) + <b>≈ ${Math.round(w.qPerDay)} câu kreuzen</b> (${hm(c.perDay * (1 - w.share - w.shareA))}) + <b>ôn Anki ${hm(c.perDay * w.shareA)}</b> → <b>xong ${fmtD(w.finish)}</b>, còn ${monthsTxt(today0(), w.finish)}.</p>
-      <p class="small muted">Chưa có thẻ Anki (từ giai đoạn 2) nên tạm thời giờ ôn thẻ dồn sang đọc.</p>
-      <ol class="agenda">${p.items.map((i) => `<li>
+      ${p.due ? "" : `<p class="small muted">Hôm nay chưa có thẻ đến hạn nên giờ ôn thẻ dồn sang đọc.</p>`}
+      <ol class="agenda">${(td.tk || []).map((r, i) => `<li class="done">
+        <span class="t">${r.m}′</span><span class="what"><span class="kind">${esc(r.kind)} · đã xong</span><b>${esc(r.label)}</b></span>
+        <label class="tick" title="Bỏ tick"><input type="checkbox" checked data-un="${i}" aria-label="Bỏ tick ${esc(r.label)}"></label></li>`).join("")}${p.items.map((i, n) => `<li>
         <span class="t">${i.m}′</span>
-        <span class="what">${i.id ? `<a href="${readHref(i.id)}">` : ""}<span class="kind">${esc(i.kind)}</span><b>${esc(i.label)}</b>${i.sub ? `<span class="small muted">${esc(i.sub)}</span>` : ""}${i.id ? "</a>" : ""}</span><span></span>
+        <span class="what">${i.id || i.href ? `<a href="${i.href || readHref(i.id)}">` : ""}<span class="kind">${esc(i.kind)}</span><b>${esc(i.label)}</b>${i.sub ? `<span class="small muted">${esc(i.sub)}</span>` : ""}${i.id || i.href ? "</a>" : ""}</span>
+        ${i.tk ? `<label class="tick" title="Tick khi đã làm xong"><input type="checkbox" data-tk="${n}" aria-label="Đã xong ${esc(i.label)}"></label>` : "<span></span>"}
       </li>`).join("") || `<li><span></span><span class="muted">Đủ ${hm(c.perDay)} hôm nay rồi. Học thêm thì ngày xong sẽ sớm hơn.</span><span></span></li>`}</ol>
+      <p class="small muted">Tick một mục khi đã làm xong ngoài app (đọc trên AMBOSS, kreuzen, ôn Anki): app ghi thời gian tương đương, cán cân bên dưới tự tính lại.</p>
     </section>
     <section class="card">
       <span class="eyebrow">Hôm nay đã làm</span>
@@ -363,6 +474,7 @@ function viewToday() {
         <div><span class="kind">Chương xong</span><b>${(td.ch || []).length}</b></div>
         <div><span class="kind">Phút đọc</span><b>${Math.round(td.min || 0)}</b></div>
         <div><span class="kind">Câu kreuzen</span><b>${td.kq || 0}</b></div>
+        <div><span class="kind">Thẻ đã ôn</span><b>${td.rv || 0}</b></div>
       </div>
       <form class="row" id="kzf"><label class="f" for="kq">Số câu kreuzen hôm nay<input type="number" id="kq" min="0" max="2000" inputmode="numeric" value="${td.kq || ""}" style="width:120px"></label>
         <label class="f" for="kmin">trong bao nhiêu phút<input type="number" id="kmin" min="0" max="900" inputmode="numeric" value="${td.kmin || ""}" style="width:120px"></label>
@@ -373,7 +485,7 @@ function viewToday() {
       <div class="stats">
         <div><span class="kind">Chương</span><b>${w.left}</b><span class="small muted">≈ ${hm(w.readMin)} đọc</span></div>
         <div><span class="kind">Câu kreuzen</span><b>${w.kqLeft}</b><span class="small muted">≈ ${hm(w.kzMin)}</span></div>
-        <div><span class="kind">Thẻ Anki</span><b>≈ ${w.ankiCards}</b><span class="small muted">≈ ${hm(w.ankiMin)} ôn</span></div>
+        <div><span class="kind">Thẻ Anki</span><b>≈ ${w.ankiCards}</b><span class="small muted">≈ ${hm(w.ankiMin)} ôn còn lại</span></div>
       </div>
       <div class="bar ok"><i style="width:${(done / CH.length * 100).toFixed(1)}%"></i></div>
       <ul class="small" style="margin:0;padding-left:1.1em;display:grid;gap:4px">
@@ -381,9 +493,11 @@ function viewToday() {
         ${w.finish0 ? `<li>Ngày xong: <b>${fmtD(w.finish)}</b>${shift ? ` (sáng nay ${fmtD(w.finish0)}, ${shift < 0 ? `sớm hơn ${-shift}` : `trễ hơn ${shift}`} ngày)` : " (như sáng nay)"}.</li>` : ""}
         ${w.needForTarget != null ? `<li>Muốn xong trước <b>${fmtD(c.target)}</b> cần <b>${hm(w.needForTarget)}/ngày</b> (${w.needForTarget > c.perDay ? `tăng ${hm(w.needForTarget - c.perDay)}` : `dư ${hm(c.perDay - w.needForTarget)}`}).</li>` : `<li class="muted">Đặt hạn thi trong <a href="#cai-dat">Cài đặt</a> để biết cần bao nhiêu phút/ngày cho kịp.</li>`}
       </ul>
-      <p class="small muted">Ước ${Math.round(w.readMin / Math.max(1, w.left))}′ đọc/chương, ${w.perQ.toFixed(1)}′/câu kreuzen, mục tiêu ${c.kqTotal} câu, ${c.cpc} thẻ/chương × ~1′ ôn/thẻ; tự chỉnh theo số Vy ghi thật.</p>
+      <p class="small muted">Ước ${Math.round(w.readMin / Math.max(1, w.left))}′ đọc/chương, ${w.perQ.toFixed(1)}′/câu kreuzen, mục tiêu ${c.kqTotal} câu, ${c.cpc} thẻ/chương × ~${w.perCard.toFixed(1)}′ ôn/thẻ; tự chỉnh theo số Vy ghi thật.</p>
     </section>
   </div>`;
+  for (const b of document.querySelectorAll("[data-tk]")) b.onchange = () => { tick(p.items[+b.dataset.tk]); viewToday(); };
+  for (const b of document.querySelectorAll("[data-un]")) b.onchange = () => { untick(+b.dataset.un); viewToday(); };
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
   $("#kzf").onsubmit = (e) => { e.preventDefault(); const q = Math.max(0, Math.round(+$("#kq").value || 0)), m = Math.max(0, Math.round(+$("#kmin").value || 0)); putDay({ kq: q, kmin: m }); document.activeElement?.blur(); toast("Đã ghi kreuzen hôm nay"); viewToday(); };
@@ -515,7 +629,7 @@ async function shrinkImgs(blocks) {
 
 /* PDF → khối (pdf.js tải khi cần; chạy trên luồng chính vì artifact không cho worker từ CDN) */
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
-const loadScript = (src) => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("Không tải được thư viện đọc PDF")); document.head.appendChild(s); });
+const loadScript = (src) => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("Không tải được thư viện (kiểm tra mạng)")); document.head.appendChild(s); });
 async function pdfBlocks(file) {
   if (!window.pdfjsLib) { await loadScript(PDFJS + "pdf.min.js"); await loadScript(PDFJS + "pdf.worker.min.js"); }
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise;
@@ -575,21 +689,29 @@ async function openReader(id) {
       <div class="ttl"><b>${esc(c.t)}</b><span class="muted">Tag ${c.tag} · ${esc(c.sub)}</span></div>
       <button class="ib" id="aa" aria-label="Cỡ chữ và giao diện">Aa</button>
       <button class="ib" id="mks" aria-label="Danh sách đánh dấu">✎</button>
-      <button class="ib" id="fcs" aria-label="Chế độ tập trung">⛶</button>
+      <button class="ib" id="chatb" aria-label="Hỏi Claude về chương này">Hỏi</button>
       <button class="ib" id="more" aria-label="Soạn lại / thay nội dung">⋯</button>
     </div><div class="seg" role="tablist" aria-label="Bản đọc"><button role="tab" data-v="e">Dễ hiểu (Claude soạn)</button><button role="tab" data-v="a">AMBOSS</button></div><div class="rprog"><i id="rp"></i></div></div>
     <div id="rbody"><p class="wrap muted">Đang tải chương…</p></div>
-    <button class="btn" id="unfocus" hidden>Thoát tập trung</button>`;
+    <button class="btn" id="unfocus" hidden>Thoát tập trung</button>
+    <aside id="chat" hidden aria-label="Hỏi Claude"><div class="chead"><b>Hỏi Claude</b><span class="small muted" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.t)}</span><button class="ib" id="cclose" aria-label="Đóng">✕</button></div>
+      <div id="clog"></div><div id="cctx" class="small"></div>
+      <form id="cform"><textarea id="cin" rows="2" placeholder="Hỏi về đoạn đang đọc…" aria-label="Câu hỏi"></textarea><button class="btn primary" type="submit">Gửi</button></form></aside>`;
   document.documentElement.style.setProperty("--fs", R.fs + "px");
   $("#aa").onclick = () => {
     const bg = sheet(`<h2 style="font-size:18px">Hiển thị</h2>
       <div class="row"><button class="btn" id="fsm" aria-label="Chữ nhỏ hơn">A−</button><span class="num" id="fsv" style="min-width:48px;text-align:center">${R.fs}px</span><button class="btn" id="fsp" aria-label="Chữ lớn hơn">A+</button></div>
-      <div class="row">${[["system", "Theo máy"], ["light", "Sáng"], ["dark", "Tối"]].map(([v, l]) => `<button class="btn" data-t="${v}" aria-pressed="${(store.get("m2.theme") || "system") === v}">${l}</button>`).join("")}</div>`);
+      <div class="row">${[["system", "Theo máy"], ["light", "Sáng"], ["dark", "Tối"]].map(([v, l]) => `<button class="btn" data-t="${v}" aria-pressed="${(store.get("m2.theme") || "system") === v}">${l}</button>`).join("")}</div>
+      <button class="btn" id="fcs">Chế độ tập trung (ẩn mọi thứ trừ bài đọc)</button>`);
+    $("#fcs", bg).onclick = () => { bg.remove(); chatClose(); document.body.classList.add("focus"); $("#unfocus").hidden = false; };
     const fs = (d) => { setFs(R.fs + d); $("#fsv", bg).textContent = R.fs + "px"; };
     $("#fsm", bg).onclick = () => fs(-1); $("#fsp", bg).onclick = () => fs(1);
     for (const b of bg.querySelectorAll("[data-t]")) b.onclick = () => { store.set("m2.theme", b.dataset.t); applyTheme(); for (const x of bg.querySelectorAll("[data-t]")) x.setAttribute("aria-pressed", x === b); };
   };
-  $("#fcs").onclick = () => { document.body.classList.add("focus"); $("#unfocus").hidden = false; };
+  $("#chatb").onclick = () => ($("#chat").hidden ? chatOpen(c) : chatClose());
+  $("#cclose").onclick = chatClose;
+  $("#cform").onsubmit = (e) => { e.preventDefault(); const q = $("#cin").value; $("#cin").value = ""; chatSend(c, q); };
+  $("#cin").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#cform").requestSubmit(); } };
   $("#unfocus").onclick = () => { document.body.classList.remove("focus"); $("#unfocus").hidden = true; };
   $("#mks").onclick = marksSheet;
   $("#more").onclick = () => R.view === "a" ? showImport(c, true) : showEasy(c, true);
@@ -598,8 +720,9 @@ async function openReader(id) {
   try {
     const [blocks, mk, ez] = await Promise.all([loadText(id), DB.doc("mk/" + id).get(), DB.doc("easy/" + id).get()]);
     if (R.id !== id) return;
-    R.blocks = blocks; R.marks = mk.exists ? (mk.data().list || []) : []; R.easy = ez.exists ? (ez.data().blocks || []) : []; R.easySrc = ez.exists ? ez.data().src : null;
+    R.blocks = blocks; R.marks = mk.exists ? (mk.data().list || []).map((m) => ({ ...m })) : []; R.easy = ez.exists ? (ez.data().blocks || []) : []; R.easySrc = ez.exists ? ez.data().src : null;
   } catch (e) { $("#rbody").innerHTML = `<p class="wrap muted">Không tải được chương: ${esc(e.message || e.code)}</p>`; return; }
+  if (JUMP?.ch === id) R.view = JUMP.v;
   showView(c, next);
 }
 function showView(c, next) {
@@ -618,7 +741,8 @@ function renderDoc(c, next) {
   $("#rbody").innerHTML = `<article class="doc${R.view === "e" ? " easy" : ""}" id="doc">${R.view === "e" ? `<p class="small muted ai-note">Bài do Claude soạn ${R.easySrc === "ai" ? "<b>chưa dựa trên bài AMBOSS</b> (chưa dán)" : "từ bài AMBOSS đã dán"}; số liệu quan trọng nên đối chiếu bản AMBOSS.</p>` : ""}${blocks.map((b, i) => `<div class="blk" data-b="${i}">${/^<table/i.test(b) ? `<div class="tbl">${b}</div>` : b}</div>`).join("")}</article>
     <div class="done-box" id="donebox">${k.st === 2
       ? `<span class="burst"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span><b>Đã đọc xong chương này</b>`
-      : `<button class="btn primary" id="finish">Đọc xong chương</button><span class="small muted">Thẻ kiến thức của chương sẽ mở từ giai đoạn 4.</span>`}
+      : `<button class="btn primary" id="finish">Đọc xong chương</button><span class="small muted">Đọc xong thì Claude soạn thẻ kiến thức cho chương này để Vy duyệt.</span>`}
+      ${k.st === 2 ? `<div id="genbox" class="row" style="justify-content:center"></div>` : ""}
       ${next ? `<a class="btn" href="${readHref(next.id)}">Chương sau: ${esc(next.t)}</a>` : ""}</div>`;
   const doc = $("#doc");
   for (const m of R.marks) if ((m.v || "a") === R.view) paintMark(m);
@@ -627,18 +751,31 @@ function renderDoc(c, next) {
     const miss = e.target.closest("figure[data-miss]"); if (miss) return replaceImg(+miss.closest(".blk").dataset.b);
   });
   if ($("#finish")) $("#finish").onclick = () => finishChapter(c, next);
+  if ($("#genbox")) genBox(c);
+  // chạm đúp (điện thoại) / nháy đúp (máy tính) vào một từ → tra nghĩa
+  let lastTap = 0, lx = 0, ly = 0;
+  doc.addEventListener("touchend", (e) => {
+    if (e.touches.length || e.changedTouches.length !== 1) return;
+    const t = e.changedTouches[0], now = Date.now();
+    if (now - lastTap < 320 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) { e.preventDefault(); lastTap = 0; lookupAt(t.clientX, t.clientY); }
+    else { lastTap = now; lx = t.clientX; ly = t.clientY; }
+  }, { passive: false });
+  doc.addEventListener("dblclick", (e) => lookupAt(e.clientX, e.clientY));
   if (k.st === 0) putKap(c.id, { st: 1 });
   // về đúng đoạn đang đọc dở
-  const pk = k[posKey()] || 0;
+  // về đúng đoạn đang đọc dở, hoặc đoạn gốc của thẻ vừa bấm "mở đoạn gốc"
+  const jump = JUMP?.ch === c.id && JUMP.v === R.view ? JUMP.b : null; JUMP = null;
+  const pk = jump ?? k[posKey()] ?? 0;
   const target = doc.querySelector(`.blk[data-b="${Math.min(pk, blocks.length - 1)}"]`);
-  if (pk > 0 && target) requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+  if (pk > 0 && target) requestAnimationFrame(() => target.scrollIntoView({ block: jump != null ? "center" : "start" }));
+  if (jump != null && target) target.classList.add("flash");
   trackReading(c.id);
 }
 
 function trackReading(id) {
   if (stopTrack) stopTrack();
   const pk = posKey();
-  let pos = kap(id)[pk] || 0, pct = kap(id).pct || 0, ms = 0, last = Date.now(), tick = Date.now(), sel = null;
+  let pos = (R.pos = kap(id)[pk] || 0), pct = kap(id).pct || 0, ms = 0, last = Date.now(), tick = Date.now(), sel = null;
   const blks = [...document.querySelectorAll("#doc .blk")];
   const prog = () => { $("#rp").style.width = (pct * 100).toFixed(1) + "%"; };
   const onScroll = () => {
@@ -647,6 +784,7 @@ function trackReading(id) {
     const end = innerHeight + scrollY >= document.documentElement.scrollHeight - 40;
     const p = end ? 1 : Math.min(1, (i + 1) / blks.length);
     if (i !== pos || p > pct) { pos = i; pct = Math.max(pct, p); prog(); dirty(); }
+    R.pos = i;
   };
   let to = null; const dirty = () => { clearTimeout(to); to = setTimeout(flush, 1500); };
   const flush = () => {
@@ -677,7 +815,27 @@ function finishChapter(c, next) {
   box.innerHTML = `<span class="burst pop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
     <b>Xong chương ${c.n}/${PLAN[c.tag - 1].ch.length} của Tag ${c.tag}</b>
     <span class="small muted">${Math.round(kap(c.id).ms / MIN)} phút đọc · còn ${CH.filter((x) => kap(x.id).st !== 2).length} chương</span>
+    <div id="genbox" class="row" style="justify-content:center"></div>
     ${next ? `<a class="btn primary" href="${readHref(next.id)}">Chương sau: ${esc(next.t)}</a>` : ""}<a class="btn" href="#today">Về Hôm nay</a>`;
+  if (!kap(c.id).gen) runGen(c); else genBox(c);
+}
+/* thẻ kiến thức của chương: soạn từ bài AMBOSS (hoặc bài dễ hiểu nếu chưa dán) */
+function genBox(c) {
+  const box = $("#genbox"); if (!box) return;
+  const nd = kap(c.id).nd || 0;
+  box.innerHTML = `${nd ? `<a class="btn primary" href="#duyet-${hashId(c.id)}">Duyệt ${nd} thẻ kiến thức</a>` : ""}<button class="btn" id="genmore">${kap(c.id).gen ? "Soạn thêm thẻ" : "Soạn thẻ kiến thức"}</button>`;
+  $("#genmore").onclick = () => runGen(c);
+}
+async function runGen(c) {
+  const box = $("#genbox"); if (!box || !DB) return;
+  const src = R.blocks.length ? R.blocks : R.easy, v = R.blocks.length ? "a" : "e";
+  if (!src.length) { box.innerHTML = `<span class="small muted">Chương chưa có nội dung để soạn thẻ.</span>`; return; }
+  box.innerHTML = `<span class="small muted">Claude đang soạn thẻ kiến thức (khoảng 1 phút)…</span>`;
+  try {
+    const got = await genCards(c.id, { n: "10–20", v, src: numbered(src), task: `Soạn thẻ kiến thức cho cả chương từ nội dung dưới đây. Mỗi đoạn có số [§n]; ghi số đó vào "abschnitt".${v === "e" ? " Nội dung là bài giảng tiếng Việt: câu thẻ vẫn viết bằng tiếng Đức theo thuật ngữ AMBOSS." : ""}` });
+    putKap(c.id, { gen: Date.now() });
+    if (R.id === c.id) { genBox(c); toast(got.length ? `Claude soạn ${got.length} thẻ, chờ Vy duyệt` : "Không có thẻ mới"); }
+  } catch (e) { if (R.id === c.id) { box.innerHTML = `<span class="small muted">${esc(aiErr(e))}</span>`; const b = document.createElement("button"); b.className = "btn"; b.textContent = "Thử lại"; b.onclick = () => runGen(c); box.append(b); } }
 }
 
 /* ---------- đánh dấu (highlight + ghi chú) ---------- */
@@ -705,12 +863,21 @@ function selToolbar() {
   $("#seltb")?.remove();
   const x = curSel(); if (!x) return;
   const tb = document.createElement("div"); tb.id = "seltb";
-  tb.innerHTML = `<button data-c="hard">Khó</button><button data-c="again">Đọc lại</button><button data-c="note">Ghi chú</button>`;
+  R.sel = { txt: x.txt, b: x.b, at: Date.now() };
+  if (!$("#chat").hidden) chatCtx();
+  tb.innerHTML = `<button data-c="hard">Khó</button><button data-c="again">Đọc lại</button><button data-c="note">Ghi chú</button><button data-a="tr">Dịch</button><button data-a="ex">Giải thích</button><button data-a="card">Tạo thẻ</button>`;
   document.body.appendChild(tb);
   const w = tb.offsetWidth, top = Math.min(innerHeight - 60, x.rect.bottom + 10);
   tb.style.top = top + "px"; tb.style.left = Math.max(8, Math.min(innerWidth - w - 8, x.rect.left + x.rect.width / 2 - w / 2)) + "px";
   tb.onpointerdown = (e) => e.preventDefault();      // giữ vùng bôi đen khi bấm nút
   tb.onclick = (e) => {
+    const a = e.target.dataset.a, ch = BY[R.id];
+    if (a) {
+      getSelection().removeAllRanges(); tb.remove();
+      if (a === "tr") return aiSheet("Dịch đoạn", `Dịch đoạn y khoa tiếng Đức sau sang tiếng Việt tự nhiên. Lần đầu gặp thuật ngữ thi thì giữ từ tiếng Đức in đậm trong ngoặc sau bản dịch. Chỉ trả bản dịch.\n\n${x.txt}`, "quick");
+      if (a === "ex") return aiSheet("Giải thích đơn giản", `Chương "${ch.t}" (${ch.fach}). Giải thích đoạn sau bằng tiếng Việt thật đơn giản, như cho học sinh lớp 5, 3–6 câu, nói rõ ý cần nhớ cho thi M2; giữ thuật ngữ tiếng Đức in đậm kèm nghĩa.\n\n${x.txt}`, "default");
+      return cardsSheet(ch.id, () => genCards(ch.id, { n: "1–3", b: x.b, v: R.view, src: x.txt, task: "Soạn thẻ chỉ từ đoạn trích dưới đây. abschnitt để null." }), "Thẻ từ đoạn đã chọn");
+    }
     const c = e.target.dataset.c; if (!c) return;
     const m = { id: Date.now().toString(36), v: R.view, b: x.b, s: x.s, e: x.e, c: c === "note" ? "again" : c, note: "", txt: x.txt.slice(0, 400) };
     R.marks.push(m); paintMark(m); saveMarks(); getSelection().removeAllRanges(); tb.remove();
@@ -885,9 +1052,526 @@ function replaceImg(b) {
   pick.click();
 }
 
+/* ------------------------------------------------------------------ */
+/* SRS: SM-2 kiểu Anki, chép từ Phòng Trực (chép chứ không dùng chung để không đụng Phòng Trực) */
+/* ------------------------------------------------------------------ */
+const SRS = { learn: [1, 10], relearn: [10], grad: 1, easyIvl: 4, ease: 2.5, minEase: 1.3, easyBonus: 1.3, hard: 1.2, lapse: 0.2, maxIvl: 365 };
+const newCard = (now = Date.now()) => ({ state: "new", due: now, ivl: 0, ease: SRS.ease, reps: 0, lapses: 0, step: 0, last: null });
+function schedule(prev, rating, now = Date.now()) {
+  const c = { ...prev, reps: prev.reps + 1, last: now };
+  const learning = prev.state === "new" || prev.state === "learning" || prev.state === "relearning";
+  if (learning) {
+    const steps = prev.state === "relearning" ? SRS.relearn : SRS.learn;
+    if (rating === "again") { c.state = prev.state === "relearning" ? "relearning" : "learning"; c.step = 0; c.due = now + steps[0] * MIN; return c; }
+    if (rating === "easy") { c.state = "review"; c.step = 0; c.ivl = prev.state === "relearning" ? Math.max(1, prev.ivl) : SRS.easyIvl; c.due = now + c.ivl * DAY; return c; }
+    const nx = prev.step + (rating === "good" ? 1 : 0);
+    if (nx < steps.length) { c.state = prev.state === "new" ? "learning" : prev.state; c.step = nx; c.due = now + steps[nx] * MIN; return c; }
+    c.state = "review"; c.step = 0; c.ivl = prev.state === "relearning" ? Math.max(1, prev.ivl) : SRS.grad; c.due = now + c.ivl * DAY; return c;
+  }
+  if (rating === "again") { c.state = "relearning"; c.lapses = prev.lapses + 1; c.ease = Math.max(SRS.minEase, prev.ease - 0.2); c.ivl = Math.max(1, prev.ivl * SRS.lapse); c.step = 0; c.due = now + SRS.relearn[0] * MIN; return c; }
+  const over = Math.max(0, (now - prev.due) / DAY);
+  let ivl;
+  if (rating === "hard") { c.ease = Math.max(SRS.minEase, prev.ease - 0.15); ivl = prev.ivl * SRS.hard; }
+  else if (rating === "good") ivl = (prev.ivl + over / 2) * prev.ease;
+  else { c.ease = prev.ease + 0.15; ivl = (prev.ivl + over) * prev.ease * SRS.easyBonus; }
+  c.ivl = Math.min(SRS.maxIvl, Math.max(prev.ivl + 1, Math.round(ivl)));
+  c.due = now + c.ivl * DAY;
+  return c;
+}
+const fmtIvl = (ms) => ms < 60 * MIN ? `${Math.max(1, Math.round(ms / MIN))}′` : ms < DAY ? `${Math.round(ms / 36e5)} giờ` : `${Math.round(ms / DAY)} ngày`;
+
+/* ------------------------------------------------------------------ */
+/* Thẻ: mỗi chương một doc cards/<ch> {ch, due, list}; due = hạn sớm nhất để chỉ tải chương có thẻ đến hạn. */
+/* Thẻ: {id, t:"vocab"|"wissen"|"fall"|"apkg", f, x, h?(f/x là HTML), b?, v?, tags, st:"draft"|"on", c?, at} */
+/* Thẻ kiến thức/apkg chỉ vào hàng ôn khi chương đã "Đọc xong"; từ vựng và tình huống thì ôn ngay.   */
+/* ------------------------------------------------------------------ */
+const NEW_PER_DAY = { vocab: 10, other: 30 };
+const FAR = 9e15;
+const cid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const isCh = (ch) => !!BY[ch];
+const unlocked = (card, ch) => card.t === "vocab" || card.t === "fall" || !isCh(ch) || kap(ch).st === 2;
+function putCards(ch, list) {
+  S.cards[ch] = list;
+  const on = list.filter((x) => x.st === "on");
+  save("cards/" + ch, { ch, due: on.length ? Math.min(...on.map((x) => x.c.due)) : FAR, list });
+  const nc = on.length, nd = list.length - nc, k = S.kap[ch] || {};
+  if (k.nc !== nc || k.nd !== nd) putKap(ch, { nc, nd });
+  S.dueChs.add(ch);
+}
+async function getCards(ch) {
+  if (S.cards[ch]) return S.cards[ch];
+  const d = await DB.doc("cards/" + ch).get();
+  return (S.cards[ch] = d.exists ? [...(d.data().list || [])] : []);
+}
+const norm = (s) => String(s).toLowerCase().replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g, "$1").replace(/<[^>]+>/g, " ").replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+function similar(a, b) {   // trùng ý: Jaccard từ ≥ 0.7
+  const A = new Set(norm(a).split(" ").filter((w) => w.length > 2)), B = new Set(norm(b).split(" ").filter((w) => w.length > 2));
+  if (!A.size || !B.size) return false; let n = 0; for (const w of A) if (B.has(w)) n++;
+  return n / (A.size + B.size - n) >= 0.7;
+}
+const clozeAns = (f) => [...f.matchAll(/\{\{c\d+::(.*?)(::.*?)?\}\}/g)].map((m) => m[1]);
+function cardWarn(f) {
+  const w = [], ans = clozeAns(f), nums = new Set([...f.matchAll(/\{\{c(\d+)::/g)].map((m) => m[1]));
+  if (!ans.length) w.push("chưa có {{c1::…}}");
+  if (nums.size > 2) w.push("quá nhiều cloze");
+  if (ans.some((a) => a.split(/\s+/).length > 5)) w.push("đáp án dài hơn 5 từ");
+  if (/^\s*(ist|sind|hat|kann|gibt)\b.*\?\s*$/i.test(f.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g, "$1"))) w.push("câu có/không");
+  return w;
+}
+/* hiển thị mặt thẻ; thẻ tự soạn là chữ thuần (escape), thẻ apkg là HTML đã làm sạch */
+function cardHTML(card, back) {
+  const body = card.h ? card.f : esc(card.f);
+  let out = body.replace(/\{\{c\d+::(.*?)(?:::(.*?))?\}\}/g, (_, a, hint) => back ? `<b class="cz">${a}</b>` : `<span class="cz">[${hint || "…"}]</span>`);
+  if (back && card.x) out += `<div class="cx">${card.h ? card.x : esc(card.x).replace(/\n/g, "<br>")}</div>`;
+  return out;
+}
+
+/* hàng ôn hôm nay: thẻ ôn/đang học đến hạn trong ngày + thẻ mới trong giới hạn ngày */
+function queue() {
+  const td = S.days[key(today0())] || {}, eod = addDays(today0(), 1).getTime();
+  let nv = NEW_PER_DAY.vocab - (td.nv || 0), nw = NEW_PER_DAY.other - (td.nw || 0);
+  const rev = [], fresh = [];
+  for (const ch of S.dueChs) for (const c of S.cards[ch] || []) {
+    if (c.st !== "on" || !unlocked(c, ch)) continue;
+    if (c.c.state === "new") fresh.push([ch, c]); else if (c.c.due <= eod) rev.push([ch, c]);
+  }
+  rev.sort((a, b) => a[1].c.due - b[1].c.due);
+  fresh.sort((a, b) => a[1].at - b[1].at);
+  return { rev, fresh: fresh.filter(([, c]) => (c.t === "vocab" ? nv-- > 0 : nw-- > 0)) };
+}
+const dueCount = () => { const q = queue(); return q.rev.length + q.fresh.length; };
+function nextCard() {
+  const now = Date.now(), q = queue();
+  return q.rev.find(([, c]) => c.c.due <= now) || q.fresh[0] || q.rev.find(([, c]) => c.c.due <= now + 20 * MIN) || null;
+}
+const secPerReview = () => { const D = Object.values(S.days), n = D.reduce((a, d) => a + (d.rv || 0), 0); return n >= 100 ? D.reduce((a, d) => a + (d.rvms || 0), 0) / n / 1000 : 10; };
+
+/* ---------- tab Ôn thẻ ---------- */
+let JUMP = null, APKG_MSG = "";   // APKG_MSG: kết quả nhập/xuất gần nhất, giữ qua các lần vẽ lại   // {ch, b, v}: thẻ bấm "mở đoạn gốc" → trang đọc cuộn tới đó
+function viewReview() {
+  const q = queue(), td = S.days[key(today0())] || {};
+  const drafts = Object.entries(S.kap).filter(([, k]) => k.nd > 0);
+  $("#app").innerHTML = `<div class="wrap">
+    <h1 style="font-size:26px">Ôn thẻ</h1>
+    <div class="stats card"><div><span class="kind">Đến hạn</span><b>${q.rev.length}</b></div><div><span class="kind">Mới hôm nay</span><b>${q.fresh.length}</b></div><div><span class="kind">Đã ôn hôm nay</span><b>${td.rv || 0}</b></div></div>
+    <section class="card" id="rv"></section>
+    ${drafts.length ? `<section class="card"><span class="eyebrow">Chờ duyệt</span><ul class="mlist">${drafts.map(([ch, k]) => `<li><a class="btn" style="display:block;text-align:left" href="#duyet-${hashId(ch)}">${esc(chName(ch))} · <b>${k.nd}</b> thẻ</a></li>`).join("")}</ul></section>` : ""}
+    <section class="card"><span class="eyebrow">Thêm thẻ</span>
+      <div class="row"><button class="btn" id="addfall">Thẻ từ câu kreuzen làm sai</button>
+      <label class="btn" for="apkgin" style="display:inline-grid;place-items:center">Nhập .apkg</label><input type="file" id="apkgin" accept=".apkg,.zip,.colpkg" hidden>
+      <button class="btn" id="apkgout">Xuất .apkg</button></div>
+      <p class="small muted" id="apkgst">${APKG_MSG ? esc(APKG_MSG) : `Thẻ từ vựng: chạm đúp vào một từ trong bài đọc. Thẻ kiến thức: Claude soạn khi Vy bấm "Đọc xong chương". Giới hạn ${NEW_PER_DAY.vocab} thẻ từ vựng mới và ${NEW_PER_DAY.other} thẻ kiến thức mới mỗi ngày.`}</p>
+    </section>
+  </div>`;
+  showNextCard();
+  $("#addfall").onclick = fallSheet;
+  $("#apkgin").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importApkg(f); };
+  $("#apkgout").onclick = exportApkg;
+}
+const chName = (ch) => (BY[ch] ? `Tag ${BY[ch].tag} · ${BY[ch].t}` : ch === "_fall" ? "Thẻ tình huống chưa gắn chương" : "Thẻ nhập từ .apkg (chưa gắn chương)");
+const hashId = (ch) => (ch === "_fall" ? "fall" : ch.replace("_", "-"));
+const unhash = (h) => (h === "fall" ? "_fall" : h.replace("-", "_"));
+let revKeys = null;
+function showNextCard() {
+  const box = $("#rv"); if (!box) return;
+  if (revKeys) { removeEventListener("keydown", revKeys); revKeys = null; }
+  const nx = nextCard();
+  if (!nx) {
+    const q = queue(), later = q.rev[0];
+    box.innerHTML = `<p class="muted">${later ? `Thẻ tiếp theo đến hạn sau ${fmtIvl(later[1].c.due - Date.now())}.` : "Hết thẻ cho hôm nay."}</p>`;
+    return;
+  }
+  const [ch, card] = nx, t0 = Date.now(), c = BY[ch];
+  const kind = { vocab: "Từ vựng", wissen: "Kiến thức", fall: "Tình huống", apkg: "Anki" }[card.t];
+  box.innerHTML = `<div class="row small muted" style="justify-content:space-between"><span class="kind">${kind}</span><span>${esc(c ? `Tag ${c.tag} · ${c.t}` : chName(ch))}</span></div>
+    <div class="cardface" id="cface">${cardHTML(card, false)}</div>
+    <div id="cbtns"><button class="btn primary" id="show" style="width:100%">Xem đáp án</button></div>`;
+  const reveal = () => {
+    $("#cface").innerHTML = cardHTML(card, true) + (c && card.b != null ? `<p><a href="${readHref(ch)}" id="jump" class="small">Mở đoạn gốc trong bài</a></p>` : "");
+    const now = Date.now();
+    $("#cbtns").innerHTML = `<div class="rate">${[["again", "Lại"], ["hard", "Khó"], ["good", "Được"], ["easy", "Dễ"]].map(([r, l], i) => `<button class="btn" data-r="${r}"><b>${l}</b><span class="small muted">${fmtIvl(schedule(card.c, r, now).due - now)}</span></button>`).join("")}</div>`;
+    if ($("#jump")) $("#jump").onclick = () => { JUMP = { ch, b: card.b, v: card.v || "a" }; };
+    for (const b of document.querySelectorAll("#cbtns [data-r]")) b.onclick = () => rate(b.dataset.r);
+  };
+  const rate = (r) => {
+    const list = S.cards[ch], wasNew = card.c.state === "new";
+    putCards(ch, list.map((x) => (x.id === card.id ? { ...x, c: schedule(x.c, r) } : x)));
+    const td = S.days[key(today0())] || {};
+    putDay({ rv: (td.rv || 0) + 1, rvms: (td.rvms || 0) + Math.min(Date.now() - t0, 120e3), ...(wasNew ? (card.t === "vocab" ? { nv: (td.nv || 0) + 1 } : { nw: (td.nw || 0) + 1 }) : {}) });
+    viewReview();
+  };
+  $("#show").onclick = reveal;
+  revKeys = (e) => {
+    if (e.target.closest?.("input, textarea") || !$("#rv")) return;
+    if (e.key === " " && $("#show")) { e.preventDefault(); reveal(); }
+    const r = { 1: "again", 2: "hard", 3: "good", 4: "easy" }[e.key]; if (r && !$("#show")) rate(r);
+  };
+  addEventListener("keydown", revKeys);
+}
+
+/* ---------- duyệt thẻ nháp (trang riêng hoặc tấm trượt) ---------- */
+function draftEditor(el, ch, only) {
+  const draw = () => {
+    const list = (S.cards[ch] || []).filter((x) => x.st === "draft" && (!only || only.includes(x.id)));
+    if (!list.length) { el.innerHTML = `<p class="muted">Không còn thẻ chờ duyệt.</p>`; return; }
+    el.innerHTML = `<p class="small muted">${list.length} thẻ chờ duyệt. Sửa trực tiếp; ✓ đưa vào hàng ôn, ✕ xoá.</p>
+      ${list.map((x) => { const w = cardWarn(x.f); return `<div class="draft" data-id="${x.id}">
+        <label class="f">Mặt trước<textarea data-k="f" rows="3">${esc(x.f)}</textarea></label>
+        <label class="f">Mặt sau (gợi ý VN, giải thích)<textarea data-k="x" rows="2">${esc(x.x || "")}</textarea></label>
+        <div class="row small"><span class="muted">${esc((x.tags || []).join(" · "))}</span>${w.length ? `<span class="warn">⚠ ${esc(w.join(", "))}</span>` : ""}
+          <span style="flex:1"></span><button class="btn" data-a="del" aria-label="Xoá thẻ">✕</button><button class="btn primary" data-a="ok" aria-label="Duyệt thẻ">✓</button></div></div>`; }).join("")}
+      <button class="btn primary" id="okall">Duyệt tất cả ${list.length} thẻ</button>`;
+    const edit = (id, patch) => putCards(ch, S.cards[ch].map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    for (const d of el.querySelectorAll(".draft")) {
+      for (const t of d.querySelectorAll("textarea")) t.onchange = () => edit(d.dataset.id, { [t.dataset.k]: t.value.trim() });
+      d.querySelector('[data-a="del"]').onclick = () => { putCards(ch, S.cards[ch].filter((x) => x.id !== d.dataset.id)); draw(); };
+      d.querySelector('[data-a="ok"]').onclick = () => { edit(d.dataset.id, { st: "on", c: newCard(), at: Date.now() }); draw(); };
+    }
+    $("#okall", el).onclick = () => { const ids = new Set(list.map((x) => x.id)); putCards(ch, S.cards[ch].map((x) => (ids.has(x.id) ? { ...x, st: "on", c: newCard(), at: Date.now() } : x))); draw(); toast(`Đã đưa ${ids.size} thẻ vào hàng ôn`); };
+  };
+  draw();
+}
+async function viewDrafts(ch) {
+  $("#app").innerHTML = `<div class="wrap"><a href="#on" class="small">← Ôn thẻ</a><h1 style="font-size:22px">Duyệt thẻ · ${esc(chName(ch))}</h1><div id="ded" style="display:grid;gap:12px"><p class="muted">Đang tải…</p></div></div>`;
+  if (!DB) return;
+  await getCards(ch); draftEditor($("#ded"), ch);
+}
+
+/* ---------- Claude soạn thẻ theo quy tắc ở prompts/the-kien-thuc.md ---------- */
+const RULES = JSON.parse(document.getElementById("m2-rules").textContent || '""');
+async function fit(text, sample, reserve = 6000) {   // cắt nguồn cho vừa giới hạn đầu vào của Claude
+  const lim = ((await sample.limits?.().catch(() => null))?.maxPromptBytes || 120e3) - reserve;
+  const enc = new TextEncoder(); let t = text;
+  while (enc.encode(t).length > lim) t = t.slice(0, Math.floor(t.length * 0.9));
+  return t;
+}
+const plain = (html) => html.replace(/<figure[\s\S]*?<\/figure>/g, "").replace(/<\/(p|h\d|li|tr|div)>/g, "\n").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/[ \t]+/g, " ").trim();
+const numbered = (blocks) => blocks.map((h, i) => `[§${i}] ${plain(h)}`).join("\n");
+async function genCards(ch, { task, src, n, t = "wissen", v = "a", b = null }) {
+  const sample = await getSample(); if (!sample) throw { code: "not_granted" };
+  const c = BY[ch], have = (await getCards(ch)).map((x) => x.f);
+  const prompt = `${RULES}\n\nYÊU CẦU\n${task}\nSố thẻ: ${n}.${c ? `\nKapitel: ${c.t} (${c.fach} › ${c.sub}, Tag ${c.tag})` : ""}${have.length ? `\n\nThẻ đã có (không soạn trùng ý):\n- ${have.slice(-80).join("\n- ")}` : ""}\n\nNỘI DUNG\n`;
+  const arr = await sample.json(prompt + await fit(src, sample, new TextEncoder().encode(prompt).length + 4000), { modelTier: "complex" });
+  if (!Array.isArray(arr)) throw new Error("Claude trả về sai định dạng, thử lại");
+  const out = [];
+  for (const x of arr) {
+    if (!x || typeof x.front !== "string" || !/\{\{c\d+::/.test(x.front)) continue;
+    const f = x.front.trim();
+    if ([...have, ...out.map((o) => o.f)].some((h) => similar(h, f))) continue;
+    out.push({ id: cid(), t, f, x: [x.vn && `VN: ${x.vn}`, x.why].filter(Boolean).join("\n"), b: b ?? (Number.isInteger(x.abschnitt) ? x.abschnitt : null), v,
+      tags: [c?.fach, c && `Tag ${c.tag}`, x.typ].filter(Boolean).map(String), st: "draft", at: Date.now() });
+  }
+  if (out.length) putCards(ch, [...S.cards[ch], ...out]);
+  return out;
+}
+const aiErr = (e) => e?.code === "rate_limited" ? "Claude đang bận, đợi một lúc rồi thử lại." : e?.code === "not_granted" ? "Trang chưa được phép hỏi Claude (menu Permissions của trang)." : "Chưa được: " + (e?.message || e?.code || e);
+async function cardsSheet(ch, job, title) {
+  const bg = sheet(`<h2 style="font-size:18px">${esc(title)}</h2><div id="csh" style="display:grid;gap:12px"><p class="muted">Claude đang soạn thẻ…</p></div>`);
+  try {
+    const got = await job();
+    if (!got.length) { $("#csh", bg).innerHTML = `<p class="muted">Không có thẻ mới (có thể trùng ý với thẻ đã có).</p>`; return; }
+    draftEditor($("#csh", bg), ch, got.map((x) => x.id));
+  } catch (e) { $("#csh", bg).innerHTML = `<p class="muted">${esc(aiErr(e))}</p>`; }
+}
+function fallSheet() {
+  const bg = sheet(`<h2 style="font-size:18px">Thẻ từ câu kreuzen làm sai</h2>
+    <label class="f" for="fq">Dán câu hỏi + đáp án đúng + giải thích<textarea id="fq" rows="8" placeholder="Fallvignette, các lựa chọn, đáp án đúng, Erklärung…"></textarea></label>
+    <label class="f" for="fch">Chương liên quan (tuỳ chọn)<input id="fch" list="chlist" placeholder="gõ tên chương…"><datalist id="chlist">${CH.map((c) => `<option value="${esc(c.t)} · Tag ${c.tag}">`).join("")}</datalist></label>
+    <button class="btn primary" id="fgo">Soạn thẻ</button>`);
+  $("#fgo", bg).onclick = () => {
+    const txt = $("#fq", bg).value.trim(); if (txt.length < 30) return toast("Dán đủ đề, đáp án và giải thích");
+    const v = $("#fch", bg).value, ch = CH.find((c) => `${c.t} · Tag ${c.tag}` === v)?.id || "_fall";
+    bg.remove();
+    cardsSheet(ch, () => genCards(ch, { t: "fall", n: "1–3", src: txt,
+      task: "Từ câu kreuzen Vy làm sai dưới đây, soạn thẻ tình huống dạng \"Leitsymptom → Diagnose/Therapie\": câu cloze nêu các Leitsymptome/bối cảnh then chốt rồi hỏi {{c1::Diagnose}} hoặc {{c1::Therapie/Maßnahme}}. Nhấn vào đúng ý mà câu này kiểm tra. abschnitt để null." }), "Thẻ tình huống");
+  };
+}
+
+/* ---------- chạm đúp tra từ + thẻ từ vựng ---------- */
+const dictKey = (w) => "w-" + w.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9-]/g, "_").slice(0, 150);
+function wordAt(x, y) {
+  let node, off;
+  if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); if (!r) return null; node = r.startContainer; off = r.startOffset; }
+  else if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); if (!p) return null; node = p.offsetNode; off = p.offset; }
+  if (!node || node.nodeType !== 3) return null;
+  const t = node.data, isL = (ch) => /[\p{L}\p{M}-]/u.test(ch || "");
+  let a = off, b = off; while (a > 0 && isL(t[a - 1])) a--; while (b < t.length && isL(t[b])) b++;
+  while (t[a] === "-") a++; while (b > a && t[b - 1] === "-") b--;
+  const w = t.slice(a, b); if (w.length < 2) return null;
+  const blk = node.parentElement.closest(".blk"); if (!blk) return null;
+  return { w, blk, bo: textOffset(blk, node, a) };
+}
+function sentenceAt(text, i, w) {
+  let s = 0; for (const m of text.matchAll(/[.!?](?=\s+\S)/g)) { if (m.index + 1 <= i) s = m.index + 1; else break; }
+  const rest = text.slice(i).search(/[.!?](\s|$)/), e = rest < 0 ? text.length : i + rest + 1;
+  let a = s, z = e; if (z - a > 320) { a = Math.max(s, i - 150); z = Math.min(e, i + w.length + 150); }
+  return { s: text.slice(a, z).trim(), off: i - a - (text.slice(a, z).length - text.slice(a, z).trimStart().length) };
+}
+let lastLookup = 0;
+async function lookupAt(x, y) {
+  if (Date.now() - lastLookup < 500) return; lastLookup = Date.now();
+  const hit = wordAt(x, y); if (!hit) return;
+  getSelection().removeAllRanges(); $("#seltb")?.remove();
+  const c = BY[R.id], { w, blk, bo } = hit, { s: sent, off } = sentenceAt(blk.textContent, bo, w);
+  const hl = esc(sent.slice(0, off)) + `<mark class="hl c-again">${esc(sent.slice(off, off + w.length))}</mark>` + esc(sent.slice(off + w.length));
+  const bg = sheet(`<div class="row" style="align-items:baseline"><b style="font-size:22px;font-family:var(--font-read)" id="wdw">${esc(w)}</b><span class="muted" id="wdg"></span></div>
+    <p id="wdvn">Đang tra…</p><p class="small" id="wdex"></p>
+    <blockquote style="background:var(--bg)">${hl}</blockquote><p class="small muted" id="wdsatz"></p>
+    <div class="row"><button class="btn primary" id="wdadd" disabled>Thêm vào Anki từ vựng</button><button class="btn" id="wdtr">Dịch câu</button></div>`);
+  const sample = await getSample();
+  $("#wdtr", bg).onclick = async () => {
+    if (!sample) return; $("#wdsatz", bg).textContent = "Đang dịch…";
+    try { const r = await sample(`Dịch câu y khoa tiếng Đức sau sang tiếng Việt tự nhiên. Chỉ trả bản dịch.\n\n${sent}`, { modelTier: "quick" }); $("#wdsatz", bg).textContent = r.text.trim(); }
+    catch (e) { $("#wdsatz", bg).textContent = aiErr(e); }
+  };
+  let info = S.dict[dictKey(w)];
+  try {
+    if (!info && DB) { const d = await DB.doc("dict/" + dictKey(w)).get(); if (d.exists) info = d.data(); }
+    if (!info) {
+      if (!sample) throw { code: "not_granted" };
+      const j = await sample.json(`Từ tiếng Đức "${w}" trong câu y khoa: "${sent}".
+Trả về chỉ một JSON: {"lemma": "dạng từ điển", "art": "der|die|das hoặc rỗng nếu không phải danh từ", "pl": "dạng số nhiều (danh từ) hoặc rỗng", "pos": "Nomen|Verb|Adjektiv|Adverb|…", "vn": "nghĩa tiếng Việt ngắn trong ngữ cảnh y khoa", "ex": "1–2 câu tiếng Việt giải thích thuật ngữ y khoa thật dễ hiểu; từ thông thường thì để rỗng"}`, { modelTier: "quick" });
+      info = { w, lemma: String(j.lemma || w), art: /^(der|die|das)$/.test(j.art) ? j.art : "", pl: String(j.pl || ""), pos: String(j.pos || ""), vn: String(j.vn || ""), ex: String(j.ex || "") };
+      if (DB) save("dict/" + dictKey(w), info);
+    }
+    S.dict[dictKey(w)] = info;
+  } catch (e) { $("#wdvn", bg).textContent = aiErr(e); return; }
+  $("#wdw", bg).innerHTML = `${info.art ? `<span class="art-${info.art}">${info.art}</span> ` : ""}${esc(info.lemma)}`;
+  $("#wdg", bg).textContent = [info.pos, info.pl && `Pl. ${info.pl}`].filter(Boolean).join(" · ");
+  $("#wdvn", bg).textContent = info.vn; $("#wdex", bg).textContent = info.ex;
+  const list = DB ? await getCards(c.id) : [];
+  const dup = list.some((x) => x.t === "vocab" && x.lemma === info.lemma);
+  const add = $("#wdadd", bg); add.disabled = dup || !DB; if (dup) add.textContent = "Đã có trong Anki";
+  add.onclick = () => {
+    const f = sent.slice(0, off) + `{{c1::${sent.slice(off, off + w.length)}}}` + sent.slice(off + w.length);
+    putCards(c.id, [...S.cards[c.id], { id: cid(), t: "vocab", lemma: info.lemma, f, x: `${info.art ? info.art + " " : ""}${info.lemma}${info.pl ? `, Pl. ${info.pl}` : ""} — ${info.vn}`, b: +blk.dataset.b, v: R.view, tags: ["Vokabel", c.fach], st: "on", c: newCard(), at: Date.now() }]);
+    add.disabled = true; add.textContent = "Đã thêm"; toast("Đã thêm thẻ từ vựng");
+  };
+}
+
+/* ---------- bôi đen: dịch / giải thích ---------- */
+async function aiSheet(title, prompt, tier) {
+  const bg = sheet(`<h2 style="font-size:18px">${esc(title)}</h2><article class="doc easy" id="ais" style="padding:0;font-size:17px"><p class="muted">Claude đang viết…</p></article>`);
+  const sample = await getSample();
+  if (!sample) { $("#ais", bg).textContent = aiErr({ code: "not_granted" }); return; }
+  try { const r = await sample(prompt, { modelTier: tier, onText: ({ text }) => { $("#ais", bg).innerHTML = mdBlocks(text).join(""); } }); $("#ais", bg).innerHTML = mdBlocks(r.text).join(""); }
+  catch (e) { $("#ais", bg).textContent = aiErr(e); }
+}
+
+/* ---------- chat bên cạnh bài đọc ---------- */
+const CHAT = { id: null, msgs: [], busy: false };
+const CHAT_PRE = (c) => `Bạn là gia sư y khoa cho sinh viên Việt ôn thi M2 (Zweites Staatsexamen, Đức), đọc tiếng Đức còn chậm. Trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu; giữ thuật ngữ thi tiếng Đức in đậm kèm nghĩa. Chỉ dùng Markdown đơn giản. Chương đang đọc: "${c.t}" (${c.fach} › ${c.sub}, Tag ${c.tag}).`;
+function chatContext() {
+  if (R.sel && Date.now() - R.sel.at < 5 * MIN) return R.sel.txt.slice(0, 1500);
+  const bl = viewBlocks(); return [bl[R.pos || 0], bl[(R.pos || 0) + 1]].filter(Boolean).map(plain).join("\n").slice(0, 1500);
+}
+async function chatOpen(c) {
+  document.body.classList.add("chat-open"); $("#chat").hidden = false;
+  if (CHAT.id !== c.id) {
+    CHAT.id = c.id; CHAT.msgs = [];
+    $("#clog").innerHTML = `<p class="small muted">Đang tải…</p>`;
+    try { const d = DB && await DB.doc("chat/" + c.id).get(); CHAT.msgs = d?.exists ? [...(d.data().msgs || [])] : []; } catch {}
+  }
+  chatDraw(c); chatCtx();
+}
+function chatClose() { document.body.classList.remove("chat-open"); const el = $("#chat"); if (el) el.hidden = true; }
+function chatCtx() { const t = chatContext(); $("#cctx").innerHTML = t ? `<span class="kind">Kèm đoạn đang xem</span><q>${esc(t.slice(0, 160))}${t.length > 160 ? "…" : ""}</q>` : ""; }
+function chatDraw(c) {
+  $("#clog").innerHTML = CHAT.msgs.length ? CHAT.msgs.map((m, i) => m.r === "u"
+    ? `<div class="msg u">${esc(m.t)}</div>`
+    : `<div class="msg a"><div class="doc easy">${mdBlocks(m.t).join("")}</div><button class="btn small" data-card="${i}">Biến thành thẻ</button></div>`).join("")
+    : `<p class="small muted">Hỏi bất cứ gì về chương này. Câu hỏi tự kèm đoạn Vy đang xem hoặc đang bôi đen.</p>`;
+  for (const b of document.querySelectorAll("#clog [data-card]")) b.onclick = () => {
+    const m = CHAT.msgs[+b.dataset.card], q = CHAT.msgs[+b.dataset.card - 1];
+    cardsSheet(c.id, () => genCards(c.id, { n: "1–4", v: R.view, b: R.pos ?? null, src: `Câu hỏi: ${q?.t || ""}\nTrả lời: ${m.t}`,
+      task: "Soạn thẻ kiến thức từ câu trả lời dưới đây (chỉ ý đáng nhớ cho thi). Câu thẻ viết bằng tiếng Đức theo thuật ngữ AMBOSS. abschnitt để null." }), "Thẻ từ câu trả lời");
+  };
+  $("#clog").scrollTop = 1e9;
+}
+async function chatSend(c, q) {
+  if (CHAT.busy || !q.trim()) return;
+  const sample = await getSample(); if (!sample) return toast(aiErr({ code: "not_granted" }));
+  CHAT.busy = true;
+  const ctx = chatContext();
+  const hist = CHAT.msgs.slice(-8); while (hist.length && hist[0].r !== "u") hist.shift();
+  const fmt = (m, first) => (first ? CHAT_PRE(c) + "\n\n" : "") + (m.ctx ? `Đoạn đang xem:\n"""${m.ctx}"""\n\n` : "") + m.t;
+  const input = [...hist.map((m, i) => ({ role: m.r === "u" ? "user" : "assistant", content: m.r === "u" ? fmt(m, i === 0) : m.t })), { role: "user", content: fmt({ t: q, ctx }, !hist.length) }];
+  CHAT.msgs.push({ r: "u", t: q, ctx: ctx.slice(0, 800), at: Date.now() }); chatDraw(c);
+  const bubble = document.createElement("div"); bubble.className = "msg a"; bubble.innerHTML = `<div class="doc easy"><p class="muted">…</p></div>`; $("#clog").appendChild(bubble);
+  try {
+    const r = await sample(input, { cache: false, onText: ({ text }) => { bubble.firstChild.innerHTML = mdBlocks(text).join(""); $("#clog").scrollTop = 1e9; } });
+    CHAT.msgs.push({ r: "a", t: r.text, at: Date.now() });
+    while (CHAT.msgs.length > 2 && JSON.stringify(CHAT.msgs).length > 180e3) CHAT.msgs.splice(0, 2);   // doc ≤256KB
+    save("chat/" + c.id, { msgs: CHAT.msgs });
+  } catch (e) { CHAT.msgs.pop(); toast(aiErr(e)); }
+  CHAT.busy = false; chatDraw(c);
+}
+
+/* ---------- .apkg: nhập (map vào chương, bỏ trùng) và xuất ---------- */
+const LIBS = { sql: "https://cdn.jsdelivr.net/npm/sql.js@1.12.0/dist/sql-asm.js", fflate: "https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js", fzstd: "https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.js" };
+const GLOB = { sql: "initSqlJs", fflate: "fflate", fzstd: "fzstd" };
+async function libs(...names) { for (const n of names) if (!window[GLOB[n]]) await loadScript(LIBS[n]); }
+const cleanHtml = (h) => { const d = new DOMParser().parseFromString(String(h).replace(/<img[^>]*>/gi, " [hình] ").replace(/\[sound:[^\]]*\]/g, ""), "text/html"); return clean(d.body, document.createElement("div")).innerHTML.trim(); };
+async function readApkg(file) {
+  await libs("fflate", "sql");
+  const files = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
+  let raw = files["collection.anki21b"];
+  if (raw) { await libs("fzstd"); raw = fzstd.decompress(raw); } else raw = files["collection.anki21"] || files["collection.anki2"];
+  if (!raw) throw new Error("Không thấy bộ thẻ trong file");
+  const SQL = await initSqlJs(), db = new SQL.Database(raw);
+  try {
+    const decks = {};
+    const hasDecks = db.exec("select name from sqlite_master where type='table' and name='decks'")[0];
+    if (hasDecks) for (const [id, name] of db.exec("select id, name from decks")[0]?.values || []) decks[id] = String(name).replace(/\x1f/g, "::");
+    else for (const d of Object.values(JSON.parse(db.exec("select decks from col")[0].values[0][0]))) decks[d.id] = d.name;
+    const rows = db.exec("select n.id, n.flds, n.tags, min(c.did) from notes n join cards c on c.nid = n.id group by n.id")[0]?.values || [];
+    return rows.map(([nid, flds, tags, did]) => { const fl = String(flds).split("\x1f"); return { nid: String(nid), f: cleanHtml(fl[0] || ""), x: cleanHtml(fl.slice(1).filter(Boolean).join("<br>")), tags: String(tags).trim().split(/\s+/).filter(Boolean), deck: decks[did] || "" }; }).filter((n) => n.f);
+  } finally { db.close(); }
+}
+let TITLES = null;
+function mapChapter(n) {
+  TITLES ||= CH.map((c) => ({ id: c.id, n: " " + norm(c.t) + " " })).filter((x) => x.n.trim().length >= 4).sort((a, b) => b.n.length - a.n.length);
+  const meta = " " + norm(n.tags.join(" ").replace(/::|_/g, " ") + " " + n.deck.replace(/::/g, " ")) + " ";
+  for (const t of TITLES) if (meta.includes(t.n)) return t.id;
+  const body = " " + norm(n.f) + " ";
+  for (const t of TITLES) if (t.n.trim().includes(" ") && body.includes(t.n)) return t.id;
+  return null;
+}
+function apkgSay(st, m) { APKG_MSG = m; if (st?.isConnected) st.textContent = m; else { const el = $("#apkgst"); if (el) el.textContent = m; } }
+async function importApkg(file) {
+  const st = $("#apkgst"); if (!DB) return toast("Chưa kết nối được kho dữ liệu");
+  try {
+    apkgSay(st, "Đang đọc file…");
+    const notes = await readApkg(file), groups = {}, now = Date.now();
+    for (const n of notes) (groups[mapChapter(n) || "_apkg"] ||= []).push(n);
+    const buckets = Object.keys(S.kap).filter((k) => k.startsWith("_apkg-")).sort((a, b) => +a.slice(6) - +b.slice(6));
+    for (const b of buckets) await getCards(b);
+    const seen = new Set(buckets.flatMap((b) => S.cards[b].map((x) => x.id)));
+    let added = 0, mapped = 0, dupes = 0, done = 0;
+    const toCard = (n) => ({ id: "a" + n.nid, t: "apkg", h: 1, f: n.f, x: n.x, tags: n.tags.slice(0, 8), st: "on", c: newCard(now), at: now });
+    for (const [ch, ns] of Object.entries(groups)) {
+      if (ch === "_apkg") continue;
+      const list = [...await getCards(ch)], ids = new Set(list.map((x) => x.id));
+      for (const n of ns) {
+        if (ids.has("a" + n.nid) || seen.has("a" + n.nid) || list.some((x) => similar(x.f, n.f))) { dupes++; continue; }
+        // shortcut: một chương giữ tối đa 350 thẻ (doc ≤256KB); phần dư sang ngăn chưa gắn chương
+        if (list.length >= 350) { (groups._apkg ||= []).push(n); continue; }
+        list.push(toCard(n)); ids.add("a" + n.nid); added++; mapped++;
+      }
+      await DB.doc("cards/" + ch).set({ ch, due: Math.min(FAR, ...list.filter((x) => x.st === "on").map((x) => x.c.due)), list });
+      S.cards[ch] = list; S.dueChs.add(ch); putKap(ch, { nc: list.filter((x) => x.st === "on").length, nd: list.filter((x) => x.st !== "on").length });
+      apkgSay(st, `Đang ghi… ${++done} chương`);
+    }
+    let k = buckets.length ? +buckets.at(-1).slice(6) : 0, cur = k ? [...S.cards["_apkg-" + k]] : [];
+    for (const n of groups._apkg || []) {
+      if (seen.has("a" + n.nid)) { dupes++; continue; }
+      if (!k || cur.length >= 300) { if (k) putCards("_apkg-" + k, cur); k++; cur = []; }
+      cur.push(toCard(n)); seen.add("a" + n.nid); added++;
+    }
+    if (cur.length) putCards("_apkg-" + k, cur);
+    apkgSay(st, `Đã nhập ${added} thẻ: ${mapped} gắn vào chương (chỉ ôn sau khi đọc xong chương đó), ${added - mapped} chưa gắn chương; bỏ ${dupes} thẻ trùng. Hình trong thẻ được thay bằng [hình].`);
+  } catch (e) { apkgSay(st, "Chưa nhập được: " + (e.message || e)); }
+}
+async function sha1int(s) { const h = new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(s))); return ((h[0] << 24) | (h[1] << 16) | (h[2] << 8) | h[3]) >>> 0; }
+async function buildApkg(cards) {
+  await libs("sql", "fflate");
+  const SQL = await initSqlJs(), db = new SQL.Database(), now = Date.now(), crt = Math.floor(today0().getTime() / 1000);
+  db.run(`CREATE TABLE col (id integer primary key, crt integer not null, mod integer not null, scm integer not null, ver integer not null, dty integer not null, usn integer not null, ls integer not null, conf text not null, models text not null, decks text not null, dconf text not null, tags text not null);
+    CREATE TABLE notes (id integer primary key, guid text not null, mid integer not null, mod integer not null, usn integer not null, tags text not null, flds text not null, sfld integer not null, csum integer not null, flags integer not null, data text not null);
+    CREATE TABLE cards (id integer primary key, nid integer not null, did integer not null, ord integer not null, mod integer not null, usn integer not null, type integer not null, queue integer not null, due integer not null, ivl integer not null, factor integer not null, reps integer not null, lapses integer not null, left integer not null, odue integer not null, odid integer not null, flags integer not null, data text not null);
+    CREATE TABLE revlog (id integer primary key, cid integer not null, usn integer not null, ease integer not null, ivl integer not null, lastIvl integer not null, factor real not null, time integer not null, type integer not null);
+    CREATE TABLE graves (usn integer not null, oid integer not null, type integer not null);`);
+  const fld = (name, ord) => ({ name, ord, sticky: false, rtl: false, font: "Arial", size: 20, media: [] });
+  const css = ".card{font-family:Arial;font-size:20px;text-align:center}.cloze{font-weight:bold;color:#3550c8}";
+  const base = { mod: Math.floor(now / 1000), usn: -1, sortf: 0, did: 1, tags: [], vers: [], latexPre: "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n\\begin{document}\n", latexPost: "\\end{document}", css };
+  const MC = 1700000000001, MB = 1700000000002;
+  const models = {
+    [MC]: { ...base, id: MC, name: "M2 Cloze", type: 1, flds: [fld("Text", 0), fld("Extra", 1)], req: [[0, "any", [0]]], tmpls: [{ name: "Cloze", ord: 0, qfmt: "{{cloze:Text}}", afmt: "{{cloze:Text}}<br>{{Extra}}", did: null, bqfmt: "", bafmt: "" }] },
+    [MB]: { ...base, id: MB, name: "M2 Basic", type: 0, flds: [fld("Front", 0), fld("Back", 1)], req: [[0, "all", [0]]], tmpls: [{ name: "Card 1", ord: 0, qfmt: "{{Front}}", afmt: "{{FrontSide}}<hr id=answer>{{Back}}", did: null, bqfmt: "", bafmt: "" }] },
+  };
+  const deck = (id, name) => ({ id, name, mod: Math.floor(now / 1000), usn: -1, lrnToday: [0, 0], revToday: [0, 0], newToday: [0, 0], timeToday: [0, 0], collapsed: false, desc: "", dyn: 0, conf: 1, extendNew: 10, extendRev: 50 });
+  const decks = { 1: deck(1, "Default") }, did = {};
+  const deckOf = (ch) => { const c = BY[ch]; const parts = ["M2 AMBOSS", c ? c.fach : "Khác", c ? `Tag ${pad(c.tag)}` : null].filter(Boolean);
+    let name = ""; for (const p of parts) { name = name ? name + "::" + p : p; if (!did[name]) { did[name] = 1700000001000 + Object.keys(did).length; decks[did[name]] = deck(did[name], name); } } return did[name]; };
+  const dconf = { 1: { id: 1, name: "Default", mod: 0, usn: 0, maxTaken: 60, autoplay: true, timer: 0, replayq: true, dyn: false, new: { delays: [1, 10], ints: [1, 4, 7], initialFactor: 2500, order: 1, perDay: 20, bury: false }, lapse: { delays: [10], mult: 0, minInt: 1, leechFails: 8, leechAction: 0 }, rev: { perDay: 200, ease4: 1.3, ivlFct: 1, maxIvl: 36500, bury: false, hardFactor: 1.2 } } };
+  const conf = { nextPos: cards.length + 1, estTimes: true, activeDecks: [1], sortType: "noteFld", timeLim: 0, sortBackwards: false, addToCur: true, curDeck: 1, newBury: true, newSpread: 0, dueCounts: true, curModel: MC, collapseTime: 1200 };
+  const html = (card, k) => (card.h ? card[k] || "" : esc(card[k] || "").replace(/\n/g, "<br>"));
+  let i = 0;
+  for (const card of cards) {
+    i++;
+    const nid = now + i, cloze = /\{\{c\d+::/.test(card.f), f = html(card, "f"), x = html(card, "x"), sf = plain(f.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g, "$1"));
+    db.run("insert into notes values (?,?,?,?,?,?,?,?,?,?,?)", [nid, card.id, cloze ? MC : MB, Math.floor(now / 1000), -1, " " + (card.tags || []).map((t) => t.replace(/\s+/g, "_")).join(" ") + " ", f + "\x1f" + x, sf, await sha1int(sf), 0, ""]);
+    const ords = cloze ? [...new Set([...card.f.matchAll(/\{\{c(\d+)::/g)].map((m) => +m[1] - 1))] : [0];
+    const r = card.c?.state === "review" ? card.c : null;   // giữ tiến độ thẻ đang ôn; thẻ mới/đang học xuất là mới
+    for (const ord of ords) db.run("insert into cards values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      [nid * 10 + ord, nid, deckOf(card.ch), ord, Math.floor(now / 1000), -1, r ? 2 : 0, r ? 2 : 0, r ? Math.round((r.due - crt * 1000) / DAY) : i, r ? r.ivl : 0, r ? Math.round(r.ease * 1000) : 0, r ? r.reps : 0, r ? r.lapses : 0, 0, 0, 0, 0, ""]);
+  }
+  db.run("insert into col values (1,?,?,?,11,0,0,0,?,?,?,?,?)", [crt, now, now, JSON.stringify(conf), JSON.stringify(models), JSON.stringify(decks), JSON.stringify(dconf), "{}"]);
+  const bytes = db.export(); db.close();
+  return fflate.zipSync({ "collection.anki2": bytes, media: fflate.strToU8("{}") });
+}
+async function exportApkg() {
+  const st = $("#apkgst"); if (!DB) return toast("Chưa kết nối được kho dữ liệu");
+  try {
+    apkgSay(st, "Đang gom thẻ…");
+    // shortcut: đọc tối đa 1000 doc thẻ (≈ 1000 chương/ngăn); vượt mức đó thì phân trang
+    const snap = await DB.collection("cards").limit(1000).get();
+    const cards = snap.docs.flatMap((d) => (d.data().list || []).filter((x) => x.st === "on").map((x) => ({ ...x, ch: d.id })));
+    if (!cards.length) { apkgSay(st, "Chưa có thẻ nào để xuất."); return; }
+    const zip = await buildApkg(cards);
+    const dl = await window.claude?.use("downloads").catch(() => null);
+    if (!dl) { apkgSay(st, "Trình xem này không cho tải file xuống."); return; }
+    await dl.save({ filename: "M2-AMBOSS.apkg.zip", data: zip });
+    apkgSay(st, `Đã xuất ${cards.length} thẻ. Đổi tên file thành "M2-AMBOSS.apkg" (bỏ đuôi .zip) rồi mở bằng Anki.`);
+  } catch (e) { apkgSay(st, e?.code === "declined" ? "Đã huỷ tải xuống." : "Chưa xuất được: " + (e.message || e.code || e)); }
+}
+
+/* ---------- Tiến độ (dashboard) ---------- */
+const active = (d) => dayMin(d) >= 5 || (d.rv || 0) >= 10;
+function streak() {
+  const c = cfg(); let n = 0, d = today0();
+  if (!active(S.days[key(d)] || {})) d = addDays(d, -1);
+  for (let i = 0; i < 3000; i++, d = addDays(d, -1)) {
+    if (active(S.days[key(d)] || {})) n++;
+    else if (d.getDay() !== c.rest || d < c.start) break;   // ngày nghỉ không làm đứt chuỗi
+  }
+  return n;
+}
+function barChart(label, vals, fmt, floor) {
+  const W = 320, H = 120, P = 18, max = Math.max(floor, ...vals.map((v) => v.y)), bw = (W - P) / vals.length;
+  return `<figure class="chart"><figcaption><b>${esc(label)}</b> · 30 ngày gần nhất</figcaption>
+    <svg viewBox="0 0 ${W} ${H + 16}" role="img" aria-label="${esc(label)}">
+      <line x1="${P}" x2="${W}" y1="${H}" y2="${H}" class="ax"/><line x1="${P}" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="grid"/>
+      <text x="0" y="10" class="lbl">${fmt(max)}</text><text x="0" y="${H / 2 + 4}" class="lbl">${fmt(max / 2)}</text>
+      ${vals.map((v, i) => { const h = v.y / max * (H - 8); return `<g class="bar"><rect x="${P + i * bw}" y="0" width="${bw}" height="${H}" class="hit"><title>${v.d}: ${fmt(v.y)}</title></rect>${v.y ? `<rect x="${P + i * bw + 1}" y="${H - h}" width="${bw - 2}" height="${h}" rx="2" class="fill"/>` : ""}</g>`; }).join("")}
+      <text x="${P}" y="${H + 14}" class="lbl">${vals[0].d}</text><text x="${W}" y="${H + 14}" class="lbl" text-anchor="end">hôm nay</text>
+    </svg></figure>`;
+}
+function viewStats() {
+  const w = workload(), c = w.c, st = streak();
+  const days = []; for (let i = 29; i >= 0; i--) { const d = addDays(today0(), -i); days.push({ d: `${d.getDate()}/${d.getMonth() + 1}`, x: S.days[key(d)] || {} }); }
+  const groups = []; for (const d of PLAN) { const g = groups.at(-1); if (g && g.fach === d.fach) g.ch.push(...d.ch); else groups.push({ fach: d.fach, ch: [...d.ch] }); }
+  const D = Object.values(S.days), cards = Object.values(S.kap).reduce((a, k) => a + (k.nc || 0), 0);
+  $("#app").innerHTML = `<div class="wrap">
+    <h1 style="font-size:26px">Tiến độ</h1>
+    <section class="card stats4">
+      <div><span class="kind">Chuỗi ngày học</span><b>${st}</b><span class="small muted">ngày nghỉ không làm đứt chuỗi</span></div>
+      <div><span class="kind">Chương xong</span><b>${CH.length - w.left}<span class="small muted">/${CH.length}</span></b></div>
+      <div><span class="kind">Thẻ đang ôn</span><b>${cards}</b><span class="small muted">${D.reduce((a, d) => a + (d.rv || 0), 0)} lượt ôn</span></div>
+      <div><span class="kind">Dự kiến xong</span><b style="font-size:18px">${fmtD(w.finish)}</b><span class="small muted">${hm(c.perDay)}/ngày${c.target ? ` · hạn ${fmtD(c.target)}` : ""}</span></div>
+    </section>
+    <section class="card">${barChart("Phút học mỗi ngày (đọc + kreuzen + Anki)", days.map((v) => ({ d: v.d, y: Math.round(dayMin(v.x)) })), (y) => `${Math.round(y)}′`, 60)}</section>
+    <section class="card">${barChart("Thẻ ôn mỗi ngày", days.map((v) => ({ d: v.d, y: v.x.rv || 0 })), (y) => `${Math.round(y)}`, 20)}</section>
+    <section class="card"><span class="eyebrow">Theo Fach</span>
+      <ul class="fachs">${groups.map((g) => { const dn = g.ch.filter((x) => kap(x.id).st === 2).length, p = dn / g.ch.length * 100; return `<li><span>${esc(g.fach)}</span><span class="num small muted">${dn}/${g.ch.length} · ${Math.round(p)}%</span><div class="bar ok"><i style="width:${p.toFixed(1)}%"></i></div></li>`; }).join("")}</ul>
+    </section>
+  </div>`;
+}
+
 /* ---------- chung ---------- */
 let toastT = null;
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
+function toast(msg, cheer) { const t = $("#toast"); t.textContent = msg; t.hidden = false; t.classList.toggle("pop", !!cheer); t.classList.toggle("cheer", !!cheer); clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
 
 addEventListener("hashchange", route);
 applyTheme();
@@ -903,7 +1587,7 @@ route();
     got.add(what);
     // ghi mốc "sáng nay còn bao nhiêu" một lần mỗi ngày, khi đã có đủ dữ liệu
     const tk = key(today0());
-    if (got.size === 3 && S.days[tk]?.r0 == null && S.r0For !== tk) { S.r0For = tk; putDay({ r0: Math.round(workload().total) }); }
+    if (["kap", "cfg", "days"].every((g) => got.has(g)) && S.days[tk]?.r0 == null && S.r0For !== tk) { S.r0For = tk; putDay({ r0: Math.round(workload().total) }); }
     rerender();
   };
   const fail = (e) => { clearTimeout(timeout); toast("Kho dữ liệu lỗi: " + (e.message || e.code)); };
@@ -913,5 +1597,10 @@ route();
   }, fail);
   DB.doc("cfg/plan").onSnapshot((d) => { S.cfg = d.exists ? d.data() : null; ready("cfg"); }, fail);
   DB.collection("days").limit(1000).onSnapshot((snap) => { for (const d of snap.docs) S.days[d.id] = d.data(); ready("days"); }, fail);
+  // chỉ tải các chương có thẻ đến hạn trong hôm nay
+  DB.collection("cards").where("due", "<=", addDays(today0(), 1).getTime()).limit(1000).onSnapshot((snap) => {
+    for (const d of snap.docs) { const w = W["cards/" + d.id]; if (!(w?.busy || w?.next)) S.cards[d.id] = [...(d.data().list || [])]; S.dueChs.add(d.id); }
+    ready("cards");
+  }, fail);
 })();
 </script>
