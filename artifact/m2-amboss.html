@@ -954,17 +954,26 @@ function vocDrill(c) {
   };
   const next = () => { if (i < queue.length) return draw(); finish(); };
   const finish = () => {
-    const now = Date.now(), list = S.cards[c.id] || [], have = new Set(list.filter((x) => x.t === "vocab").map((x) => (x.lemma || "").toLowerCase()));
-    const add = V.list.filter((w) => !have.has(lemmaOf(w.de).toLowerCase())).map((w, k) => ({
-      id: "v" + hkey(c.id + w.de), t: "vocab", lemma: lemmaOf(w.de), f: w.de, x: [w.vi, w.pl && `Pl. ${w.pl}`, w.ex && `„${w.ex}“`].filter(Boolean).join("\n"),
-      tags: ["Vokabel", c.fach], st: "on", at: now + k,
-      // đã học trong phiên: vào hàng ôn từ mai (từ "chưa nhớ" cũng vậy, SRS sẽ kéo lại nếu quên)
-      c: { ...newCard(now), state: "review", ivl: 1, reps: 1, last: now, due: now + DAY } }));
-    if (DB && add.length) getCards(c.id).then(() => putCards(c.id, [...S.cards[c.id], ...add]));
+    // kết quả phiên học quyết định lịch SRS: nhớ ngay lần đầu → ôn lại ngày mai;
+    // "chưa nhớ" → đang học lại, gặp lại sau ~10 phút ở tab Ôn thẻ (rồi theo SM-2 như mọi thẻ)
+    const now = Date.now(), sched = (k) => wrong.has(k)
+      ? { ...newCard(now), state: "learning", step: 1, reps: 1, last: now, due: now + 10 * MIN }
+      : { ...newCard(now), state: "review", ivl: 1, reps: 1, last: now, due: now + DAY };
+    const add = V.list.map((w, k) => [w, k]);
+    let nAdd = 0;
+    if (DB) getCards(c.id).then(() => {
+      const list = [...S.cards[c.id]], idx = new Map(list.map((x, j) => [x.t === "vocab" ? (x.lemma || "").toLowerCase() : null, j]));
+      for (const [w, k] of add) {
+        const j = idx.get(lemmaOf(w.de).toLowerCase());
+        if (j == null) { list.push({ id: "v" + hkey(c.id + w.de), t: "vocab", lemma: lemmaOf(w.de), f: w.de, x: [w.vi, w.pl && `Pl. ${w.pl}`, w.ex && `„${w.ex}“`].filter(Boolean).join("\n"), tags: ["Vokabel", c.fach], st: "on", at: now + k, c: sched(k) }); nAdd++; }
+        else if (wrong.has(k)) list[j] = { ...list[j], c: { ...list[j].c, state: "relearning", step: 0, due: now + 10 * MIN } };   // ôn lại mà vẫn quên: kéo về hàng ôn hôm nay
+      }
+      putCards(c.id, list);
+    });
     R.voc = { ...V, done: V.done || now }; if (DB) save("voc/" + c.id, R.voc);
     const td = S.days[key(today0())] || {}; putDay({ amin: Math.round(((td.amin || 0) + (now - t0) / MIN) * 10) / 10 });
     $("#vdc", bg).innerHTML = `<div class="done-box" style="margin:12px 0"><span class="burst pop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
-      <b>Xong ${V.list.length} từ${wrong.size ? ` · ${wrong.size} từ phải học lại` : ""}</b><span class="small muted">${add.length ? `Đã thêm ${add.length} thẻ từ vựng, ôn lại từ mai.` : ""}</span>
+      <b>Xong ${V.list.length} từ${wrong.size ? ` · ${wrong.size} từ phải học lại` : ""}</b><span class="small muted">${V.done ? "Đã cập nhật lịch ôn của các từ." : `Các từ đã thành thẻ ở tab Ôn thẻ: từ nhớ ngay → ôn lại ngày mai${wrong.size ? `, ${wrong.size} từ chưa nhớ → gặp lại sau ~10 phút` : ""}.`}</span>
       <button class="btn primary" id="vread">Bước 2: Đọc bài</button></div>`;
     $("#vdbar", bg).style.width = "100%"; $("#vdn", bg).textContent = `${V.list.length}/${V.list.length}`;
     $("#vread", bg).onclick = () => { bg.remove(); vocBox(c); glossify(); $("#doc")?.scrollIntoView({ block: "start" }); };
@@ -1309,12 +1318,13 @@ function cardHTML(card, back) {
 }
 
 /* hàng ôn hôm nay: thẻ ôn/đang học đến hạn trong ngày + thẻ mới trong giới hạn ngày */
-function queue() {
+let REVMODE = store.get("m2.revmode") === "vocab" ? "vocab" : "all";   // tab Ôn thẻ: tất cả / chỉ từ vựng
+function queue(mode = "all") {
   const td = S.days[key(today0())] || {}, eod = addDays(today0(), 1).getTime();
   let nv = NEW_PER_DAY.vocab - (td.nv || 0), nw = NEW_PER_DAY.other - (td.nw || 0);
   const rev = [], fresh = [];
   for (const ch of S.dueChs) for (const c of S.cards[ch] || []) {
-    if (c.st !== "on" || !unlocked(c, ch)) continue;
+    if (c.st !== "on" || !unlocked(c, ch) || (mode === "vocab" && c.t !== "vocab")) continue;
     if (c.c.state === "new") fresh.push([ch, c]); else if (c.c.due <= eod) rev.push([ch, c]);
   }
   rev.sort((a, b) => a[1].c.due - b[1].c.due);
@@ -1332,7 +1342,7 @@ function lockedCount() {
 }
 const dueCount = () => { const q = queue(); return q.rev.length + q.fresh.length; };
 function nextCard() {
-  const now = Date.now(), q = queue();
+  const now = Date.now(), q = queue(REVMODE);
   return q.rev.find(([, c]) => c.c.due <= now) || q.fresh[0] || q.rev.find(([, c]) => c.c.due <= now + 20 * MIN) || null;
 }
 const secPerReview = () => { const D = Object.values(S.days), n = D.reduce((a, d) => a + (d.rv || 0), 0); return n >= 100 ? D.reduce((a, d) => a + (d.rvms || 0), 0) / n / 1000 : 10; };
@@ -1340,10 +1350,11 @@ const secPerReview = () => { const D = Object.values(S.days), n = D.reduce((a, d
 /* ---------- tab Ôn thẻ ---------- */
 let JUMP = null, APKG_MSG = "";   // APKG_MSG: kết quả nhập/xuất gần nhất, giữ qua các lần vẽ lại   // {ch, b, v}: thẻ bấm "mở đoạn gốc" → trang đọc cuộn tới đó
 function viewReview() {
-  const q = queue(), td = S.days[key(today0())] || {};
+  const q = queue(REVMODE), td = S.days[key(today0())] || {};
   const drafts = Object.entries(S.kap).filter(([, k]) => k.nd > 0);
   $("#app").innerHTML = `<div class="wrap">
-    <h1 style="font-size:26px">Ôn thẻ</h1>
+    <div class="row" style="justify-content:space-between"><h1 style="font-size:26px">Ôn thẻ</h1>
+      <div class="seg" style="padding:0;margin:0;max-width:260px" role="tablist" aria-label="Loại thẻ">${[["all", "Tất cả"], ["vocab", "Chỉ từ vựng"]].map(([v, l]) => `<button role="tab" data-rm="${v}" aria-selected="${REVMODE === v}">${l}</button>`).join("")}</div></div>
     <div class="stats card"><div><span class="kind">Đến hạn</span><b>${q.rev.length}</b></div><div><span class="kind">Mới hôm nay</span><b>${q.fresh.length}</b></div><div><span class="kind">Đã ôn hôm nay</span><b>${td.rv || 0}</b></div></div>
     ${(() => { const L = lockedCount(); return L ? `<p class="note small">Đang có <b>${L}</b> thẻ chờ mở khoá: thẻ của chương nào sẽ vào hàng ôn khi Vy bấm "Đọc xong chương" ở chương đó (thẻ chung của Tag mở khi xong cả Tag).</p>` : ""; })()}
     <section class="card" id="rv"></section>
@@ -1357,6 +1368,7 @@ function viewReview() {
       <p class="small muted" id="apkgst">${APKG_MSG ? esc(APKG_MSG) : `Thẻ từ vựng: chạm đúp vào một từ trong bài đọc. Thẻ kiến thức: Claude soạn khi Vy bấm "Đọc xong chương". Giới hạn ${NEW_PER_DAY.vocab} thẻ từ vựng mới và ${NEW_PER_DAY.other} thẻ kiến thức mới mỗi ngày.`}</p>
     </section>
   </div>`;
+  for (const b of document.querySelectorAll("[data-rm]")) b.onclick = () => { REVMODE = b.dataset.rm; store.set("m2.revmode", REVMODE); viewReview(); };
   showNextCard();
   drawDecks();
   $("#addfall").onclick = fallSheet;
@@ -1373,7 +1385,7 @@ function showNextCard() {
   if (revKeys) { removeEventListener("keydown", revKeys); revKeys = null; }
   const nx = nextCard();
   if (!nx) {
-    const q = queue(), later = q.rev[0];
+    const q = queue(REVMODE), later = q.rev[0];
     box.innerHTML = `<p class="muted">${later ? `Thẻ tiếp theo đến hạn sau ${fmtIvl(later[1].c.due - Date.now())}.` : "Hết thẻ cho hôm nay."}</p>`;
     return;
   }
