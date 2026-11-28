@@ -134,7 +134,8 @@ article.doc ul, article.doc ol { padding-left: 1.3em; margin: 0 0 .9em; }
 article.doc li { margin: .2em 0; }
 article.doc .tbl { overflow-x: auto; margin: 0 0 1em; border: 1px solid var(--line); border-radius: 8px; }
 article.doc table { border-collapse: collapse; font-size: .86em; line-height: 1.45; min-width: 100%; }
-article.doc th, article.doc td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+article.doc th, article.doc td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; min-width: 9em; }
+article.doc td + td, article.doc th + th { border-left: 1px solid var(--line); }
 article.doc th { background: var(--accent-soft); font-weight: 600; }
 article.doc img { display: block; margin: 0 auto; border-radius: 6px; }
 article.doc figure { margin: 0 0 1em; }
@@ -1579,7 +1580,8 @@ route();
   if (!DB) { clearTimeout(timeout); S.off = true; rerender(); return; }
   let first = true; const got = new Set();
   const ready = (what) => {
-    if (!online) { online = true; S.off = false; clearTimeout(timeout); }
+    // trang đọc mở trước khi kho sẵn sàng thì mở lại khi kho đã kết nối
+    if (!online) { online = true; S.off = false; clearTimeout(timeout); if (document.body.classList.contains("reading")) route(); }
     got.add(what);
     // ghi mốc "sáng nay còn bao nhiêu" một lần mỗi ngày, khi đã có đủ dữ liệu
     const tk = key(today0());
