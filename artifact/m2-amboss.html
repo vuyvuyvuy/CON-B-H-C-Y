@@ -2,34 +2,38 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Lexend:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Nunito:wght@400;600;700;800&display=swap">
 <style>
-/* Bố cục: một cột đọc ~68 ký tự như trang sách, thanh tab dưới đáy trên điện thoại, trên cùng ở màn rộng.
-   Chữ bài đọc là serif Literata (làm cho đọc màn hình lâu), giao diện là Lexend (dễ đọc cho người đọc chậm). */
+/* Bố cục: một cột đọc ~68 ký tự như trang sách, thanh tab có icon dưới đáy trên điện thoại, trên cùng ở màn rộng.
+   Giao diện thân thiện: chữ Nunito bo tròn, xanh dịu + điểm hồng đào, góc bo lớn, bóng nhẹ. Bài đọc giữ Literata (đọc lâu không mỏi). */
 :root {
-  --bg: #f4f5f1;        /* giấy hơi xanh xám, đỡ chói hơn trắng */
+  --bg: #f5f7fc;        /* trắng ngả xanh rất nhẹ */
   --panel: #ffffff;
-  --line: #dfe2da;
-  --fg: #1d2320;
-  --muted: #5f6a64;
-  --accent: #3550c8;    /* mực xanh bút bi */
-  --accent-soft: #e3e8fb;
-  --ok: #2f7d4f;
-  --hard: rgba(235, 87, 110, .28);    /* đánh dấu "khó" */
-  --again: rgba(240, 180, 40, .36);   /* đánh dấu "đọc lại" */
+  --line: #e3e8f2;
+  --fg: #243049;        /* mực xanh than, dịu hơn đen */
+  --muted: #687389;
+  --accent: #4f68e8;    /* xanh dừa cạn */
+  --accent-soft: #ebefff;
+  --on-accent: #ffffff;
+  --peach: #e8795a;     /* điểm nhấn ấm: chuỗi ngày, mục đã xong */
+  --peach-soft: #fff0ea;
+  --ok: #23946f;
+  --shadow: 0 1px 2px rgba(36, 48, 73, .04), 0 4px 14px rgba(36, 48, 73, .05);
+  --hard: rgba(235, 87, 110, .26);    /* đánh dấu "khó" */
+  --again: rgba(240, 180, 40, .34);   /* đánh dấu "đọc lại" */
   --font-read: "Literata", Georgia, "Times New Roman", serif;
-  --font-ui: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   --fs: 19px;
-  --r: 12px;
+  --r: 18px;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #141716; --panel: #1c201e; --line: #2c322f; --fg: #e2e6e1; --muted: #9aa59f;
-  --accent: #93a6ff; --accent-soft: #252c48; --ok: #6cc893;
-  --hard: rgba(255, 110, 130, .30); --again: rgba(255, 200, 70, .28); color-scheme: dark; } }
+  --bg: #151a27; --panel: #1d2436; --line: #2d3652; --fg: #e7ebf5; --muted: #9ba4bb;
+  --accent: #93a5ff; --accent-soft: #283158; --on-accent: #151a27; --peach: #ffab8f; --peach-soft: #3b2a2c; --ok: #5fd3a6;
+  --shadow: none; --hard: rgba(255, 110, 130, .30); --again: rgba(255, 200, 70, .28); color-scheme: dark; } }
 :root[data-theme="dark"] {
-  --bg: #141716; --panel: #1c201e; --line: #2c322f; --fg: #e2e6e1; --muted: #9aa59f;
-  --accent: #93a6ff; --accent-soft: #252c48; --ok: #6cc893;
-  --hard: rgba(255, 110, 130, .30); --again: rgba(255, 200, 70, .28); color-scheme: dark; }
+  --bg: #151a27; --panel: #1d2436; --line: #2d3652; --fg: #e7ebf5; --muted: #9ba4bb;
+  --accent: #93a5ff; --accent-soft: #283158; --on-accent: #151a27; --peach: #ffab8f; --peach-soft: #3b2a2c; --ok: #5fd3a6;
+  --shadow: none; --hard: rgba(255, 110, 130, .30); --again: rgba(255, 200, 70, .28); color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { background: var(--bg); color: var(--fg); }
 body { font: 15px/1.5 var(--font-ui); padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
@@ -37,28 +41,32 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2; font-weight: 600; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2; font-weight: 800; letter-spacing: -.01em; }
 .wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px; display: grid; gap: 18px; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 .num { font-variant-numeric: tabular-nums; }
 .btn { text-decoration: none; text-align: center; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 8px 14px; min-height: 40px; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+.btn { font-weight: 600; transition: transform .08s, background .15s; }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
 .btn[aria-pressed=true] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .btn:disabled { opacity: .5; cursor: default; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 12px; box-shadow: var(--shadow); }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
 .bar.ok i { background: var(--ok); }
-input[type=number], input[type=date], select, textarea { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 40px; }
+input[type=number], input[type=date], select, textarea { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; min-height: 40px; }
 label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
 
 /* thanh tab */
 nav.tabs { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 4px;
   background: var(--panel); border-top: 1px solid var(--line);
   padding: 6px max(16px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
-nav.tabs a { flex: 1; max-width: 160px; text-align: center; padding: 8px; border-radius: 10px; color: var(--muted); text-decoration: none; font-weight: 500; }
+nav.tabs a { flex: 1; max-width: 160px; display: grid; justify-items: center; gap: 2px; text-align: center; padding: 6px 4px; border-radius: 14px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 12px; }
+nav.tabs a svg { width: 22px; height: 22px; }
+@media (min-width: 900px) { nav.tabs a { display: flex; gap: 6px; justify-content: center; align-items: center; font-size: 14px; padding: 8px; } nav.tabs a svg { width: 18px; height: 18px; } }
 nav.tabs a[aria-current=page] { color: var(--accent); background: var(--accent-soft); }
 @media (min-width: 900px) {
   body { padding-bottom: 0; }
@@ -71,7 +79,7 @@ body.reading { padding-bottom: 0; }
 .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .mins { display: flex; gap: 6px; flex-wrap: wrap; }
 .mins button { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 14px; min-height: 40px; font-variant-numeric: tabular-nums; }
-.mins button[aria-pressed=true] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.mins button[aria-pressed=true] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .mins input { width: 90px; }
 ol.agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 ol.agenda li { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 12px; border-radius: 10px; background: var(--bg); }
@@ -172,7 +180,7 @@ body.focus .rhead { display: none; }
 .preview article.doc { padding-top: 12px; font-size: 16px; }
 
 /* Ôn thẻ */
-.chip { justify-self: start; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.chip { justify-self: start; font-size: 13px; padding: 4px 12px; border-radius: 999px; background: var(--peach-soft); color: var(--peach); font-weight: 700; }
 .cardface { touch-action: manipulation; font: 20px/1.6 var(--font-read); padding: 12px 4px; min-height: 120px; overflow-wrap: break-word; }
 .cardface .cz { color: var(--accent); font-weight: 700; }
 .cardface img { display: block; max-width: 100%; height: auto; margin: 8px auto; border-radius: 6px; }
@@ -201,7 +209,7 @@ article.doc { touch-action: manipulation; }
 .chead { display: flex; gap: 8px; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 #clog { flex: 1; overflow-y: auto; display: grid; align-content: start; gap: 10px; padding: 10px 0; }
 .msg { max-width: 92%; padding: 8px 12px; border-radius: 12px; font-size: 15px; }
-.msg.u { justify-self: end; background: var(--accent); color: var(--bg); white-space: pre-wrap; }
+.msg.u { justify-self: end; background: var(--accent); color: var(--on-accent); white-space: pre-wrap; }
 .msg.a { justify-self: start; background: var(--bg); display: grid; gap: 6px; }
 .msg.a .doc { font: 15px/1.55 var(--font-ui); }
 .msg.a .doc p, .msg.a .doc ul, .msg.a .doc ol { margin: 0 0 .5em; } .msg.a .doc h3, .msg.a .doc h4 { font-size: 15px; margin: .6em 0 .3em; }
@@ -271,6 +279,22 @@ ul.fachs .bar { grid-column: 1 / -1; }
 @media (max-width: 480px) { nav.tabs a { font-size: 12px; padding: 8px 2px; } }
 #toast.cheer { background: var(--ok); }
 
+/* đồng hồ học + thẻ nhẹ */
+.card.soft { background: var(--accent-soft); border-color: transparent; box-shadow: none; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.acts .btn { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+a.btn { color: var(--fg); display: inline-flex; align-items: center; justify-content: center; }
+a.btn.primary { color: var(--on-accent); }
+#tpill { position: fixed; z-index: 21; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 14px; box-shadow: var(--shadow); }
+#tpill.on { background: var(--peach-soft); color: var(--peach); border-color: transparent; }
+#tpill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--peach); animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+@media (min-width: 900px) { #tpill { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); } }
+body.reading #tpill { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+body.focus #tpill { display: none; }
+@media (prefers-reduced-motion: reduce) { #tpill .dot { animation: none; } }
+
 #toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 60; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; max-width: calc(100% - 32px); font-size: 14px; }
 .burst { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--ok); color: var(--bg); }
 .burst svg { width: 28px; height: 28px; }
@@ -282,11 +306,11 @@ ul.fachs .bar { grid-column: 1 / -1; }
 </style>
 
 <nav class="tabs" id="tabs">
-  <a href="#today" data-v="today">Hôm nay</a>
-  <a href="#plan" data-v="plan">Lộ trình</a>
-  <a href="#on" data-v="on">Ôn thẻ</a>
-  <a href="#tien-do" data-v="tien-do">Tiến độ</a>
-  <a href="#cai-dat" data-v="cai-dat">Cài đặt</a>
+  <a href="#today" data-v="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Hôm nay</span></a>
+  <a href="#plan" data-v="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg><span>Lộ trình</span></a>
+  <a href="#on" data-v="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="14" rx="3"/><path d="M7 3h11a3 3 0 0 1 3 3v11"/></svg><span>Ôn thẻ</span></a>
+  <a href="#tien-do" data-v="tien-do"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Tiến độ</span></a>
+  <a href="#cai-dat" data-v="cai-dat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Cài đặt</span></a>
 </nav>
 <main id="app"><div class="wrap"><p class="muted">Đang mở lộ trình…</p></div></main>
 <div id="toast" hidden></div>
@@ -428,7 +452,7 @@ function todayPlan(due = 0) {
     if (read < 5) break;
     const need = Math.max(5, Math.ceil(estMin(x.id) * (1 - (kap(x.id).pct || 0))));
     const m = Math.min(read, need);
-    items.push({ tk: "ch:" + x.id, need, kind: kap(x.id).st === 0 ? "Chương mới · ① từ vựng → ② đọc" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
+    items.push({ tk: "ch:" + x.id, need, kind: kap(x.id).st === 0 ? "Chương mới" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `${kap(x.id).st === 0 ? "① từ vựng → ② đọc · " : ""}Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
     read -= m;
   }
   rem += read;
@@ -438,7 +462,7 @@ function todayPlan(due = 0) {
 }
 
 /* ---------- tick ngay trên danh sách Hôm nay: ghi thời gian tương đương, cán cân tự tính lại ---------- */
-const dayMin = (d) => (d.min || 0) + (d.kmin || 0) + (d.amin || 0);
+const dayMin = (d) => (d.min || 0) + (d.kmin || 0) + (d.amin || 0) + (d.xmin || 0);
 function tick(it) {
   const td = S.days[key(today0())] || {}, rec = { k: it.tk, m: it.m, kind: it.kind, label: it.label };
   if (it.tk.startsWith("ch:")) {
@@ -493,10 +517,15 @@ function viewToday() {
   $("#app").innerHTML = `<div class="wrap">
     <header style="display:grid;gap:4px">
       <span class="eyebrow">${WD[new Date().getDay()]}, ${fmtD(new Date())}${p.restDay ? " · ngày ôn" : ""}</span>
-      <h1 style="font-size:26px">${p.restDay ? "Hôm nay chỉ ôn" : "Hôm nay học gì"}</h1>
+      <h1 style="font-size:28px">${(() => { const h = new Date().getHours(); return h < 11 ? "Chào buổi sáng, Vy" : h < 14 ? "Chào buổi trưa, Vy" : h < 18 ? "Chào buổi chiều, Vy" : "Chào buổi tối, Vy"; })()}</h1>
+      <span class="muted">${p.restDay ? "Hôm nay là ngày ôn: chỉ ôn thẻ và làm lại câu sai." : "Hôm nay học gì nè:"}</span>
       ${st ? `<span class="chip">Chuỗi ${st} ngày học</span>` : ""}
     </header>
     ${S.off ? `<p class="note small">Chưa kết nối được kho dữ liệu, tiến độ chưa được lưu.</p>` : ""}
+    ${!c.target && online ? `<form class="card soft" id="tgf"><span class="eyebrow">Vy thi M2 ngày nào?</span><div class="row"><input type="date" id="tgd" required aria-label="Ngày thi"><button class="btn primary" type="submit">Lưu</button></div><span class="small muted">Có ngày thi thì Cán cân mới báo được có kịp không.</span></form>` : ""}
+    ${!TM.get() && !S.askedNow ? `<section class="card soft" id="nowq"><span class="eyebrow">Bây giờ Vy định làm gì?</span><div class="acts">
+      <a class="btn" href="#plan">Đọc trong app</a><a class="btn" href="#on">Ôn thẻ</a>${ACTS.map((a) => `<button class="btn" data-now="${a.k}">${a.l}</button>`).join("")}</div>
+      <span class="small muted">Trong app thì app tự tính giờ; việc ở chỗ khác thì đồng hồ góc dưới sẽ đếm giờ thật.</span></section>` : ""}
     <section class="card">
       <span class="eyebrow">Mỗi ngày học</span>
       <div class="mins">${opts.map((m) => `<button data-m="${m}" aria-pressed="${c.perDay === m}">${m} phút</button>`).join("")}
@@ -537,6 +566,8 @@ function viewToday() {
       <p class="small muted">Ước ${Math.round(w.readMin / Math.max(1, w.left))}′ đọc/chương, ${w.perQ.toFixed(1)}′/câu kreuzen, mục tiêu ${c.kqTotal} câu, ${c.cpc} thẻ/chương × ~${w.perCard.toFixed(1)}′ ôn/thẻ; tự chỉnh theo số Vy ghi thật.</p>
     </section>
   </div>`;
+  if ($("#tgf")) $("#tgf").onsubmit = (e) => { e.preventDefault(); const v = $("#tgd").value; if (v) { putCfg({ target: v }); toast("Đã lưu ngày thi"); viewToday(); } };
+  if ($("#nowq")) { for (const a of document.querySelectorAll("#nowq a")) a.addEventListener("click", () => { S.askedNow = true; }); for (const b of document.querySelectorAll("[data-now]")) b.onclick = () => { S.askedNow = true; startTimer(b.dataset.now); viewToday(); }; }
   for (const b of document.querySelectorAll("[data-tk]")) b.onchange = () => { tick(p.items[+b.dataset.tk]); viewToday(); };
   for (const b of document.querySelectorAll("[data-un]")) b.onchange = () => { untick(+b.dataset.un); viewToday(); };
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
@@ -1985,11 +2016,66 @@ function viewStats() {
   </div>`;
 }
 
+/* ---------- đồng hồ học: đo thời gian thật cho việc làm ngoài app (kreuzen trên AMBOSS, đọc AMBOSS, Anki…) ----------
+   Đọc và ôn thẻ trong app thì app tự tính giờ. Đồng hồ chạy theo giờ thật (cả khi Vy rời sang app khác);
+   quay lại app thì hỏi lưu. Trạng thái đang chạy giữ trong máy (localStorage), phút đã lưu vào days/<ngày>. */
+const ACTS = [
+  { k: "kz", l: "Kreuzen trên AMBOSS", f: "kmin" },
+  { k: "rd", l: "Đọc bài trên AMBOSS", f: "min" },
+  { k: "an", l: "Ôn Anki ngoài app", f: "amin" },
+  { k: "x", l: "Học M2 việc khác", f: "xmin" },
+];
+const TM = { get: () => { try { return JSON.parse(store.get("m2.timer") || "null"); } catch { return null; } }, set: (v) => store.set("m2.timer", v ? JSON.stringify(v) : "") };
+const ICON_CLOCK = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>`;
+const mmss = (ms) => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`; };
+function drawTimer() {
+  let el = $("#tpill");
+  if (!el) { el = document.createElement("button"); el.id = "tpill"; el.onclick = timerSheet; document.body.appendChild(el); }
+  const t = TM.get();
+  el.classList.toggle("on", !!t);
+  el.innerHTML = t ? `<span class="dot"></span>${esc(ACTS.find((a) => a.k === t.a)?.l.split(" ")[0] || "")} · <span class="num">${mmss(Date.now() - t.t0)}</span>` : `${ICON_CLOCK}<span>Bấm giờ</span>`;
+  el.setAttribute("aria-label", t ? "Đồng hồ đang chạy, bấm để dừng" : "Bắt đầu bấm giờ");
+}
+function startTimer(a) { TM.set({ a, t0: Date.now() }); drawTimer(); toast("Bắt đầu tính giờ"); }
+function timerSheet() {
+  const t = TM.get();
+  if (!t) {
+    const bg = sheet(`<h2 style="font-size:20px">Vy sắp làm gì?</h2>
+      <p class="small muted">Đọc bài và ôn thẻ <b>trong app</b> thì app tự tính giờ, không cần bấm. Đồng hồ dành cho việc làm ở chỗ khác.</p>
+      <div class="acts">${ACTS.map((a) => `<button class="btn" data-a="${a.k}">${a.l}</button>`).join("")}</div>`);
+    for (const b of bg.querySelectorAll("[data-a]")) b.onclick = () => { bg.remove(); startTimer(b.dataset.a); };
+    return;
+  }
+  const act = ACTS.find((a) => a.k === t.a) || ACTS[3], mins = Math.max(1, Math.round((Date.now() - t.t0) / MIN));
+  const bg = sheet(`<h2 style="font-size:20px">${esc(act.l)}</h2>
+    <p class="small muted">Bắt đầu lúc ${new Date(t.t0).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}. Quên tắt thì sửa lại số phút cho đúng.</p>
+    <div class="row"><label class="f" for="tmin">Số phút<input type="number" id="tmin" min="1" max="600" value="${mins}" inputmode="numeric" style="width:110px"></label>
+      ${t.a === "kz" ? `<label class="f" for="tq">Số câu đã làm<input type="number" id="tq" min="0" max="500" placeholder="vd 40" inputmode="numeric" style="width:110px"></label>` : ""}</div>
+    <div class="row"><button class="btn primary" id="tsave">Lưu & dừng</button><button class="btn" id="tgo">Vẫn đang làm</button><button class="btn" id="tdrop">Bỏ, không lưu</button></div>`);
+  $("#tgo", bg).onclick = () => bg.remove();
+  $("#tdrop", bg).onclick = () => { TM.set(null); drawTimer(); bg.remove(); };
+  $("#tsave", bg).onclick = () => {
+    const m = Math.max(0, Math.min(600, Math.round(+$("#tmin", bg).value || 0))), q = Math.max(0, Math.round(+($("#tq", bg)?.value || 0)));
+    const d = S.days[key(today0())] || {};
+    putDay({ [act.f]: Math.round(((d[act.f] || 0) + m) * 10) / 10, ...(t.a === "kz" && q ? { kq: (d.kq || 0) + q } : {}) });
+    TM.set(null); drawTimer(); bg.remove(); toast(`Đã lưu ${m} phút: ${act.l}`, true);
+    if (location.hash === "" || location.hash === "#today") viewToday();
+  };
+}
+setInterval(() => { if (TM.get()) drawTimer(); }, 1000);
+// quay lại app khi đồng hồ đang chạy → hỏi lưu
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") hiddenAt = Date.now();
+  else if (TM.get() && hiddenAt && Date.now() - hiddenAt > MIN && !$(".sheet-bg")) timerSheet();
+});
+
 /* ---------- chung ---------- */
 let toastT = null;
 function toast(msg, cheer) { const t = $("#toast"); t.textContent = msg; t.hidden = false; t.classList.toggle("pop", !!cheer); t.classList.toggle("cheer", !!cheer); clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 3200); }
 
 addEventListener("hashchange", route);
+drawTimer();
 applyTheme();
 route();
 

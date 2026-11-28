@@ -121,7 +121,7 @@ Artifact riêng **M2 Lernplan**: `artifact/m2-amboss.html`, publish tại https:
 (riêng tư, capabilities `db` + `sample` + `downloads`). Không đụng Phòng Trực khi sửa khu này, và ngược lại.
 
 Kho db riêng:
-- `cfg/plan` {start, rest, perDay, target?, kqTotal, cpc}; `days/<YYYYMMDD>` {min, kq, kmin, amin, rv, rvms, nv, nw, ch, tk, r0}
+- `cfg/plan` {start, rest, perDay, target?, kqTotal, cpc}; `days/<YYYYMMDD>` {min, kq, kmin, amin, xmin, rv, rvms, nv, nw, ch, tk, r0}; đồng hồ học đang chạy giữ ở localStorage `m2.timer`
 - `kap/<id>` tiến độ chương (+ `nc`/`nd` số thẻ đang ôn/chờ duyệt); `txt/<id>-<k>` bài AMBOSS Vy dán; `easy/<id>` bài dễ hiểu; `mk/<id>` đánh dấu
 - `cards/<ch>` {ch, due, list} thẻ Anki theo chương (`<ch>~2` doc phụ khi đầy; `_d<Tag>` thẻ chung của Tag; `_fall`; `_apkg-<n>` ngoài lộ trình); `img/<khoá>` hình thẻ dùng chung, mỗi hình 1 lần (data URI, 600px ≤~30KB), `imgidx/main` danh sách khoá; `voc/<id>` từ vựng Bước 1 của chương (học trước khi đọc, gạch chân trong bài); `dict/<từ>`; `chat/<id>`
 - Nhập Ankiphil: gắn Tag theo tag `$Lernpläne::100-Tage::NNN`, chọn chương trong Tag theo tên (xem `bestInDay`)
