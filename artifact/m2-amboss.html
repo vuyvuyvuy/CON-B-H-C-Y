@@ -519,7 +519,7 @@ function viewToday() {
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
 }
-function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, extra: c.extra, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
+function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, extra: c.extra, imgv: S.cfg?.imgv, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
 function setMin(m) { putCfg({ perDay: m }); document.activeElement?.blur(); viewToday(); }
 
 /* ---------- Lộ trình ---------- */
@@ -1557,13 +1557,27 @@ async function importImages(ch, names, pk, st) {
     let b = files[z]; if (!b) continue;
     if (b[0] === 0x28 && b[1] === 0xb5 && b[2] === 0x2f && b[3] === 0xfd) b = fzstd.decompress(b);
     const ext = name.split(".").pop().toLowerCase().replace("jpg", "jpeg");
-    let url; try { url = await shrink(new Blob([b], { type: "image/" + ext }), 100e3, 900); } catch { continue; }
+    // kho có hạn: hình nhỏ (~25KB)
+    let url; try { url = await shrink(new Blob([b], { type: "image/" + ext }), 25e3, 600); } catch { continue; }
     if (size + url.length > 190e3) await flush();
     cur[name] = url; S.img[name] = url; size += url.length + name.length; n++;
   }
   await flush();
   putKap(ch, { img: docs });
   return n;
+}
+/* Một lần: xoá hình to (~46KB, cả mặt sau) của lần nhập đầu làm đầy kho; nhập lại sẽ lưu hình mặt trước, nhỏ */
+async function cleanBigImages() {
+  S.migrating = true;
+  const chs = Object.entries(S.kap).filter(([, k]) => k.img?.length);
+  let n = 0;
+  for (const [ch, k] of chs) {
+    for (const id of k.img) { try { await DB.doc("cimg/" + id).delete(); n++; } catch {} }
+    S.kap[ch] = { ...S.kap[ch], img: [] }; try { await DB.doc("kap/" + ch).set(S.kap[ch]); } catch {}
+    if (n % 50 < k.img.length) toast(`Đang dọn hình cũ để giải phóng bộ nhớ… ${n}`);
+  }
+  putCfg({ imgv: 2 });
+  if (n) toast(`Đã dọn ${n} ô hình cũ. Nhập lại file .apkg để có hình mặt trước (nhỏ gọn).`);
 }
 /* gắn ảnh vào <img data-k> trong el; tải các doc ảnh của chương khi cần */
 async function fillImgs(el, ch) {
@@ -1617,7 +1631,8 @@ async function importApkg(file) {
     let added = 0, mapped = 0, dupes = 0, done = 0, upd = 0, nimg = 0;
     // thẻ Anki dài (nhiều HTML): cắt bớt phần quá dài, chia doc theo dung lượng thật (doc ≤256KB, giữ ≤200KB)
     const cap = (h) => (h.length > 5000 ? esc(plain(h).slice(0, 3000)) + " …" : h);
-    const toCard = (n, keepImg) => { const f = keepImg ? n.f : noImgs(n.f), x = keepImg ? n.x : noImgs(n.x); return { id: "a" + n.nid, t: "apkg", h: 1, f: cap(f), x: cap(x), tags: n.tags.slice(0, 8), st: "on", c: newCard(now), at: now }; };
+    // chỉ giữ hình mặt trước (cần để trả lời); hình minh hoạ mặt sau bỏ cho đỡ tốn kho
+    const toCard = (n, keepImg) => { const f = keepImg ? n.f : noImgs(n.f), x = noImgs(n.x); return { id: "a" + n.nid, t: "apkg", h: 1, f: cap(f), x: cap(x), tags: n.tags.slice(0, 8), st: "on", c: newCard(now), at: now }; };
     const enc = new TextEncoder(), sz = (o) => enc.encode(JSON.stringify(o)).length, LIM = 200e3;
     const write = async (ch, list) => {
       const on = list.filter((x) => x.st === "on");
@@ -1634,12 +1649,12 @@ async function importApkg(file) {
       for (const n of ns) {
         if (ids.has("a" + n.nid)) {   // đã nhập trước đây (khi chưa có hình): cập nhật nội dung có hình, giữ tiến độ ôn
           const card = toCard(n, true);
-          lists.forEach((l, li) => l.forEach((x, xi) => { if (x.id === card.id && x.f + x.x !== card.f + card.x && /data-k=/.test(card.f + card.x)) { l[xi] = { ...x, f: card.f, x: card.x }; dirty.add(li); upd++; imgNames(card.f + card.x).forEach((m) => names.add(m)); } }));
+          lists.forEach((l, li) => l.forEach((x, xi) => { if (x.id === card.id && x.f + x.x !== card.f + card.x) { l[xi] = { ...x, f: card.f, x: card.x }; dirty.add(li); upd++; imgNames(card.f).forEach((m) => names.add(m)); } }));
           dupes++; continue;
         }
         if (seen.has("a" + n.nid) || mine.some((x) => similar(x.f, n.f))) { dupes++; continue; }   // chỉ bỏ thẻ trùng ý với thẻ Claude/Vy soạn
         const card = toCard(n, true), cs = sz(card) + 1;
-        imgNames(card.f + card.x).forEach((m) => names.add(m));
+        imgNames(card.f).forEach((m) => names.add(m));
         if (size + cs > LIM) { di++; docs[di] ||= `${ch}~${di + 1}`; lists[di] ||= []; list = lists[di]; size = sz(list); }   // doc đầy: sang doc phụ của cùng chương
         list.push(card); dirty.add(di); ids.add(card.id); size += cs; added++; mapped++;
       }
@@ -1657,7 +1672,10 @@ async function importApkg(file) {
     if (cur.length) await write("_apkg-" + k, cur);
     if (location.hash === "#on") viewReview();
     apkgSay(st, `Đã nhập ${added} thẻ: ${mapped} theo lộ trình (mở khi Vy đọc xong chương/Tag đó), ${added - mapped} ngoài lộ trình (bật ô bên dưới nếu muốn ôn); bỏ ${dupes} thẻ đã có${upd ? `, cập nhật hình cho ${upd} thẻ cũ` : ""}; lưu ${nimg} hình. Thẻ ngoài lộ trình không kèm hình.`);
-  } catch (e) { apkgSay(st, "Chưa nhập được: " + (e.message || e)); }
+  } catch (e) {
+    const full = e?.code === "resource_exhausted" || e?.code === "quota_exceeded" || /limit|quota|full/i.test(e?.message || "");
+    apkgSay(st, full ? "Kho dữ liệu của app đã đầy nên dừng nhập. Nhắn Claude để dọn bớt." : "Chưa nhập được: " + (e.message || e.code || e));
+  }
 }
 async function sha1int(s) { const h = new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(s))); return ((h[0] << 24) | (h[1] << 16) | (h[2] << 8) | h[3]) >>> 0; }
 async function buildApkg(cards) {
@@ -1774,6 +1792,7 @@ route();
     got.add(what);
     // ghi mốc "sáng nay còn bao nhiêu" một lần mỗi ngày, khi đã có đủ dữ liệu
     const tk = key(today0());
+    if (["kap", "cfg", "days"].every((g) => got.has(g)) && !S.cfg?.imgv && !S.migrating) cleanBigImages();
     if (["kap", "cfg", "days"].every((g) => got.has(g)) && S.days[tk]?.r0 == null && S.r0For !== tk) { S.r0For = tk; putDay({ r0: Math.round(workload().total) }); }
     rerender();
   };
