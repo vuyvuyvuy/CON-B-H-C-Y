@@ -392,7 +392,9 @@ function workload() {
   // shortcut: mỗi thẻ cần ~6 lượt ôn cả đời thẻ; thẻ đang có coi như đã đi nửa đường. Giây/lượt đo từ lượt ôn thật (mặc định 10 giây)
   const perCard = secPerReview() * 6 / 60, haveCards = Object.values(S.kap).reduce((a, k) => a + (k.nc || 0), 0);
   // phút ôn Anki Vy tick (ôn ngoài app) được trừ thẳng vào phần Anki còn lại
-  const ankiCards = left.length * c.cpc + haveCards, ankiMin = Math.max(0, (left.length * c.cpc + haveCards * 0.5) * perCard - D.reduce((a, d) => a + (d.amin || 0), 0));
+  // thẻ đang khoá (chương chưa đọc) = ôn trọn đời thẻ; thẻ đã mở coi như đi nửa đường; + thẻ sẽ thêm cho mỗi chương còn lại (từ vựng Bước 1, thẻ bổ sung)
+  const locked = lockedCount(), ankiCards = left.length * c.cpc + haveCards;
+  const ankiMin = Math.max(0, (left.length * c.cpc + locked + (haveCards - locked) * 0.5) * perCard - D.reduce((a, d) => a + (d.amin || 0), 0));
   const total = readMin + kzMin + ankiMin;
   // chia phút mỗi ngày theo tỉ lệ việc còn lại → đọc, kreuzen, Anki xong cùng lúc
   const share = total ? readMin / total : 1, shareA = total ? ankiMin / total : 0;
@@ -586,7 +588,7 @@ function viewSettings() {
       <label class="f" for="crest">Ngày chỉ ôn trong tuần<select id="crest">${WD.map((w, i) => `<option value="${i}" ${i === c.rest ? "selected" : ""}>${w}</option>`).join("")}</select></label>
       <label class="f" for="ctarget">Hạn muốn xong (ngày thi, tuỳ chọn)<input type="date" id="ctarget" value="${c.target ? iso(c.target) : ""}"></label>
       <label class="f" for="ckq">Mục tiêu tổng số câu kreuzen<input type="number" id="ckq" min="0" max="20000" step="50" value="${c.kqTotal}" required></label>
-      <label class="f" for="ccpc">Số thẻ Anki mỗi chương (kiến thức + từ vựng)<input type="number" id="ccpc" min="0" max="60" value="${c.cpc}" required></label>
+      <label class="f" for="ccpc">Thẻ thêm mỗi chương, ngoài Ankiphil (từ vựng Bước 1 + thẻ Claude bổ sung)<input type="number" id="ccpc" min="0" max="60" value="${c.cpc}" required></label>
       <p class="small muted">Số phút học mỗi ngày chỉnh ở tab Hôm nay. Cỡ chữ và sáng/tối chỉnh bằng nút Aa trong trang đọc.</p>
       <div class="row"><button class="btn primary" type="submit" ${online ? "" : "disabled"}>Lưu</button></div>
     </form>
@@ -954,11 +956,11 @@ function vocDrill(c) {
   };
   const next = () => { if (i < queue.length) return draw(); finish(); };
   const finish = () => {
-    // kết quả phiên học quyết định lịch SRS: nhớ ngay lần đầu → ôn lại ngày mai;
+    // kết quả phiên học quyết định lịch SRS: nhớ ngay lần đầu → ôn lại sau 3 ngày (đỡ dồn ~20 từ/chương);
     // "chưa nhớ" → đang học lại, gặp lại sau ~10 phút ở tab Ôn thẻ (rồi theo SM-2 như mọi thẻ)
     const now = Date.now(), sched = (k) => wrong.has(k)
       ? { ...newCard(now), state: "learning", step: 1, reps: 1, last: now, due: now + 10 * MIN }
-      : { ...newCard(now), state: "review", ivl: 1, reps: 1, last: now, due: now + DAY };
+      : { ...newCard(now), state: "review", ivl: 3, reps: 1, last: now, due: now + 3 * DAY };
     const add = V.list.map((w, k) => [w, k]);
     let nAdd = 0;
     if (DB) getCards(c.id).then(() => {
@@ -973,7 +975,7 @@ function vocDrill(c) {
     R.voc = { ...V, done: V.done || now }; if (DB) save("voc/" + c.id, R.voc);
     const td = S.days[key(today0())] || {}; putDay({ amin: Math.round(((td.amin || 0) + (now - t0) / MIN) * 10) / 10 });
     $("#vdc", bg).innerHTML = `<div class="done-box" style="margin:12px 0"><span class="burst pop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
-      <b>Xong ${V.list.length} từ${wrong.size ? ` · ${wrong.size} từ phải học lại` : ""}</b><span class="small muted">${V.done ? "Đã cập nhật lịch ôn của các từ." : `Các từ đã thành thẻ ở tab Ôn thẻ: từ nhớ ngay → ôn lại ngày mai${wrong.size ? `, ${wrong.size} từ chưa nhớ → gặp lại sau ~10 phút` : ""}.`}</span>
+      <b>Xong ${V.list.length} từ${wrong.size ? ` · ${wrong.size} từ phải học lại` : ""}</b><span class="small muted">${V.done ? "Đã cập nhật lịch ôn của các từ." : `Các từ đã thành thẻ ở tab Ôn thẻ: từ nhớ ngay → ôn lại sau 3 ngày${wrong.size ? `, ${wrong.size} từ chưa nhớ → gặp lại sau ~10 phút` : ""}.`}</span>
       <button class="btn primary" id="vread">Bước 2: Đọc bài</button></div>`;
     $("#vdbar", bg).style.width = "100%"; $("#vdn", bg).textContent = `${V.list.length}/${V.list.length}`;
     $("#vread", bg).onclick = () => { bg.remove(); vocBox(c); glossify(); $("#doc")?.scrollIntoView({ block: "start" }); };
@@ -1329,7 +1331,9 @@ function queue(mode = "all") {
   }
   rev.sort((a, b) => a[1].c.due - b[1].c.due);
   fresh.sort((a, b) => a[1].at - b[1].at);
-  return { rev, fresh: fresh.filter(([, c]) => (c.t === "vocab" ? nv-- > 0 : nw-- > 0)) };
+  // thẻ của chương vừa đọc xong hôm nay học luôn (nhớ lâu nhất khi học ngay sau khi đọc), không bị giới hạn 30 thẻ mới/ngày
+  const fresh2 = new Set(td.ch || []);
+  return { rev, fresh: fresh.filter(([ch, c]) => fresh2.has(base(ch)) || (c.t === "vocab" ? nv-- > 0 : nw-- > 0)) };
 }
 // số thẻ đã nhập nhưng chưa mở (chương chưa đọc xong) — đếm từ kap.nc, không cần tải thẻ
 function lockedCount() {
@@ -1983,9 +1987,11 @@ route();
     rerender();
   };
   const fail = (e) => { clearTimeout(timeout); toast("Kho dữ liệu lỗi: " + (e.message || e.code)); };
-  DB.collection("kap").limit(1000).onSnapshot((snap) => {
+  // kap có thể vượt 1000 doc (854 chương + doc phụ/ngăn thẻ) — mỗi truy vấn tối đa 1000, nên tách theo trạng thái st
+  const kapGot = new Set();
+  for (const st of [0, 1, 2]) DB.collection("kap").where("st", "==", st).limit(1000).onSnapshot((snap) => {
     for (const d of snap.docs) if (d.id !== R.id) S.kap[d.id] = d.data();   // chương đang mở: bản trong trang là mới nhất
-    if (!snap.metadata.fromCache || first) { first = false; ready("kap"); }
+    if (!snap.metadata.fromCache || first) { kapGot.add(st); if (kapGot.size === 3) { first = false; ready("kap"); } }
   }, fail);
   DB.doc("cfg/plan").onSnapshot((d) => { S.cfg = d.exists ? d.data() : null; ready("cfg"); }, fail);
   DB.collection("days").limit(1000).onSnapshot((snap) => { for (const d of snap.docs) S.days[d.id] = d.data(); ready("days"); }, fail);
