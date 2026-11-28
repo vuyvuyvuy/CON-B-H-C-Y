@@ -213,6 +213,25 @@ article.doc { touch-action: manipulation; }
 #cform { display: flex; gap: 6px; align-items: end; }
 #cform textarea { flex: 1; min-width: 0; resize: none; }
 
+/* Bước 1: từ vựng trước khi đọc */
+.vocwrap { max-width: 68ch; margin: 0 auto; padding: 16px max(18px, env(safe-area-inset-right, 0px)) 0 max(18px, env(safe-area-inset-left, 0px)); }
+.vocwrap:empty { display: none; }
+.vocb { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--r); padding: 12px 14px; display: grid; gap: 10px; }
+.vocb > summary { list-style: none; cursor: pointer; }
+.vocb > summary::-webkit-details-marker { display: none; }
+.vocb[open] { gap: 10px; }
+.vh { display: grid; gap: 2px; }
+.vchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.vchip { font: 14px var(--font-read); padding: 3px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.vchip.hard { border-color: var(--accent); }
+.vcard { min-height: 170px; display: grid; align-content: center; justify-items: center; gap: 8px; text-align: center; padding: 12px 0; }
+.vde { font: 600 28px/1.3 var(--font-read); }
+.vvi { font-size: 20px; font-weight: 500; color: var(--accent); }
+.vex { font: italic 16px/1.5 var(--font-read); color: var(--muted); max-width: 46ch; }
+.gl { border-bottom: 2px dotted var(--accent); cursor: pointer; }
+#gtip { position: fixed; z-index: 45; max-width: min(320px, calc(100vw - 16px)); background: var(--fg); color: var(--bg); padding: 8px 12px; border-radius: 10px; font-size: 15px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+#gtip [class^="art-"] { filter: brightness(1.6); }
+
 /* Cây bộ thẻ */
 .deckhead, details.deck > summary { display: grid; grid-template-columns: 1fr 56px 64px; gap: 8px; align-items: center; }
 .deckhead .kind { text-align: right; }
@@ -287,6 +306,7 @@ ul.fachs .bar { grid-column: 1 / -1; }
 /*   days/<YYYYMMDD>   {min, ch:[id], kq, kmin, r0, rv, rvms, nv, nw}  r0 = khối lượng còn lúc mở app sáng nay (phút) */
 /*   cards/<ch>        {ch, due, list:[thẻ]}  thẻ Anki theo chương (xem phần SRS)  */
 /*   img/<khoá>        {n: tên file, d: data URI} hình thẻ Anki, mỗi hình 1 lần; imgidx/main {k:[khoá]} */
+/*   voc/<id>          {list:[{de,pl,vi,ex,hard}], done} từ vựng Bước 1 của chương
 /*   dict/<từ>         nghĩa từ đã tra;  chat/<id> {msgs}  lịch sử chat theo chương */
 /* Kho này tách hẳn khỏi Phòng Trực (Artifact khác, kho khác).          */
 /* ------------------------------------------------------------------ */
@@ -405,7 +425,7 @@ function todayPlan(due = 0) {
     if (read < 5) break;
     const need = Math.max(5, Math.ceil(estMin(x.id) * (1 - (kap(x.id).pct || 0))));
     const m = Math.min(read, need);
-    items.push({ tk: "ch:" + x.id, need, kind: kap(x.id).st === 0 ? "Chương mới" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
+    items.push({ tk: "ch:" + x.id, need, kind: kap(x.id).st === 0 ? "Chương mới · ① từ vựng → ② đọc" : "Đọc tiếp", m, id: x.id, label: x.t, sub: `Tag ${x.tag} · ${x.sub}${m < need ? ` · đọc ${m}′, còn ${need - m}′ để mai` : ""}` });
     read -= m;
   }
   rem += read;
@@ -699,7 +719,7 @@ var R = { id: null, blocks: [], easy: [], view: store.get("m2.view") === "a" ? "
 async function openReader(id) {
   const c = BY[id];
   if (!c) { location.hash = "#plan"; return; }
-  R.id = id; R.blocks = []; R.easy = []; R.marks = [];
+  R.id = id; R.blocks = []; R.easy = []; R.marks = []; R.voc = null;
   const next = CH[c.i + 1];
   $("#app").innerHTML = `
     <div class="rhead"><div class="in">
@@ -710,6 +730,7 @@ async function openReader(id) {
       <button class="ib" id="chatb" aria-label="Hỏi Claude về chương này">Hỏi</button>
       <button class="ib" id="more" aria-label="Soạn lại / thay nội dung">⋯</button>
     </div><div class="seg" role="tablist" aria-label="Bản đọc"><button role="tab" data-v="e">Dễ hiểu (Claude soạn)</button><button role="tab" data-v="a">AMBOSS</button></div><div class="rprog"><i id="rp"></i></div></div>
+    <div id="vocbox" class="vocwrap"></div>
     <div id="rbody"><p class="wrap muted">Đang tải chương…</p></div>
     <button class="btn" id="unfocus" hidden>Thoát tập trung</button>
     <aside id="chat" hidden aria-label="Hỏi Claude"><div class="chead"><b>Hỏi Claude</b><span class="small muted" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.t)}</span><button class="ib" id="cclose" aria-label="Đóng">✕</button></div>
@@ -736,11 +757,15 @@ async function openReader(id) {
   for (const b of document.querySelectorAll(".seg button")) b.onclick = () => { if (R.view === b.dataset.v) return; R.view = b.dataset.v; store.set("m2.view", R.view); if (stopTrack) { stopTrack(); stopTrack = null; } showView(c, next); };
   if (!DB) { $("#rbody").innerHTML = `<p class="wrap muted">Chưa kết nối được kho dữ liệu nên chưa mở được nội dung chương.</p>`; return; }
   try {
-    const [blocks, mk, ez] = await Promise.all([loadText(id), DB.doc("mk/" + id).get(), DB.doc("easy/" + id).get()]);
+    const [blocks, mk, ez, vc] = await Promise.all([loadText(id), DB.doc("mk/" + id).get(), DB.doc("easy/" + id).get(), DB.doc("voc/" + id).get()]);
+    R.voc = vc.exists ? vc.data() : null;
     if (R.id !== id) return;
     R.blocks = blocks; R.marks = mk.exists ? (mk.data().list || []).map((m) => ({ ...m })) : []; R.easy = ez.exists ? (ez.data().blocks || []) : []; R.easySrc = ez.exists ? ez.data().src : null;
   } catch (e) { $("#rbody").innerHTML = `<p class="wrap muted">Không tải được chương: ${esc(e.message || e.code)}</p>`; return; }
   if (JUMP?.ch === id) R.view = JUMP.v;
+  vocBox(c);
+  // chương chưa đọc xong mà chưa có từ vựng: Claude chọn luôn
+  if (!R.voc && kap(id).st !== 2) genVoc(c);
   showView(c, next);
 }
 function showView(c, next) {
@@ -764,7 +789,10 @@ function renderDoc(c, next) {
       ${next ? `<a class="btn" href="${readHref(next.id)}">Chương sau: ${esc(next.t)}</a>` : ""}</div>`;
   const doc = $("#doc");
   for (const m of R.marks) if ((m.v || "a") === R.view) paintMark(m);
+  glossify();
   doc.addEventListener("click", (e) => {
+    $("#gtip")?.remove();
+    const gl = e.target.closest(".gl"); if (gl && getSelection().isCollapsed) return glossTip(gl);
     const mk = e.target.closest("mark.hl"); if (mk && getSelection().isCollapsed) return markSheet(R.marks.find((m) => m.id === mk.dataset.m));
     const miss = e.target.closest("figure[data-miss]"); if (miss) return replaceImg(+miss.closest(".blk").dataset.b);
   });
@@ -852,6 +880,140 @@ async function runGen(c) {
     putKap(c.id, { gen: Date.now() });
     if (R.id === c.id) { genBox(c); toast(got.length ? `Claude soạn ${got.length} thẻ, chờ Vy duyệt` : "Không có thẻ mới"); }
   } catch (e) { if (R.id === c.id) { box.innerHTML = `<span class="small muted">${esc(aiErr(e))}</span>`; const b = document.createElement("button"); b.className = "btn"; b.textContent = "Thử lại"; b.onclick = () => runGen(c); box.append(b); } }
+}
+
+/* ---------- Bước 1: từ vựng của bài trước khi đọc (như TestAS Deathmatch) ----------
+   voc/<id> {list:[{de, pl, vi, ex, hard}], at, done}; học xong → thẻ từ vựng của chương (ôn lại từ mai),
+   trong bài các từ này được gạch chân, chạm 1 lần hiện nghĩa. */
+const VOC_PROMPT = (c, text) => `Chương AMBOSS "${c.t}" (${c.fach} › ${c.sub}). Người học: sinh viên y người Việt đọc tiếng Đức còn chậm, sắp đọc chương này.
+Chọn 15–30 từ/cụm từ tiếng Đức QUAN TRỌNG NHẤT cần biết trước để hiểu chương:
+- thuật ngữ y khoa trung tâm của chương (bệnh, triệu chứng, xét nghiệm, thuốc, cấu trúc giải phẫu);
+- từ tiếng Đức học thuật/y khoa hay gặp trong bài mà người đọc chậm dễ vấp (vd. "die Ursache", "auslösen", "die Untersuchung").
+Bỏ từ quá cơ bản (und, haben, groß…) và từ giống hệt tiếng Anh/Latin dễ đoán.
+Danh từ ghi kèm der/die/das ở số ít; động từ để nguyên mẫu; lấy đúng từ xuất hiện trong bài khi có thể. Xếp theo thứ tự gặp trong bài.
+Trả về CHỈ một mảng JSON, mỗi phần tử: {"de":"die Lungenembolie","pl":"die Lungenembolien","vi":"thuyên tắc phổi","ex":"câu ví dụ ngắn tiếng Đức (lấy từ bài nếu có)","hard":true}
+"pl" để rỗng nếu không phải danh từ; "hard": true cho từ khó/dài.
+${text ? `\nNội dung chương:\n${text}` : `\nChưa có nội dung chương: chọn theo kiến thức chuẩn về chủ đề này trong AMBOSS.`}`;
+const lemmaOf = (de) => de.replace(/^\s*(der|die|das)\s+/i, "").replace(/\s*\(.*?\)/g, "").trim();
+const artHTML = (de) => { const m = de.match(/^\s*(der|die|das)\s+(.*)$/i); return m ? `<span class="art-${m[1].toLowerCase()}">${esc(m[1])}</span> ${esc(m[2])}` : esc(de); };
+function vocBox(c) {
+  const el = $("#vocbox"); if (!el) return;
+  const V = R.voc;
+  if (!V?.list?.length) {
+    el.innerHTML = `<div class="vocb"><div class="vh"><span class="eyebrow">Bước 1 · Từ vựng của bài</span><span class="small muted" id="vocst">Học các từ quan trọng trước, đọc sẽ nhanh hơn.</span></div>
+      <div class="row"><button class="btn primary" id="vocgen" ${DB ? "" : "disabled"}>Chọn từ vựng cho bài</button></div></div>`;
+    $("#vocgen").onclick = () => genVoc(c);
+    return;
+  }
+  const done = !!V.done;
+  el.innerHTML = `<details class="vocb" ${done ? "" : "open"}><summary class="vh"><span class="eyebrow">${done ? "✓ Bước 1 xong" : "Bước 1"} · Từ vựng (${V.list.length} từ)</span>
+      <span class="small muted">${done ? "Bước 2: đọc bài bên dưới. Từ đã học được gạch chân, chạm để xem nghĩa." : "Học xong rồi đọc bài bên dưới."}</span></summary>
+    <div class="vchips">${V.list.map((w) => `<span class="vchip${w.hard ? " hard" : ""}" title="${esc(w.vi)}">${artHTML(w.de)}</span>`).join("")}</div>
+    <div class="row"><button class="btn primary" id="vocgo">${done ? "Ôn lại các từ" : `Học ${V.list.length} từ`}</button>${done ? "" : `<button class="btn" id="vocskip">Bỏ qua, đọc luôn</button>`}</div></details>`;
+  $("#vocgo").onclick = () => vocDrill(c);
+  if ($("#vocskip")) $("#vocskip").onclick = () => { el.querySelector("details").open = false; };
+}
+async function genVoc(c) {
+  const st = $("#vocst"), btn = $("#vocgen"); if (btn) btn.disabled = true;
+  if (st) st.textContent = "Claude đang chọn từ vựng của bài…";
+  try {
+    const sample = await getSample(); if (!sample) throw { code: "not_granted" };
+    const text = R.blocks.length ? R.blocks.map(plain).join("\n") : "";
+    const arr = await sample.json(VOC_PROMPT(c, text ? await fit(text, sample, 4000) : ""), { modelTier: "default" });
+    if (!Array.isArray(arr)) throw new Error("Claude trả về sai định dạng");
+    const seen = new Set(), list = [];
+    for (const w of arr) {
+      if (!w || typeof w.de !== "string" || typeof w.vi !== "string" || !w.de.trim()) continue;
+      const k = lemmaOf(w.de).toLowerCase(); if (seen.has(k)) continue; seen.add(k);
+      list.push({ de: w.de.trim().slice(0, 80), pl: String(w.pl || "").slice(0, 80), vi: w.vi.trim().slice(0, 160), ex: String(w.ex || "").slice(0, 240), hard: !!w.hard });
+    }
+    if (list.length < 3) throw new Error("Ít từ quá, thử lại");
+    R.voc = { list: list.slice(0, 35), at: Date.now() };
+    if (DB) save("voc/" + c.id, R.voc);
+    if (R.id === c.id) { vocBox(c); glossify(); }
+  } catch (e) { if (st) st.textContent = aiErr(e); if (btn) btn.disabled = false; }
+}
+let TTS;
+const getTts = () => (TTS ||= window.claude?.use("tts").catch(() => null) ?? Promise.resolve(null));
+async function speakDe(text) { const t = await getTts(); if (t) t.speak(text, { language: "de" }).catch(() => {}); }
+async function vocDrill(c) {
+  const V = R.voc, t0 = Date.now(), tts = await getTts();
+  let queue = V.list.map((w, i) => i), first = new Set(), wrong = new Set(), i = 0, open = false;
+  const bg = sheet(`<div class="row" style="justify-content:space-between"><span class="eyebrow">Từ vựng · ${esc(c.t)}</span><span class="small muted num" id="vdn"></span></div><div class="bar"><i id="vdbar" style="width:0"></i></div><div id="vdc"></div>`);
+  const draw = () => {
+    const w = V.list[queue[i]];
+    $("#vdn", bg).textContent = `${V.list.length - queue.length + i}/${V.list.length}`;
+    $("#vdbar", bg).style.width = ((V.list.length - queue.length + i) / V.list.length * 100).toFixed(1) + "%";
+    $("#vdc", bg).innerHTML = `<div class="vcard"><div class="vde">${artHTML(w.de)}${tts ? ` <button class="ib" id="vsay" aria-label="Nghe phát âm">🔊</button>` : ""}</div>
+      ${w.pl ? `<div class="small muted">Pl. ${esc(w.pl)}</div>` : ""}
+      ${open ? `<div class="vvi">${esc(w.vi)}</div>${w.ex ? `<div class="vex">„${esc(w.ex)}“</div>` : ""}` : ""}</div>
+      ${open ? `<div class="row"><button class="btn" id="vno" style="flex:1">Chưa nhớ</button><button class="btn primary" id="vyes" style="flex:1">Nhớ rồi</button></div>`
+        : `<button class="btn primary" id="vshow" style="width:100%">Xem nghĩa</button>`}`;
+    if ($("#vsay", bg)) $("#vsay", bg).onclick = () => speakDe(w.de);
+    if (!open && tts && !first.has(queue[i])) { first.add(queue[i]); speakDe(w.de); }
+    if (!open) $("#vshow", bg).onclick = () => { open = true; draw(); };
+    else {
+      $("#vyes", bg).onclick = () => { open = false; i++; next(); };
+      $("#vno", bg).onclick = () => { wrong.add(queue[i]); queue.push(queue[i]); open = false; i++; next(); };
+    }
+  };
+  const next = () => { if (i < queue.length) return draw(); finish(); };
+  const finish = () => {
+    const now = Date.now(), list = S.cards[c.id] || [], have = new Set(list.filter((x) => x.t === "vocab").map((x) => (x.lemma || "").toLowerCase()));
+    const add = V.list.filter((w) => !have.has(lemmaOf(w.de).toLowerCase())).map((w, k) => ({
+      id: "v" + hkey(c.id + w.de), t: "vocab", lemma: lemmaOf(w.de), f: w.de, x: [w.vi, w.pl && `Pl. ${w.pl}`, w.ex && `„${w.ex}“`].filter(Boolean).join("\n"),
+      tags: ["Vokabel", c.fach], st: "on", at: now + k,
+      // đã học trong phiên: vào hàng ôn từ mai (từ "chưa nhớ" cũng vậy, SRS sẽ kéo lại nếu quên)
+      c: { ...newCard(now), state: "review", ivl: 1, reps: 1, last: now, due: now + DAY } }));
+    if (DB && add.length) getCards(c.id).then(() => putCards(c.id, [...S.cards[c.id], ...add]));
+    R.voc = { ...V, done: V.done || now }; if (DB) save("voc/" + c.id, R.voc);
+    const td = S.days[key(today0())] || {}; putDay({ amin: Math.round(((td.amin || 0) + (now - t0) / MIN) * 10) / 10 });
+    $("#vdc", bg).innerHTML = `<div class="done-box" style="margin:12px 0"><span class="burst pop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
+      <b>Xong ${V.list.length} từ${wrong.size ? ` · ${wrong.size} từ phải học lại` : ""}</b><span class="small muted">${add.length ? `Đã thêm ${add.length} thẻ từ vựng, ôn lại từ mai.` : ""}</span>
+      <button class="btn primary" id="vread">Bước 2: Đọc bài</button></div>`;
+    $("#vdbar", bg).style.width = "100%"; $("#vdn", bg).textContent = `${V.list.length}/${V.list.length}`;
+    $("#vread", bg).onclick = () => { bg.remove(); vocBox(c); glossify(); $("#doc")?.scrollIntoView({ block: "start" }); };
+  };
+  draw();
+}
+/* gạch chân các từ của Bước 1 trong bài; chạm 1 lần hiện nghĩa */
+function glossify() {
+  const doc = $("#doc"), V = R.voc; if (!doc || !V?.list?.length || doc.dataset.gl) return;
+  doc.dataset.gl = "1";
+  const map = new Map();
+  for (const w of V.list) {
+    const terms = [lemmaOf(w.de), lemmaOf(w.pl || "")];
+    // động từ nguyên mẫu (viết thường, đuôi -en/-ern/-eln): bắt cả dạng chia (zeigen → zeigt, zeigte)
+    if (/^[a-zäöüß]+(en|ern|eln)$/.test(terms[0])) terms.push(terms[0].replace(/(en|n)$/, ""));
+    for (const t of terms) if (t.length >= 4) map.set(t.toLowerCase(), w);
+  }
+  if (!map.size) return;
+  const alt = [...map.keys()].sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const re = new RegExp(`(^|[^\\p{L}])(${alt})(\\p{Ll}{0,3})(?!\\p{L})`, "giu");
+  for (const blk of doc.querySelectorAll(".blk")) {
+    const seen = new Set(), tw = document.createTreeWalker(blk, NodeFilter.SHOW_TEXT), nodes = [];
+    let n; while ((n = tw.nextNode())) if (!n.parentElement.closest(".gl, mark")) nodes.push(n);
+    for (const node of nodes) {
+      const s = node.data; let last = 0, m, frag = null; re.lastIndex = 0;
+      while ((m = re.exec(s))) {
+        const w = map.get(m[2].toLowerCase()); if (!w || seen.has(w)) continue; seen.add(w);
+        frag ||= document.createDocumentFragment();
+        const at = m.index + m[1].length; frag.append(s.slice(last, at));
+        const sp = document.createElement("span"); sp.className = "gl"; sp.dataset.de = w.de; sp.dataset.vi = w.vi; sp.textContent = m[2] + m[3]; frag.append(sp);
+        last = at + m[2].length + m[3].length;
+      }
+      if (frag) { frag.append(s.slice(last)); node.replaceWith(frag); }
+    }
+  }
+}
+function glossTip(el) {
+  $("#gtip")?.remove();
+  const tip = document.createElement("div"); tip.id = "gtip"; tip.innerHTML = `${artHTML(el.dataset.de)} — ${esc(el.dataset.vi)}`;
+  document.body.appendChild(tip);
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth;
+  tip.style.top = Math.min(innerHeight - tip.offsetHeight - 8, r.bottom + 6) + "px";
+  tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+  setTimeout(() => addEventListener("scroll", () => tip.remove(), { once: true, passive: true }), 50);
 }
 
 /* ---------- đánh dấu (highlight + ghi chú) ---------- */
