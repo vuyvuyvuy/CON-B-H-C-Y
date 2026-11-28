@@ -123,7 +123,8 @@ Artifact riêng **M2 Lernplan**: `artifact/m2-amboss.html`, publish tại https:
 Kho db riêng:
 - `cfg/plan` {start, rest, perDay, target?, kqTotal, cpc}; `days/<YYYYMMDD>` {min, kq, kmin, amin, rv, rvms, nv, nw, ch, tk, r0}
 - `kap/<id>` tiến độ chương (+ `nc`/`nd` số thẻ đang ôn/chờ duyệt); `txt/<id>-<k>` bài AMBOSS Vy dán; `easy/<id>` bài dễ hiểu; `mk/<id>` đánh dấu
-- `cards/<ch>` {ch, due, list} thẻ Anki theo chương (`_fall`, `_apkg-<n>` là ngăn chưa gắn chương); `dict/<từ>`; `chat/<id>`
+- `cards/<ch>` {ch, due, list} thẻ Anki theo chương (`<ch>~2` doc phụ khi đầy; `_d<Tag>` thẻ chung của Tag; `_fall`; `_apkg-<n>` ngoài lộ trình); `cimg/<ch>-<k>` hình thẻ (data URI); `dict/<từ>`; `chat/<id>`
+- Nhập Ankiphil: gắn Tag theo tag `$Lernpläne::100-Tage::NNN`, chọn chương trong Tag theo tên (xem `bestInDay`)
 
 Prompt: quy tắc soạn thẻ kiến thức ở `artifact/m2/prompts/the-kien-thuc.md` (nhúng lúc build); bài dễ hiểu `EASY_PROMPT` trong trang.
 SRS là bản chép SM-2 của Phòng Trực. Thẻ kiến thức/apkg chỉ vào hàng ôn khi chương "Đọc xong".
