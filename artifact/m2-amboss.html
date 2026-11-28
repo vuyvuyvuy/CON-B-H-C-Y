@@ -827,11 +827,14 @@ function finishChapter(c, next) {
     <span class="small muted">${Math.round(kap(c.id).ms / MIN)} phút đọc · còn ${CH.filter((x) => kap(x.id).st !== 2).length} chương</span>
     <div id="genbox" class="row" style="justify-content:center"></div>
     ${next ? `<a class="btn primary" href="${readHref(next.id)}">Chương sau: ${esc(next.t)}</a>` : ""}<a class="btn" href="#today">Về Hôm nay</a>`;
-  if (!kap(c.id).gen) runGen(c); else genBox(c);
+  if (!kap(c.id).gen && !NOCARD(c)) runGen(c); else genBox(c);
 }
 /* thẻ kiến thức của chương: soạn từ bài AMBOSS (hoặc bài dễ hiểu nếu chưa dán) */
+// bài giới thiệu (Handbuch, Kreuztipps): không soạn thẻ — câu ví dụ trong bài không phải kiến thức cần học
+const NOCARD = (c) => /^(Handbuch|Kreuztipps)/.test(c.t);
 function genBox(c) {
   const box = $("#genbox"); if (!box) return;
+  if (NOCARD(c)) { box.innerHTML = `<span class="small muted">Bài giới thiệu, không cần thẻ.</span>`; return; }
   const nd = kap(c.id).nd || 0;
   box.innerHTML = `${nd ? `<a class="btn primary" href="#duyet-${hashId(c.id)}">Duyệt ${nd} thẻ kiến thức</a>` : ""}<button class="btn" id="genmore">${kap(c.id).gen ? "Soạn thêm thẻ" : "Soạn thẻ kiến thức"}</button>`;
   $("#genmore").onclick = () => runGen(c);
@@ -842,7 +845,10 @@ async function runGen(c) {
   if (!src.length) { box.innerHTML = `<span class="small muted">Chương chưa có nội dung để soạn thẻ.</span>`; return; }
   box.innerHTML = `<span class="small muted">Claude đang soạn thẻ kiến thức (khoảng 1 phút)…</span>`;
   try {
-    const got = await genCards(c.id, { n: "10–20", v, src: numbered(src), task: `Soạn thẻ kiến thức cho cả chương từ nội dung dưới đây. Mỗi đoạn có số [§n]; ghi số đó vào "abschnitt".${v === "e" ? " Nội dung là bài giảng tiếng Việt: câu thẻ vẫn viết bằng tiếng Đức theo thuật ngữ AMBOSS." : ""}` });
+    // chương đã có thẻ Ankiphil: chỉ soạn ý quan trọng còn thiếu
+    const docs = [c.id, ...Object.keys(S.kap).filter((k) => k.startsWith(c.id + "~"))];
+    let nAnki = 0; for (const d of docs) nAnki += (await getCards(d)).filter((x) => x.t === "apkg").length;
+    const got = await genCards(c.id, { n: nAnki >= 10 ? "0–8 (chỉ ý quan trọng mà thẻ đã có chưa hỏi; đủ rồi thì trả mảng rỗng [])" : nAnki ? "5–15" : "10–20", v, src: numbered(src), task: `Soạn thẻ kiến thức cho cả chương từ nội dung dưới đây. Mỗi đoạn có số [§n]; ghi số đó vào "abschnitt".${v === "e" ? " Nội dung là bài giảng tiếng Việt: câu thẻ vẫn viết bằng tiếng Đức theo thuật ngữ AMBOSS." : ""}` });
     putKap(c.id, { gen: Date.now() });
     if (R.id === c.id) { genBox(c); toast(got.length ? `Claude soạn ${got.length} thẻ, chờ Vy duyệt` : "Không có thẻ mới"); }
   } catch (e) { if (R.id === c.id) { box.innerHTML = `<span class="small muted">${esc(aiErr(e))}</span>`; const b = document.createElement("button"); b.className = "btn"; b.textContent = "Thử lại"; b.onclick = () => runGen(c); box.append(b); } }
@@ -1325,8 +1331,9 @@ const plain = (html) => html.replace(/<figure[\s\S]*?<\/figure>/g, "").replace(/
 const numbered = (blocks) => blocks.map((h, i) => `[§${i}] ${plain(h)}`).join("\n");
 async function genCards(ch, { task, src, n, t = "wissen", v = "a", b = null }) {
   const sample = await getSample(); if (!sample) throw { code: "not_granted" };
-  const c = BY[ch], have = (await getCards(ch)).map((x) => x.f);
-  const prompt = `${RULES}\n\nYÊU CẦU\n${task}\nSố thẻ: ${n}.${c ? `\nKapitel: ${c.t} (${c.fach} › ${c.sub}, Tag ${c.tag})` : ""}${have.length ? `\n\nThẻ đã có (không soạn trùng ý):\n- ${have.slice(-80).join("\n- ")}` : ""}\n\nNỘI DUNG\n`;
+  const c = BY[ch], have = [];
+  for (const d of [ch, ...Object.keys(S.kap).filter((k) => k.startsWith(ch + "~"))]) for (const x of await getCards(d)) have.push(x.h ? plain(noImgs(x.f)) : x.f);
+  const prompt = `${RULES}\n\nYÊU CẦU\n${task}\nSố thẻ: ${n}.${c ? `\nKapitel: ${c.t} (${c.fach} › ${c.sub}, Tag ${c.tag})` : ""}${have.length ? `\n\nChương đã có ${have.length} thẻ (Ankiphil + đã soạn). KHÔNG soạn lại ý đã có, chỉ bổ sung ý quan trọng còn thiếu:\n- ${have.slice(-150).join("\n- ")}` : ""}\n\nNỘI DUNG\n`;
   const arr = await sample.json(prompt + await fit(src, sample, new TextEncoder().encode(prompt).length + 4000), { modelTier: "complex" });
   if (!Array.isArray(arr)) throw new Error("Claude trả về sai định dạng, thử lại");
   const out = [];
