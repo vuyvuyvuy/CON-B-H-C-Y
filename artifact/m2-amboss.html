@@ -213,6 +213,23 @@ article.doc { touch-action: manipulation; }
 #cform { display: flex; gap: 6px; align-items: end; }
 #cform textarea { flex: 1; min-width: 0; resize: none; }
 
+/* Cây bộ thẻ */
+.deckhead, details.deck > summary { display: grid; grid-template-columns: 1fr 56px 64px; gap: 8px; align-items: center; }
+.deckhead .kind { text-align: right; }
+details.deck > summary { list-style: none; cursor: pointer; padding: 8px 0; border-top: 1px solid var(--line); }
+details.deck > summary::-webkit-details-marker { display: none; }
+details.deck > summary .dl::before { content: "+"; display: inline-block; width: 1.2em; color: var(--muted); }
+details.deck[open] > summary .dl::before { content: "−"; }
+details.deck details.deck { padding-left: 16px; }
+.dl { min-width: 0; overflow-wrap: anywhere; }
+.dn, .dd { text-align: right; font-variant-numeric: tabular-nums; }
+.dn { color: var(--accent); } .dd { color: var(--ok); font-weight: 600; } .dd.z { color: var(--muted); font-weight: 400; }
+.lock { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+ol.clist { margin: 0 0 8px; padding-left: 2.2em; display: grid; gap: 8px; font-size: 14px; }
+ol.clist .cf { font-family: var(--font-read); overflow-wrap: anywhere; }
+ol.clist .cf img { max-width: 160px; display: block; margin: 4px 0; border-radius: 4px; }
+ol.clist .cz { color: var(--accent); font-weight: 600; }
+
 /* Tiến độ */
 .stats4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 @media (min-width: 640px) { .stats4 { grid-template-columns: repeat(4, 1fr); } }
@@ -1167,6 +1184,7 @@ function viewReview() {
     ${(() => { const L = lockedCount(); return L ? `<p class="note small">Đang có <b>${L}</b> thẻ chờ mở khoá: thẻ của chương nào sẽ vào hàng ôn khi Vy bấm "Đọc xong chương" ở chương đó (thẻ chung của Tag mở khi xong cả Tag).</p>` : ""; })()}
     <section class="card" id="rv"></section>
     ${drafts.length ? `<section class="card"><span class="eyebrow">Chờ duyệt</span><ul class="mlist">${drafts.map(([ch, k]) => `<li><a class="btn" style="display:block;text-align:left" href="#duyet-${hashId(ch)}">${esc(chName(ch))} · <b>${k.nd}</b> thẻ</a></li>`).join("")}</ul></section>` : ""}
+    <section class="card"><div class="deckhead"><span class="eyebrow">Bộ thẻ của Vy</span><span class="kind">Thẻ</span><span class="kind">Đến hạn</span></div><div id="decks"></div></section>
     <section class="card"><span class="eyebrow">Thêm thẻ</span>
       <div class="row"><button class="btn" id="addfall">Thẻ từ câu kreuzen làm sai</button>
       <label class="btn" for="apkgin" style="display:inline-grid;place-items:center">Nhập .apkg</label><input type="file" id="apkgin" accept=".apkg,.zip,.colpkg" hidden>
@@ -1176,6 +1194,7 @@ function viewReview() {
     </section>
   </div>`;
   showNextCard();
+  drawDecks();
   $("#addfall").onclick = fallSheet;
   $("#apkgin").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importApkg(f); };
   $("#apkgout").onclick = exportApkg;
@@ -1224,6 +1243,45 @@ function showNextCard() {
     const r = { 1: "again", 2: "hard", 3: "good", 4: "easy" }[e.key]; if (r && !$("#show")) rate(r);
   };
   addEventListener("keydown", revKeys);
+}
+
+/* ---------- cây bộ thẻ (giống Anki): Fach → Tag → chương, bấm chương để xem thẻ ---------- */
+const OPEN = new Set();   // nhánh đang mở, giữ qua các lần vẽ lại
+function drawDecks() {
+  const el = $("#decks"); if (!el) return;
+  const agg = {};
+  for (const [k, v] of Object.entries(S.kap)) { if (!v.nc && !v.nd) continue; const a = (agg[base(k)] ||= { n: 0, d: 0, docs: [] }); a.n += v.nc || 0; a.d += v.nd || 0; a.docs.push(k); }
+  const eod = addDays(today0(), 1).getTime();
+  const due = (b) => (agg[b]?.docs || []).reduce((s, doc) => s + (S.cards[doc] || []).filter((c) => c.st === "on" && unlocked(c, doc) && (c.c.state === "new" ? false : c.c.due <= eod)).length, 0);
+  const lockedB = (b) => (BY[b] ? kap(b).st !== 2 : /^_d\d+$/.test(b) ? !PLAN[+b.slice(2) - 1]?.ch.every((c) => kap(c.id).st === 2) : b.startsWith("_apkg") && !cfg().extra);
+  const row = (key, label, n, dd, inner, cls = "") => `<details class="deck ${cls}" data-k="${esc(key)}" ${OPEN.has(key) ? "open" : ""}><summary><span class="dl">${label}</span><span class="dn">${n}</span><span class="dd${dd ? "" : " z"}">${dd}</span></summary>${inner}</details>`;
+  const leaf = (b, label) => { const a = agg[b]; return row("c:" + b, `${esc(label)}${lockedB(b) ? ' <span class="lock">khoá</span>' : ""}${a.d ? ` <span class="lock">${a.d} chờ duyệt</span>` : ""}`, a.n, due(b), `<div class="cl" data-b="${esc(b)}">${OPEN.has("c:" + b) ? "" : ""}</div>`, "leaf"); };
+  const fachs = []; for (const d of PLAN) { const f = fachs.at(-1); if (f && f.fach === d.fach) f.days.push(d); else fachs.push({ fach: d.fach, days: [d] }); }
+  let html = "";
+  for (const f of fachs) {
+    let fn = 0, fd = 0, inner = "";
+    for (const d of f.days) {
+      const keys = [...d.ch.map((c) => c.id), "_d" + d.tag].filter((b) => agg[b]);
+      if (!keys.length) continue;
+      const tn = keys.reduce((s, b) => s + agg[b].n, 0), td = keys.reduce((s, b) => s + due(b), 0); fn += tn; fd += td;
+      inner += row("t:" + d.tag, `Tag ${d.tag} <span class="muted">${esc(d.sub)}</span>`, tn, td, keys.map((b) => leaf(b, BY[b] ? BY[b].t : "Thẻ chung của Tag")).join(""));
+    }
+    if (fn) html += row("f:" + f.fach, esc(f.fach), fn, fd, inner);
+  }
+  const other = Object.keys(agg).filter((b) => !BY[b] && !/^_d\d+$/.test(b));
+  const on = other.reduce((s, b) => s + agg[b].n, 0);
+  if (on) html += row("f:_", "Khác", on, other.reduce((s, b) => s + due(b), 0), other.map((b) => leaf(b, chName(b))).join(""));
+  el.innerHTML = html || `<p class="small muted">Chưa có thẻ nào.</p>`;
+  for (const dt of el.querySelectorAll("details.deck")) dt.ontoggle = () => { const k = dt.dataset.k; if (dt.open) OPEN.add(k); else OPEN.delete(k); if (dt.open && dt.classList.contains("leaf")) cardList(dt.querySelector(".cl"), agg[k.slice(2)].docs); };
+  for (const dt of el.querySelectorAll("details.deck.leaf[open]")) cardList(dt.querySelector(".cl"), agg[dt.dataset.k.slice(2)].docs);
+}
+async function cardList(el, docs) {
+  el.innerHTML = `<p class="small muted">Đang tải…</p>`;
+  const all = []; for (const d of docs) for (const c of await getCards(d)) all.push([d, c]);
+  const kind = { vocab: "Từ vựng", wissen: "Kiến thức", fall: "Tình huống", apkg: "Anki" };
+  const st = (c) => c.st !== "on" ? "chờ duyệt" : c.c.state === "new" ? "mới" : c.c.state === "review" ? `ôn lại sau ${fmtIvl(Math.max(0, c.c.due - Date.now()))}` : "đang học";
+  el.innerHTML = `<ol class="clist">${all.map(([, c]) => `<li><div class="cf">${cardHTML(c, true).replace(/<div class="cx">[\s\S]*$/, "")}</div><span class="small muted">${kind[c.t] || ""} · ${st(c)}</span></li>`).join("")}</ol>`;
+  fillImgs(el, docs[0]);
 }
 
 /* ---------- duyệt thẻ nháp (trang riêng hoặc tấm trượt) ---------- */
