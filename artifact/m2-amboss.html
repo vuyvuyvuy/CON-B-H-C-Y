@@ -173,7 +173,7 @@ body.focus .rhead { display: none; }
 
 /* Ôn thẻ */
 .chip { justify-self: start; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.cardface { font: 20px/1.6 var(--font-read); padding: 12px 4px; min-height: 120px; overflow-wrap: break-word; }
+.cardface { touch-action: manipulation; font: 20px/1.6 var(--font-read); padding: 12px 4px; min-height: 120px; overflow-wrap: break-word; }
 .cardface .cz { color: var(--accent); font-weight: 700; }
 .cardface .cx { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 16px; color: var(--muted); }
 .rate { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -299,7 +299,8 @@ function cfg() {
     perDay: c.perDay || 60,                       // phút học mỗi ngày: con số duy nhất quyết định nhịp
     target: c.target ? parseISO(c.target) : null, // hạn muốn xong (tuỳ chọn), chỉ để so sánh
     kqTotal: c.kqTotal ?? 50 * PLAN.length,       // giả định ~50 câu/Lerntage AMBOSS, sửa trong Cài đặt
-    cpc: c.cpc ?? 20,                             // thẻ Anki mỗi chương (10–20 kiến thức + vài thẻ từ vựng)
+    cpc: c.cpc ?? 20,
+    extra: !!c.extra,                             // ôn cả thẻ Anki ngoài lộ trình 100 ngày                             // thẻ Anki mỗi chương (10–20 kiến thức + vài thẻ từ vựng)
     set: !!S.cfg,
   };
 }
@@ -499,7 +500,7 @@ function viewToday() {
   for (const b of document.querySelectorAll(".mins button")) b.onclick = () => setMin(+b.dataset.m);
   $("#mcustom").onchange = (e) => { const v = Math.round(+e.target.value); if (v >= 15 && v <= 900) setMin(v); };
 }
-function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
+function putCfg(patch) { const c = cfg(); S.cfg = { start: iso(c.start), rest: c.rest, perDay: c.perDay, kqTotal: c.kqTotal, cpc: c.cpc, extra: c.extra, ...(c.target ? { target: iso(c.target) } : {}), ...patch }; save("cfg/plan", S.cfg); }
 function setMin(m) { putCfg({ perDay: m }); document.activeElement?.blur(); viewToday(); }
 
 /* ---------- Lộ trình ---------- */
@@ -749,15 +750,7 @@ function renderDoc(c, next) {
   });
   if ($("#finish")) $("#finish").onclick = () => finishChapter(c, next);
   if ($("#genbox")) genBox(c);
-  // chạm đúp (điện thoại) / nháy đúp (máy tính) vào một từ → tra nghĩa
-  let lastTap = 0, lx = 0, ly = 0;
-  doc.addEventListener("touchend", (e) => {
-    if (e.touches.length || e.changedTouches.length !== 1) return;
-    const t = e.changedTouches[0], now = Date.now();
-    if (now - lastTap < 320 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) { e.preventDefault(); lastTap = 0; lookupAt(t.clientX, t.clientY); }
-    else { lastTap = now; lx = t.clientX; ly = t.clientY; }
-  }, { passive: false });
-  doc.addEventListener("dblclick", (e) => lookupAt(e.clientX, e.clientY));
+  dblTap(doc, (x, y) => lookupAt(x, y));   // chạm đúp vào một từ → tra nghĩa
   if (k.st === 0) putKap(c.id, { st: 1 });
   // về đúng đoạn đang đọc dở
   // về đúng đoạn đang đọc dở, hoặc đoạn gốc của thẻ vừa bấm "mở đoạn gốc"
@@ -1085,8 +1078,16 @@ const fmtIvl = (ms) => ms < 60 * MIN ? `${Math.max(1, Math.round(ms / MIN))}′`
 const NEW_PER_DAY = { vocab: 10, other: 30 };
 const FAR = 9e15;
 const cid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const isCh = (ch) => !!BY[ch];
-const unlocked = (card, ch) => card.t === "vocab" || card.t === "fall" || !isCh(ch) || kap(ch).st === 2;
+const base = (ch) => ch.split("~")[0];   // "t1_3~2" = doc phụ của chương t1_3 khi chương có quá nhiều thẻ
+const isCh = (ch) => !!BY[base(ch)];
+function unlocked(card, ch) {
+  if (card.t === "vocab" || card.t === "fall") return true;
+  const b = base(ch);
+  if (BY[b]) return kap(b).st === 2;                                                     // thẻ của chương: sau khi đọc xong chương
+  if (/^_d\d+$/.test(b)) return PLAN[+b.slice(2) - 1]?.ch.every((c) => kap(c.id).st === 2);   // thẻ chung của Tag: khi xong cả Tag
+  if (b.startsWith("_apkg")) return !!cfg().extra;                                       // ngoài lộ trình: chỉ khi Vy bật
+  return true;
+}
 function putCards(ch, list) {
   S.cards[ch] = list;
   const on = list.filter((x) => x.st === "on");
@@ -1158,6 +1159,7 @@ function viewReview() {
       <div class="row"><button class="btn" id="addfall">Thẻ từ câu kreuzen làm sai</button>
       <label class="btn" for="apkgin" style="display:inline-grid;place-items:center">Nhập .apkg</label><input type="file" id="apkgin" accept=".apkg,.zip,.colpkg" hidden>
       <button class="btn" id="apkgout">Xuất .apkg</button></div>
+      ${(() => { const n = Object.entries(S.kap).filter(([k]) => k.startsWith("_apkg")).reduce((a, [, k]) => a + (k.nc || 0), 0); return n ? `<label class="row small"><input type="checkbox" id="extra" ${cfg().extra ? "checked" : ""}> Ôn cả ${n} thẻ Anki ngoài lộ trình 100 ngày</label>` : ""; })()}
       <p class="small muted" id="apkgst">${APKG_MSG ? esc(APKG_MSG) : `Thẻ từ vựng: chạm đúp vào một từ trong bài đọc. Thẻ kiến thức: Claude soạn khi Vy bấm "Đọc xong chương". Giới hạn ${NEW_PER_DAY.vocab} thẻ từ vựng mới và ${NEW_PER_DAY.other} thẻ kiến thức mới mỗi ngày.`}</p>
     </section>
   </div>`;
@@ -1165,8 +1167,9 @@ function viewReview() {
   $("#addfall").onclick = fallSheet;
   $("#apkgin").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importApkg(f); };
   $("#apkgout").onclick = exportApkg;
+  if ($("#extra")) $("#extra").onchange = (e) => { putCfg({ extra: e.target.checked }); viewReview(); };
 }
-const chName = (ch) => (BY[ch] ? `Tag ${BY[ch].tag} · ${BY[ch].t}` : ch === "_fall" ? "Thẻ tình huống chưa gắn chương" : "Thẻ nhập từ .apkg (chưa gắn chương)");
+const chName = (ch) => (BY[base(ch)] ? `Tag ${BY[base(ch)].tag} · ${BY[base(ch)].t}` : /^_d\d+/.test(ch) ? `Tag ${parseInt(ch.slice(2))} · thẻ chung của ngày` : ch === "_fall" ? "Thẻ tình huống chưa gắn chương" : "Thẻ Anki ngoài lộ trình");
 const hashId = (ch) => (ch === "_fall" ? "fall" : ch.replace("_", "-"));
 const unhash = (h) => (h === "fall" ? "_fall" : h.replace("-", "_"));
 let revKeys = null;
@@ -1179,16 +1182,18 @@ function showNextCard() {
     box.innerHTML = `<p class="muted">${later ? `Thẻ tiếp theo đến hạn sau ${fmtIvl(later[1].c.due - Date.now())}.` : "Hết thẻ cho hôm nay."}</p>`;
     return;
   }
-  const [ch, card] = nx, t0 = Date.now(), c = BY[ch];
+  const [ch, card] = nx, t0 = Date.now(), c = BY[base(ch)];
   const kind = { vocab: "Từ vựng", wissen: "Kiến thức", fall: "Tình huống", apkg: "Anki" }[card.t];
   box.innerHTML = `<div class="row small muted" style="justify-content:space-between"><span class="kind">${kind}</span><span>${esc(c ? `Tag ${c.tag} · ${c.t}` : chName(ch))}</span></div>
     <div class="cardface" id="cface">${cardHTML(card, false)}</div>
-    <div id="cbtns"><button class="btn primary" id="show" style="width:100%">Xem đáp án</button></div>`;
+    <div id="cbtns"><button class="btn primary" id="show" style="width:100%">Xem đáp án</button></div>
+    <p class="small muted" style="margin:0">Chạm đúp vào từ bất kỳ trên thẻ để xem nghĩa.</p>`;
+  dblTap($("#cface"), (x, y) => lookupAt(x, y, { ch, v: card.v || "a" }));
   const reveal = () => {
-    $("#cface").innerHTML = cardHTML(card, true) + (c && card.b != null ? `<p><a href="${readHref(ch)}" id="jump" class="small">Mở đoạn gốc trong bài</a></p>` : "");
+    $("#cface").innerHTML = cardHTML(card, true) + (c && card.b != null ? `<p><a href="${readHref(c.id)}" id="jump" class="small">Mở đoạn gốc trong bài</a></p>` : "");
     const now = Date.now();
     $("#cbtns").innerHTML = `<div class="rate">${[["again", "Lại"], ["hard", "Khó"], ["good", "Được"], ["easy", "Dễ"]].map(([r, l], i) => `<button class="btn" data-r="${r}"><b>${l}</b><span class="small muted">${fmtIvl(schedule(card.c, r, now).due - now)}</span></button>`).join("")}</div>`;
-    if ($("#jump")) $("#jump").onclick = () => { JUMP = { ch, b: card.b, v: card.v || "a" }; };
+    if ($("#jump")) $("#jump").onclick = () => { JUMP = { ch: c.id, b: card.b, v: card.v || "a" }; };
     for (const b of document.querySelectorAll("#cbtns [data-r]")) b.onclick = () => rate(b.dataset.r);
   };
   const rate = (r) => {
@@ -1296,7 +1301,7 @@ function wordAt(x, y) {
   let a = off, b = off; while (a > 0 && isL(t[a - 1])) a--; while (b < t.length && isL(t[b])) b++;
   while (t[a] === "-") a++; while (b > a && t[b - 1] === "-") b--;
   const w = t.slice(a, b); if (w.length < 2) return null;
-  const blk = node.parentElement.closest(".blk"); if (!blk) return null;
+  const blk = node.parentElement.closest(".blk, .cardface"); if (!blk) return null;
   return { w, blk, bo: textOffset(blk, node, a) };
 }
 function sentenceAt(text, i, w) {
@@ -1306,11 +1311,23 @@ function sentenceAt(text, i, w) {
   return { s: text.slice(a, z).trim(), off: i - a - (text.slice(a, z).length - text.slice(a, z).trimStart().length) };
 }
 let lastLookup = 0;
-async function lookupAt(x, y) {
+/* chạm đúp (điện thoại) / nháy đúp (máy tính) → fn(x, y); dùng cho bài đọc và mặt thẻ khi ôn */
+function dblTap(el, fn) {
+  let lastTap = 0, lx = 0, ly = 0;
+  el.addEventListener("touchend", (e) => {
+    if (e.touches.length || e.changedTouches.length !== 1) return;
+    const t = e.changedTouches[0], now = Date.now();
+    if (now - lastTap < 320 && Math.hypot(t.clientX - lx, t.clientY - ly) < 30) { e.preventDefault(); lastTap = 0; fn(t.clientX, t.clientY); }
+    else { lastTap = now; lx = t.clientX; ly = t.clientY; }
+  }, { passive: false });
+  el.addEventListener("dblclick", (e) => fn(e.clientX, e.clientY));
+}
+/* ctx: {ch, v} chương và bản (AMBOSS/dễ hiểu) chứa từ; thẻ từ vựng tạo ra được gắn vào chương đó */
+async function lookupAt(x, y, ctx = { ch: R.id, v: R.view }) {
   if (Date.now() - lastLookup < 500) return; lastLookup = Date.now();
   const hit = wordAt(x, y); if (!hit) return;
   getSelection().removeAllRanges(); $("#seltb")?.remove();
-  const c = BY[R.id], { w, blk, bo } = hit, { s: sent, off } = sentenceAt(blk.textContent, bo, w);
+  const c = { id: ctx.ch, fach: BY[base(ctx.ch)]?.fach }, { w, blk, bo } = hit, { s: sent, off } = sentenceAt(blk.textContent, bo, w);
   const hl = esc(sent.slice(0, off)) + `<mark class="hl c-again">${esc(sent.slice(off, off + w.length))}</mark>` + esc(sent.slice(off + w.length));
   const bg = sheet(`<div class="row" style="align-items:baseline"><b style="font-size:22px;font-family:var(--font-read)" id="wdw">${esc(w)}</b><span class="muted" id="wdg"></span></div>
     <p id="wdvn">Đang tra…</p><p class="small" id="wdex"></p>
@@ -1342,7 +1359,7 @@ Trả về chỉ một JSON: {"lemma": "dạng từ điển", "art": "der|die|da
   const add = $("#wdadd", bg); add.disabled = dup || !DB; if (dup) add.textContent = "Đã có trong Anki";
   add.onclick = () => {
     const f = sent.slice(0, off) + `{{c1::${sent.slice(off, off + w.length)}}}` + sent.slice(off + w.length);
-    putCards(c.id, [...S.cards[c.id], { id: cid(), t: "vocab", lemma: info.lemma, f, x: `${info.art ? info.art + " " : ""}${info.lemma}${info.pl ? `, Pl. ${info.pl}` : ""} — ${info.vn}`, b: +blk.dataset.b, v: R.view, tags: ["Vokabel", c.fach], st: "on", c: newCard(), at: Date.now() }]);
+    putCards(c.id, [...S.cards[c.id], { id: cid(), t: "vocab", lemma: info.lemma, f, x: `${info.art ? info.art + " " : ""}${info.lemma}${info.pl ? `, Pl. ${info.pl}` : ""} — ${info.vn}`, b: blk.dataset.b != null ? +blk.dataset.b : null, v: ctx.v, tags: ["Vokabel", c.fach].filter(Boolean), st: "on", c: newCard(), at: Date.now() }]);
     add.disabled = true; add.textContent = "Đã thêm"; toast("Đã thêm thẻ từ vựng");
   };
 }
@@ -1412,7 +1429,8 @@ async function libs(...names) { for (const n of names) if (!window[GLOB[n]]) awa
 const cleanHtml = (h) => { const d = new DOMParser().parseFromString(String(h).replace(/<img[^>]*>/gi, " [hình] ").replace(/\[sound:[^\]]*\]/g, ""), "text/html"); return clean(d.body, document.createElement("div")).innerHTML.trim(); };
 async function readApkg(file) {
   await libs("fflate", "sql");
-  const files = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
+  // chỉ giải nén phần bộ thẻ, bỏ qua thư mục hình (bộ 200MB phần lớn là hình)
+  const files = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()), { filter: (f) => f.name.startsWith("collection") });
   let raw = files["collection.anki21b"];
   if (raw) { await libs("fzstd"); raw = fzstd.decompress(raw); } else raw = files["collection.anki21"] || files["collection.anki2"];
   if (!raw) throw new Error("Không thấy bộ thẻ trong file");
@@ -1427,7 +1445,31 @@ async function readApkg(file) {
   } finally { db.close(); }
 }
 let TITLES = null;
+/* Ankiphil gắn tag "$Lernpläne::100-Tage::074" = Lerntag 74 của đúng lộ trình này → chọn chương trong Tag đó.
+   Không khớp chương nào thì vào "_d74" (thẻ chung của Tag 74, mở khi đọc xong cả Tag).
+   Thẻ Ankiphil không thuộc lộ trình 100 ngày → null (ngăn "ngoài lộ trình"). Bộ thẻ khác: đoán theo tên chương. */
+const STOP = new Set("und der die das des den dem bei mit von zur zum ein eine einer im in am auf fur oder sowie".split(" "));
+function bestInDay(day, n) {
+  const meta = " " + norm(n.tags.map((t) => t.split("::").slice(1).join(" ").replace(/_/g, " ")).join(" ")) + " ", body = " " + norm(n.f + " " + n.x) + " ";
+  const leaves = " " + n.tags.map((t) => norm(t.split("::").pop().replace(/_/g, " "))).join("  ") + " ";
+  let best = null, bs = 0;
+  const fachW = new Set(norm(PLAN[day - 1].sub + " " + PLAN[day - 1].fach).split(" "));   // tên Fach của ngày: chương nào cũng có, không phân biệt được
+  for (const c of PLAN[day - 1].ch) {
+    const t = norm(c.t).split(" ").filter((w) => w.length >= 3 && !STOP.has(w) && !fachW.has(w)); if (!t.length) continue;
+    let sc = 0; for (const w of t) sc += meta.includes(" " + w) ? 2 : body.includes(" " + w) ? 1 : 0;
+    sc /= t.length;
+    // tên chương có nguyên văn trong tag: ưu tiên; khớp đoạn cuối của tag (cụ thể nhất) thắng khớp đoạn giữa (Vorhofflimmern > Herzrhythmusstörungen),
+    // tên dài hơn thắng tên ngắn (β2-Sympathomimetika > Sympathomimetika)
+    const ph = norm(c.t); if (leaves.includes(" " + ph + " ")) sc += 3 + ph.length / 100; else if (meta.includes(" " + ph + " ")) sc += 1 + ph.length / 100;
+    if (sc > bs) { bs = sc; best = c.id; }
+  }
+  return bs >= 0.5 ? best : null;
+}
 function mapChapter(n) {
+  const tg = n.tags.join(" ");
+  const days = [...tg.matchAll(/100-Tage::0*(\d+)/g)].map((m) => +m[1]).filter((d) => d >= 1 && d <= PLAN.length);
+  if (days.length) { const day = Math.min(...days); return bestInDay(day, n) || "_d" + day; }
+  if (/Lernpläne|Ankiphil/i.test(tg)) return null;
   TITLES ||= CH.map((c) => ({ id: c.id, n: " " + norm(c.t) + " " })).filter((x) => x.n.trim().length >= 4).sort((a, b) => b.n.length - a.n.length);
   const meta = " " + norm(n.tags.join(" ").replace(/::|_/g, " ") + " " + n.deck.replace(/::/g, " ")) + " ";
   for (const t of TITLES) if (meta.includes(t.n)) return t.id;
@@ -1446,28 +1488,41 @@ async function importApkg(file) {
     for (const b of buckets) await getCards(b);
     const seen = new Set(buckets.flatMap((b) => S.cards[b].map((x) => x.id)));
     let added = 0, mapped = 0, dupes = 0, done = 0;
-    const toCard = (n) => ({ id: "a" + n.nid, t: "apkg", h: 1, f: n.f, x: n.x, tags: n.tags.slice(0, 8), st: "on", c: newCard(now), at: now });
+    // thẻ Anki dài (nhiều HTML): cắt bớt phần quá dài, chia doc theo dung lượng thật (doc ≤256KB, giữ ≤200KB)
+    const cap = (h) => (h.length > 5000 ? esc(plain(h).slice(0, 3000)) + " …" : h);
+    const toCard = (n) => ({ id: "a" + n.nid, t: "apkg", h: 1, f: cap(n.f), x: cap(n.x), tags: n.tags.slice(0, 8), st: "on", c: newCard(now), at: now });
+    const enc = new TextEncoder(), sz = (o) => enc.encode(JSON.stringify(o)).length, LIM = 200e3;
+    const write = async (ch, list) => {
+      const on = list.filter((x) => x.st === "on");
+      await DB.doc("cards/" + ch).set({ ch, due: on.length ? Math.min(...on.map((x) => x.c.due)) : FAR, list });
+      S.cards[ch] = list; S.dueChs.add(ch); putKap(ch, { nc: on.length, nd: list.length - on.length });
+    };
     for (const [ch, ns] of Object.entries(groups)) {
       if (ch === "_apkg") continue;
-      const list = [...await getCards(ch)], ids = new Set(list.map((x) => x.id));
+      // chương + các doc phụ ch~2, ch~3… đã có từ lần nhập trước
+      const docs = [ch, ...Object.keys(S.kap).filter((k) => k.startsWith(ch + "~")).sort((a, b) => +a.split("~")[1] - +b.split("~")[1])];
+      const lists = []; for (const d of docs) lists.push([...await getCards(d)]);
+      const ids = new Set(lists.flat().map((x) => x.id)), mine = lists.flat().filter((x) => x.t !== "apkg");
+      let di = docs.length - 1, list = lists[di], size = sz(list); const dirty = new Set();
       for (const n of ns) {
-        if (ids.has("a" + n.nid) || seen.has("a" + n.nid) || list.some((x) => similar(x.f, n.f))) { dupes++; continue; }
-        // shortcut: một chương giữ tối đa 350 thẻ (doc ≤256KB); phần dư sang ngăn chưa gắn chương
-        if (list.length >= 350) { (groups._apkg ||= []).push(n); continue; }
-        list.push(toCard(n)); ids.add("a" + n.nid); added++; mapped++;
+        if (ids.has("a" + n.nid) || seen.has("a" + n.nid) || mine.some((x) => similar(x.f, n.f))) { dupes++; continue; }   // chỉ bỏ thẻ trùng ý với thẻ Claude/Vy soạn
+        const card = toCard(n), cs = sz(card) + 1;
+        if (size + cs > LIM) { di++; docs[di] ||= `${ch}~${di + 1}`; lists[di] ||= []; list = lists[di]; size = sz(list); }   // doc đầy: sang doc phụ của cùng chương
+        list.push(card); dirty.add(di); ids.add(card.id); size += cs; added++; mapped++;
       }
-      await DB.doc("cards/" + ch).set({ ch, due: Math.min(FAR, ...list.filter((x) => x.st === "on").map((x) => x.c.due)), list });
-      S.cards[ch] = list; S.dueChs.add(ch); putKap(ch, { nc: list.filter((x) => x.st === "on").length, nd: list.filter((x) => x.st !== "on").length });
+      for (const d of dirty) await write(docs[d], lists[d]);
       apkgSay(st, `Đang ghi… ${++done} chương`);
     }
-    let k = buckets.length ? +buckets.at(-1).slice(6) : 0, cur = k ? [...S.cards["_apkg-" + k]] : [];
+    let k = buckets.length ? +buckets.at(-1).slice(6) : 0, cur = k ? [...S.cards["_apkg-" + k]] : [], size = sz(cur);
     for (const n of groups._apkg || []) {
       if (seen.has("a" + n.nid)) { dupes++; continue; }
-      if (!k || cur.length >= 300) { if (k) putCards("_apkg-" + k, cur); k++; cur = []; }
-      cur.push(toCard(n)); seen.add("a" + n.nid); added++;
+      const card = toCard(n), cs = sz(card) + 1;
+      if (!k || size + cs > LIM) { if (k && cur.length) { await write("_apkg-" + k, cur); apkgSay(st, `Đang ghi… ngăn ${k}`); } k++; cur = []; size = 2; }
+      cur.push(card); seen.add(card.id); size += cs; added++;
     }
-    if (cur.length) putCards("_apkg-" + k, cur);
-    apkgSay(st, `Đã nhập ${added} thẻ: ${mapped} gắn vào chương (chỉ ôn sau khi đọc xong chương đó), ${added - mapped} chưa gắn chương; bỏ ${dupes} thẻ trùng. Hình trong thẻ được thay bằng [hình].`);
+    if (cur.length) await write("_apkg-" + k, cur);
+    if (location.hash === "#on") viewReview();
+    apkgSay(st, `Đã nhập ${added} thẻ: ${mapped} theo lộ trình (mở khi Vy đọc xong chương/Tag đó), ${added - mapped} ngoài lộ trình (bật ô bên dưới nếu muốn ôn); bỏ ${dupes} thẻ trùng. Hình trong thẻ được thay bằng [hình].`);
   } catch (e) { apkgSay(st, "Chưa nhập được: " + (e.message || e)); }
 }
 async function sha1int(s) { const h = new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(s))); return ((h[0] << 24) | (h[1] << 16) | (h[2] << 8) | h[3]) >>> 0; }
@@ -1481,15 +1536,15 @@ async function buildApkg(cards) {
     CREATE TABLE graves (usn integer not null, oid integer not null, type integer not null);`);
   const fld = (name, ord) => ({ name, ord, sticky: false, rtl: false, font: "Arial", size: 20, media: [] });
   const css = ".card{font-family:Arial;font-size:20px;text-align:center}.cloze{font-weight:bold;color:#3550c8}";
-  const base = { mod: Math.floor(now / 1000), usn: -1, sortf: 0, did: 1, tags: [], vers: [], latexPre: "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n\\begin{document}\n", latexPost: "\\end{document}", css };
+  const mbase = { mod: Math.floor(now / 1000), usn: -1, sortf: 0, did: 1, tags: [], vers: [], latexPre: "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n\\usepackage[utf8]{inputenc}\n\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n\\setlength{\\parindent}{0in}\n\\begin{document}\n", latexPost: "\\end{document}", css };
   const MC = 1700000000001, MB = 1700000000002;
   const models = {
-    [MC]: { ...base, id: MC, name: "M2 Cloze", type: 1, flds: [fld("Text", 0), fld("Extra", 1)], req: [[0, "any", [0]]], tmpls: [{ name: "Cloze", ord: 0, qfmt: "{{cloze:Text}}", afmt: "{{cloze:Text}}<br>{{Extra}}", did: null, bqfmt: "", bafmt: "" }] },
-    [MB]: { ...base, id: MB, name: "M2 Basic", type: 0, flds: [fld("Front", 0), fld("Back", 1)], req: [[0, "all", [0]]], tmpls: [{ name: "Card 1", ord: 0, qfmt: "{{Front}}", afmt: "{{FrontSide}}<hr id=answer>{{Back}}", did: null, bqfmt: "", bafmt: "" }] },
+    [MC]: { ...mbase, id: MC, name: "M2 Cloze", type: 1, flds: [fld("Text", 0), fld("Extra", 1)], req: [[0, "any", [0]]], tmpls: [{ name: "Cloze", ord: 0, qfmt: "{{cloze:Text}}", afmt: "{{cloze:Text}}<br>{{Extra}}", did: null, bqfmt: "", bafmt: "" }] },
+    [MB]: { ...mbase, id: MB, name: "M2 Basic", type: 0, flds: [fld("Front", 0), fld("Back", 1)], req: [[0, "all", [0]]], tmpls: [{ name: "Card 1", ord: 0, qfmt: "{{Front}}", afmt: "{{FrontSide}}<hr id=answer>{{Back}}", did: null, bqfmt: "", bafmt: "" }] },
   };
   const deck = (id, name) => ({ id, name, mod: Math.floor(now / 1000), usn: -1, lrnToday: [0, 0], revToday: [0, 0], newToday: [0, 0], timeToday: [0, 0], collapsed: false, desc: "", dyn: 0, conf: 1, extendNew: 10, extendRev: 50 });
   const decks = { 1: deck(1, "Default") }, did = {};
-  const deckOf = (ch) => { const c = BY[ch]; const parts = ["M2 AMBOSS", c ? c.fach : "Khác", c ? `Tag ${pad(c.tag)}` : null].filter(Boolean);
+  const deckOf = (ch) => { const c = BY[base(ch)]; const parts = ["M2 AMBOSS", c ? c.fach : "Khác", c ? `Tag ${pad(c.tag)}` : null].filter(Boolean);
     let name = ""; for (const p of parts) { name = name ? name + "::" + p : p; if (!did[name]) { did[name] = 1700000001000 + Object.keys(did).length; decks[did[name]] = deck(did[name], name); } } return did[name]; };
   const dconf = { 1: { id: 1, name: "Default", mod: 0, usn: 0, maxTaken: 60, autoplay: true, timer: 0, replayq: true, dyn: false, new: { delays: [1, 10], ints: [1, 4, 7], initialFactor: 2500, order: 1, perDay: 20, bury: false }, lapse: { delays: [10], mult: 0, minInt: 1, leechFails: 8, leechAction: 0 }, rev: { perDay: 200, ease4: 1.3, ivlFct: 1, maxIvl: 36500, bury: false, hardFactor: 1.2 } } };
   const conf = { nextPos: cards.length + 1, estTimes: true, activeDecks: [1], sortType: "noteFld", timeLim: 0, sortBackwards: false, addToCur: true, curDeck: 1, newBury: true, newSpread: 0, dueCounts: true, curModel: MC, collapseTime: 1200 };
